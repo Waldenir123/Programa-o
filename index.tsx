@@ -108,35 +108,48 @@ const aiDeletionAgent = (
     idToDelete: string,
     type: 'group' | 'task' | 'activity'
 ): ScheduleData => {
-    // Exclusão de Grupo
+    // Caso 1: Excluir um grupo inteiro. Simples e direto.
     if (type === 'group') {
-        return data.filter(group => group.id !== idToDelete);
+        return data.filter(g => g.id !== idToDelete);
     }
 
-    // Exclusão de Tarefa ou Atividade
-    const updatedGroups = data.map(group => {
-        if (type === 'task') {
-            const filteredTasks = group.tarefas.filter(task => task.id !== idToDelete);
-            return { ...group, tarefas: filteredTasks };
+    // Para itens aninhados, mapeamos e criamos novos objetos apenas no caminho da alteração
+    const newData = data.map(group => {
+        const isTaskInGroup = type === 'task' && group.tarefas.some(t => t.id === idToDelete);
+        const isActivityInGroup = type === 'activity' && group.tarefas.some(t => t.activities.some(a => a.id === idToDelete));
+
+        // Se o item a ser excluído não está neste grupo, retorna o objeto do grupo original para otimização
+        if (!isTaskInGroup && !isActivityInGroup) {
+            return group;
         }
 
-        if (type === 'activity') {
-            const updatedTasks = group.tarefas
-                .map(task => {
-                    const filteredActivities = task.activities.filter(activity => activity.id !== idToDelete);
-                    return { ...task, activities: filteredActivities };
-                })
-                // Remove tarefas sem atividades
-                .filter(task => task.activities.length > 0);
-
-            return { ...group, tarefas: updatedTasks };
+        let newTarefas;
+        if (isTaskInGroup) {
+            // Caso 2: Excluir uma tarefa principal
+            newTarefas = group.tarefas.filter(t => t.id !== idToDelete);
+        } else { // isActivityInGroup é verdadeiro
+            // Caso 3: Excluir uma atividade
+            newTarefas = group.tarefas.map(task => {
+                const isActivityInTask = task.activities.some(a => a.id === idToDelete);
+                // Se a atividade não está nesta tarefa, retorna o objeto da tarefa original
+                if (!isActivityInTask) {
+                    return task;
+                }
+                const newActivities = task.activities.filter(a => a.id !== idToDelete);
+                // Retorna um novo objeto de tarefa com a lista de atividades atualizada
+                return { ...task, activities: newActivities };
+            })
+            // Limpa as tarefas que podem ter ficado vazias após a remoção da atividade
+            .filter(t => t.activities.length > 0);
         }
 
-        return group;
-    });
+        // Retorna um novo objeto de grupo com a lista de tarefas atualizada
+        return { ...group, tarefas: newTarefas };
+    })
+    // Limpa os grupos que podem ter ficado vazios após a remoção da tarefa
+    .filter(g => g.tarefas.length > 0);
 
-    // Remove grupos sem tarefas
-    return updatedGroups.filter(group => group.tarefas.length > 0);
+    return newData;
 };
 
 
@@ -1493,7 +1506,7 @@ const ScheduleBody = ({
     // Optional props for full interactivity
     activeCell, onCellMouseDown, onCellMouseEnter, interaction,
     onTextUpdate, onAddItem, 
-    draggedGroupInfo, onGroupDragStart, onGroupDragOver, onGroupDrop, onDragEnd, onDropTargetChange, dropTargetIndex
+    draggedGroupInfo, onGroupDragStart, onGroupDrop, onDragEnd, onDropTargetChange, dropTargetId
 }: { 
     data: ScheduleData;
     dates: Date[];
@@ -1511,11 +1524,10 @@ const ScheduleBody = ({
     onAddItem?: (type: 'group' | 'task' | 'activity', parentId?: string) => void;
     draggedGroupInfo?: { group: Grupo, index: number } | null;
     onGroupDragStart?: (group: Grupo, index: number) => void;
-    onGroupDragOver?: (e: React.DragEvent, targetIndex: number) => void;
     onGroupDrop?: () => void;
     onDragEnd?: () => void;
-    onDropTargetChange?: (index: number | null) => void;
-    dropTargetIndex?: number | null;
+    onDropTargetChange?: (id: string | null) => void;
+    dropTargetId?: string | null;
 }) => {
     const renderableRows: RenderableRow[] = useMemo(() => {
         const rows: RenderableRow[] = [];
@@ -1592,30 +1604,10 @@ const ScheduleBody = ({
     };
 
     return (
-        <tbody>
+        <tbody onDragLeave={() => onDropTargetChange?.(null)}>
             {renderableRows.map((row, rowIndex) => {
                 const isDraggingGroup = draggedGroupInfo?.group.id === row.group.id;
-                
-                const dropIndicatorClass = () => {
-                    if (isComparison || !draggedGroupInfo || dropTargetIndex === null || dropTargetIndex === draggedGroupInfo.index) return '';
-                    
-                    let flatRowIndex = 0;
-                    for (let i = 0; i < data.length; i++) {
-                        const g = data[i];
-                        if (g.id === row.group.id) {
-                           if(rowIndex === flatRowIndex) {
-                               if(i === dropTargetIndex) return 'drop-target-top';
-                               if(i === dropTargetIndex - 1) return 'drop-target-bottom';
-                           }
-                        }
-                         flatRowIndex += g.tarefas.reduce((acc, t) => acc + (t.activities.length || 1), 0);
-                    }
-                    if(dropTargetIndex === data.length && data[data.length-1].id === row.group.id) {
-                         return 'drop-target-bottom';
-                    }
-
-                    return '';
-                };
+                const isDropTarget = !isComparison && draggedGroupInfo && dropTargetId === row.group.id && draggedGroupInfo.group.id !== row.group.id;
                 
                 const rowEntity = getRowEntity(row);
                 const isSelected = !isComparison && selectedItem?.id === rowEntity.id;
@@ -1624,7 +1616,7 @@ const ScheduleBody = ({
                     isComparison ? (planType === 'planned' ? 'planned-row' : 'real-row') : '',
                     isDraggingGroup ? 'group-dragging' : '',
                     isSelected ? 'selected-row' : '',
-                    dropIndicatorClass()
+                    isDropTarget ? 'drop-target-top' : ''
                 ].join(' ').trim();
 
                 return (
@@ -1632,9 +1624,13 @@ const ScheduleBody = ({
                         key={row.activity.id + (planType || '')} 
                         className={trClass}
                         onClick={() => !isComparison && setSelectedItem?.(isSelected ? null : rowEntity)}
-                        onDragOver={(e) => onGroupDragOver?.(e, data.findIndex(g => g.id === row.group.id))}
+                        onDragOver={(e) => {
+                            e.preventDefault();
+                            if (!isComparison && onDropTargetChange) {
+                                onDropTargetChange(row.group.id);
+                            }
+                        }}
                         onDrop={onGroupDrop}
-                        onDragLeave={() => onDropTargetChange?.(null)}
                         onDragEnd={onDragEnd}
                     >
                         <td className="col-sticky col-sticky-1 id-cell" style={{ left: stickyColumnPositions[0] }}>
@@ -1750,7 +1746,14 @@ const ScheduleBody = ({
                 )
             })}
              {!isComparison && onAddItem && (
-                <tr>
+                <tr 
+                    className={`add-group-row ${!isComparison && draggedGroupInfo && dropTargetId === null ? 'drop-target-end' : ''}`}
+                    onDragOver={(e) => {
+                        e.preventDefault();
+                        if (onDropTargetChange) onDropTargetChange(null);
+                    }}
+                    onDrop={onGroupDrop}
+                >
                     <td colSpan={6} className="add-group-cell">
                         <button className="add-group-button" onClick={() => onAddItem('group')}>
                             <span className="material-icons" aria-hidden="true">add</span> Adicionar Novo Grupo
@@ -1925,7 +1928,7 @@ const App = () => {
   const [selectedItem, setSelectedItem] = useState<SelectedItem | null>(null);
   
   const [draggedGroupInfo, setDraggedGroupInfo] = useState<{ group: Grupo, index: number } | null>(null);
-  const [dropTargetIndex, setDropTargetIndex] = useState<number | null>(null);
+  const [dropTargetId, setDropTargetId] = useState<string | null>(null);
 
   const [columnWidths, setColumnWidths] = useState<number[]>([50, 120, 130, 130, 280, 250, 80].concat(Array(28).fill(35)));
   const [dateColumnWidth, setDateColumnWidth] = useState(35);
@@ -2336,31 +2339,27 @@ const App = () => {
   const handleGroupDragStart = useCallback((group: Grupo, index: number) => {
       setDraggedGroupInfo({ group, index });
   }, []);
-
-  const handleGroupDragOver = useCallback((e: React.DragEvent, targetIndex: number) => {
-    e.preventDefault();
-    if (draggedGroupInfo && targetIndex !== dropTargetIndex) {
-        setDropTargetIndex(targetIndex);
-    }
-  }, [draggedGroupInfo, dropTargetIndex]);
   
   const handleGroupDrop = useCallback(() => {
-    if (draggedGroupInfo === null || dropTargetIndex === null || draggedGroupInfo.index === dropTargetIndex) {
-        handleDragEnd();
-        return;
+    if (draggedGroupInfo === null || dropTargetId === undefined) {
+      handleDragEnd();
+      return;
+    }
+    if (draggedGroupInfo.group.id === dropTargetId) {
+      handleDragEnd();
+      return;
     }
     
     const fromId = draggedGroupInfo.group.id;
-    const toGroup = filteredData[dropTargetIndex];
-    const toId = toGroup ? toGroup.id : null;
+    const toId = dropTargetId; // Can be a group ID or null for the end
 
     dispatch({ type: 'MOVE_GROUP', payload: { fromId, toId } });
     handleDragEnd();
-  }, [draggedGroupInfo, dropTargetIndex, filteredData]);
+  }, [draggedGroupInfo, dropTargetId]);
   
   const handleDragEnd = useCallback(() => {
       setDraggedGroupInfo(null);
-      setDropTargetIndex(null);
+      setDropTargetId(null);
   }, []);
 
   useEffect(() => {
@@ -2534,11 +2533,10 @@ const App = () => {
                                 stickyColumnPositions={stickyColumnPositions}
                                 draggedGroupInfo={draggedGroupInfo}
                                 onGroupDragStart={handleGroupDragStart}
-                                onGroupDragOver={handleGroupDragOver}
                                 onGroupDrop={handleGroupDrop}
                                 onDragEnd={handleDragEnd}
-                                onDropTargetChange={setDropTargetIndex}
-                                dropTargetIndex={dropTargetIndex}
+                                onDropTargetChange={setDropTargetId}
+                                dropTargetId={dropTargetId}
                                 selectedItem={selectedItem}
                                 setSelectedItem={setSelectedItem}
                              />

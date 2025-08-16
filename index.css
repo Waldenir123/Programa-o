@@ -784,8 +784,7 @@ tr.group-dragging > td {
     box-shadow: 0 8px 16px -4px var(--shadow-color);
 }
 
-tr.drop-target-top::before,
-tr.drop-target-bottom::after {
+tr.drop-target-top::before {
     content: '';
     position: absolute;
     left: 0;
@@ -794,14 +793,15 @@ tr.drop-target-bottom::after {
     background-color: var(--primary-color);
     z-index: 20; /* Above cells */
     border-radius: 2px;
-}
-
-tr.drop-target-top::before {
     top: -2px;
 }
 
-tr.drop-target-bottom::after {
-    bottom: -2px;
+tr.add-group-row.drop-target-end > .add-group-cell {
+    background-color: var(--primary-color-light);
+}
+tr.add-group-row.drop-target-end > .add-group-cell > .add-group-button {
+    border-color: var(--primary-color);
+    color: var(--primary-color);
 }
 
 
