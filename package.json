@@ -1,0 +1,26 @@
+{
+  "name": "plataforma-de-programação-avançada-v5",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "react": "19.1.0",
+    "@google/genai": "latest",
+    "react-dom": "19.1.0",
+    "xlsx": "latest",
+    "jspdf": "2.5.1",
+    "jspdf-autotable": "3.8.2",
+    "chart.js": "^4.5.0",
+    "@kurkle/color": "0.3.2"
+  },
+  "devDependencies": {
+    "@types/node": "^22.14.0",
+    "typescript": "~5.8.2",
+    "vite": "^6.2.0"
+  }
+}
