@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo, useCallback, useEffect, useRef, useReducer } from 'react';
 import { createRoot } from 'react-dom/client';
 import { GoogleGenAI, Type } from "@google/genai";
@@ -9,29 +10,29 @@ import { Chart } from 'chart.js/auto';
 // --- TYPES AND ENUMS ---
 enum Status {
   Programado = 'X',
-  Concluido = 'Ok',
+  Realizado = 'Ok',
   Cancelado = 'C',
   NaoRealizado = 'N',
 }
 const STATUS_LABELS: Record<Status, string> = {
   [Status.Programado]: 'Programado',
-  [Status.Concluido]: 'Concluído',
+  [Status.Realizado]: 'Realizado',
   [Status.Cancelado]: 'Cancelado',
   [Status.NaoRealizado]: 'Não Realizado',
 };
 const STATUS_CLASS_MAP: Record<Status, string> = {
     [Status.Programado]: 'programado',
-    [Status.Concluido]: 'concluido',
+    [Status.Realizado]: 'realizado',
     [Status.Cancelado]: 'cancelado',
     [Status.NaoRealizado]: 'nao-realizado',
 };
 const STATUS_COLOR_MAP: Record<Status, string> = {
-    [Status.Programado]: '#ffeb3b',
-    [Status.Concluido]: '#4ADE80',
-    [Status.Cancelado]: '#60A5FA',
-    [Status.NaoRealizado]: '#F87171',
+    [Status.Programado]: '#fef08a',
+    [Status.Realizado]: '#bbf7d0',
+    [Status.Cancelado]: '#bfdbfe',
+    [Status.NaoRealizado]: '#fecaca',
 };
-const STATUS_CYCLE: Status[] = [Status.Programado, Status.Concluido, Status.Cancelado, Status.NaoRealizado];
+const STATUS_CYCLE: Status[] = [Status.Programado, Status.Realizado, Status.Cancelado, Status.NaoRealizado];
 
 interface Atividade {
   id: string;
@@ -52,6 +53,27 @@ interface Grupo {
 }
 type ScheduleData = Grupo[];
 
+interface ManpowerAllocationData {
+    [role: string]: {
+        [weekYear: string]: number; // e.g., "2025-29"
+    };
+}
+interface ManpowerAllocation {
+    roles: string[];
+    hasSecondShift: boolean;
+    data: {
+        adm: ManpowerAllocationData;
+        shift2: ManpowerAllocationData;
+    };
+}
+interface DailyManpowerAllocation {
+    [activityId: string]: {
+        [date: string]: { // YYYY-MM-DD
+            [role: string]: number;
+        }
+    }
+}
+
 interface Project {
   id: string;
   name: string;
@@ -61,10 +83,12 @@ interface Project {
   programmerName: string;
   liveData: ScheduleData;
   savedPlan: ScheduleData | null;
+  manpowerAllocation: ManpowerAllocation;
+  dailyManpowerAllocation: DailyManpowerAllocation;
 }
 type UserProjects = Record<string, Project>;
 
-type Page = 'schedule' | 'dashboard' | 'comparison';
+type Page = 'schedule' | 'dashboard' | 'comparison' | 'manpower' | 'dailyAllocation' | 'manpowerDashboard';
 
 interface RenderableRow {
     group: Grupo;
@@ -75,6 +99,7 @@ interface RenderableRow {
     renderTask: boolean;
     taskRowSpan: number;
     wbsId: string;
+    isLastInGroup: boolean;
 }
 
 type SelectedItem = {
@@ -100,6 +125,86 @@ const getWeek = (date: Date) => {
     const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
     return Math.ceil((((d.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
 };
+const getWeekYear = (date: Date): string => {
+    const d = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
+    // Thursday in current week decides the year.
+    d.setUTCDate(d.getUTCDate() + 4 - (d.getUTCDay() || 7));
+    // Get year of Thursday
+    const year = d.getUTCFullYear();
+    // Get first day of year
+    const yearStart = new Date(Date.UTC(year, 0, 1));
+    // Calculate full weeks to nearest Thursday
+    const weekNo = Math.ceil((((d.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
+    return `${year}-${weekNo.toString().padStart(2, '0')}`;
+};
+const getDatesOfWeek = (weekYear: string): Date[] => {
+    const [year, weekNo] = weekYear.split('-').map(Number);
+    const d = new Date(Date.UTC(year, 0, 1 + (weekNo - 1) * 7));
+    const dayOfWeek = d.getUTCDay();
+    const diff = d.getUTCDate() - dayOfWeek + (dayOfWeek === 0 ? -6 : 1);
+    const monday = new Date(d.setUTCDate(diff));
+    
+    return Array.from({length: 7}, (_, i) => {
+        const date = new Date(monday);
+        date.setUTCDate(monday.getUTCDate() + i);
+        return date;
+    });
+};
+const getDateRangeOfWeek = (weekYear: string): string => {
+    const [year, weekNo] = weekYear.split('-').map(Number);
+    // Find the date of the first day (Monday) of the week
+    const d = new Date(Date.UTC(year, 0, 1 + (weekNo - 1) * 7));
+    const dayOfWeek = d.getUTCDay(); // 0=Sun, 1=Mon, ..
+    const diff = d.getUTCDate() - dayOfWeek + (dayOfWeek === 0 ? -6 : 1); // Adjust when day is Sunday to get Monday
+    const monday = new Date(d.setUTCDate(diff));
+    const sunday = new Date(monday);
+    sunday.setUTCDate(monday.getUTCDate() + 6);
+    
+    const format = (dt: Date) => `${dt.getUTCDate().toString().padStart(2, '0')}/${(dt.getUTCMonth() + 1).toString().padStart(2, '0')}`;
+    
+    return `${format(monday)} - ${format(sunday)}`;
+};
+
+const isBrazilianHoliday = (date: Date): boolean => {
+    const day = date.getUTCDate();
+    const month = date.getUTCMonth() + 1; // 1-12
+
+    const holidays = [
+        '1-1',   // Confraternização Universal
+        '4-21',  // Tiradentes
+        '5-1',   // Dia do Trabalho
+        '9-7',   // Independência do Brasil
+        '10-12', // Nossa Senhora Aparecida
+        '11-2',  // Finados
+        '11-15', // Proclamação da República
+        '12-25'  // Natal
+    ];
+    
+    return holidays.includes(`${month}-${day}`);
+};
+
+const getRoleAbbreviation = (role: string): string => {
+    const lowerRole = role.toLowerCase();
+    if (lowerRole.includes('supervisor de caldeiraria')) return 'Sup Cald';
+    if (lowerRole.includes('supervisor de solda')) return 'Sup Solda';
+    if (lowerRole.includes('caldeireiro')) return 'Cald';
+    if (lowerRole.includes('soldador')) return 'Sold';
+    if (lowerRole.includes('traçador')) return 'Traç';
+    if (lowerRole.includes('operador de oxicorte')) return 'Op Oxicorte';
+    if (lowerRole.includes('tratamento térmico')) return 'Trat Térm';
+    if (lowerRole.includes('inspetor de solda')) return 'Insp Solda';
+    if (lowerRole.includes('inspetor de ultrassom')) return 'Insp UT';
+    if (lowerRole.includes('inspetor de rx')) return 'Insp RX';
+    if (lowerRole.includes('inspetor dimensional')) return 'Insp Dim';
+    
+    const words = role.split(' ');
+    if (words.length > 1) {
+        return words.map(w => w.substring(0, 1)).join('').toUpperCase() + words[words.length - 1].substring(0, 3);
+    }
+    return role.substring(0, 5);
+};
+
+
 const deepClone = <T,>(obj: T): T => JSON.parse(JSON.stringify(obj));
 
 // --- AGENTE DE IA PARA EXCLUSÃO (Implementação do Usuário) ---
@@ -108,47 +213,25 @@ const aiDeletionAgent = (
     idToDelete: string,
     type: 'group' | 'task' | 'activity'
 ): ScheduleData => {
-    // Caso 1: Excluir um grupo inteiro. Simples e direto.
+    let newData = deepClone(data);
+
     if (type === 'group') {
-        return data.filter(g => g.id !== idToDelete);
-    }
-
-    // Para itens aninhados, mapeamos e criamos novos objetos apenas no caminho da alteração
-    const newData = data.map(group => {
-        const isTaskInGroup = type === 'task' && group.tarefas.some(t => t.id === idToDelete);
-        const isActivityInGroup = type === 'activity' && group.tarefas.some(t => t.activities.some(a => a.id === idToDelete));
-
-        // Se o item a ser excluído não está neste grupo, retorna o objeto do grupo original para otimização
-        if (!isTaskInGroup && !isActivityInGroup) {
-            return group;
-        }
-
-        let newTarefas;
-        if (isTaskInGroup) {
-            // Caso 2: Excluir uma tarefa principal
-            newTarefas = group.tarefas.filter(t => t.id !== idToDelete);
-        } else { // isActivityInGroup é verdadeiro
-            // Caso 3: Excluir uma atividade
-            newTarefas = group.tarefas.map(task => {
-                const isActivityInTask = task.activities.some(a => a.id === idToDelete);
-                // Se a atividade não está nesta tarefa, retorna o objeto da tarefa original
-                if (!isActivityInTask) {
-                    return task;
-                }
+        newData = newData.filter(g => g.id !== idToDelete);
+    } else if (type === 'task') {
+        newData = newData.map(group => {
+            const newTarefas = group.tarefas.filter(t => t.id !== idToDelete);
+            return { ...group, tarefas: newTarefas };
+        }).filter(g => g.tarefas.length > 0);
+    } else if (type === 'activity') {
+        newData = newData.map(group => {
+            const newTarefas = group.tarefas.map(task => {
                 const newActivities = task.activities.filter(a => a.id !== idToDelete);
-                // Retorna um novo objeto de tarefa com a lista de atividades atualizada
                 return { ...task, activities: newActivities };
-            })
-            // Limpa as tarefas que podem ter ficado vazias após a remoção da atividade
-            .filter(t => t.activities.length > 0);
-        }
-
-        // Retorna um novo objeto de grupo com a lista de tarefas atualizada
-        return { ...group, tarefas: newTarefas };
-    })
-    // Limpa os grupos que podem ter ficado vazios após a remoção da tarefa
-    .filter(g => g.tarefas.length > 0);
-
+            }).filter(t => t.activities.length > 0);
+            return { ...group, tarefas: newTarefas };
+        }).filter(g => g.tarefas.length > 0);
+    }
+    
     return newData;
 };
 
@@ -193,6 +276,29 @@ const findContiguousBlock = (activity: Atividade, startDateStr: string) => {
 };
 
 // --- INITIAL DATA ---
+const PREDEFINED_MANPOWER_ROLES = [
+    // Supervisão
+    'Supervisor de caldeiraria',
+    'Supervisor de solda',
+    // Ofícios
+    'Caldeireiro',
+    'Soldador',
+    'Traçador',
+    'Operador de oxicorte',
+    'Tratamento térmico',
+    // Inspeção
+    'Inspetor de solda',
+    'Inspetor de ultrassom',
+    'Inspetor de RX',
+    'Inspetor dimensional',
+];
+
+const MANPOWER_CATEGORIES = {
+    'Supervisão': ['Supervisor de caldeiraria', 'Supervisor de solda'],
+    'Ofícios': ['Caldeireiro', 'Soldador', 'Traçador', 'Operador de oxicorte', 'Tratamento térmico'],
+    'Inspeção': ['Inspetor de solda', 'Inspetor de ultrassom', 'Inspetor de RX', 'Inspetor dimensional'],
+};
+
 const createNewProject = (name: string): Project => ({
   id: generateId(),
   name,
@@ -202,34 +308,61 @@ const createNewProject = (name: string): Project => ({
   programmerName: 'Não definido',
   liveData: [],
   savedPlan: null,
+  manpowerAllocation: {
+    roles: [...PREDEFINED_MANPOWER_ROLES],
+    hasSecondShift: false,
+    data: {
+        adm: {},
+        shift2: {}
+    }
+  },
+  dailyManpowerAllocation: {}
 });
 
 // --- EXPORT AGENTS ---
 const exportToExcelAgent = (filteredData: ScheduleData, dates: Date[], title: string, addToast: (message: string, type: 'success' | 'error') => void) => {
     if (filteredData.length === 0) {
-        addToast("Não há dados filtrados para exportar.", "error");
+        addToast("Não há dados para exportar.", "error");
         return;
     }
-    const headerRows = 3;
-    const baseCols = 5;
 
+    const baseCols = 5;
+    const wsData: any[][] = [];
+    const merges: XLSX.Range[] = [];
+
+    // --- Create Headers ---
     const dateHeaders = dates.map(d => ({
         week: `Semana ${getWeek(d)}`,
         dayName: getDayAbbr(d),
         dayNum: d.getUTCDate()
     }));
+    const header1 = ['', '', '', '', '', ...dateHeaders.map(h => h.week)];
+    const header2 = ['Fase/Agrupador', 'COMPONENTE', 'SETOR', 'TAREFA PRINCIPAL', 'ATIVIDADE', ...dateHeaders.map(h => h.dayName)];
+    const header3 = ['', '', '', '', '', ...dateHeaders.map(h => h.dayNum)];
+    wsData.push(header1, header2, header3);
 
-    const header1 = [
-        'Fase/Agrupador', 'COMPONENTE', 'SETOR', 'TAREFA PRINCIPAL', 'ATIVIDADE',
-        ...dateHeaders.map(h => h.week)
-    ];
-    const header2 = Array(baseCols).fill('').concat(dateHeaders.map(h => h.dayName) as any);
-    const header3 = Array(baseCols).fill('').concat(dateHeaders.map(h => h.dayNum) as any);
+    // Merge week headers
+    let currentWeek = '';
+    let weekColStart = baseCols;
+    dateHeaders.forEach((h, i) => {
+        if (h.week !== currentWeek) {
+            if (currentWeek) merges.push({ s: { r: 0, c: weekColStart }, e: { r: 0, c: baseCols + i - 1 } });
+            currentWeek = h.week;
+            weekColStart = baseCols + i;
+        }
+    });
+    if (currentWeek) merges.push({ s: { r: 0, c: weekColStart }, e: { r: 0, c: baseCols + dateHeaders.length - 1 } });
+    
+    // Merge main headers
+    merges.push({ s: { r: 1, c: 0 }, e: { r: 2, c: 0 } });
+    merges.push({ s: { r: 1, c: 1 }, e: { r: 2, c: 1 } });
+    merges.push({ s: { r: 1, c: 2 }, e: { r: 2, c: 2 } });
+    merges.push({ s: { r: 1, c: 3 }, e: { r: 2, c: 3 } });
+    merges.push({ s: { r: 1, c: 4 }, e: { r: 2, c: 4 } });
 
-    const body: any[][] = [];
-    const merges: XLSX.Range[] = [];
-    let rowIndex = headerRows;
 
+    // --- Create Body ---
+    let rowIndex = wsData.length;
     filteredData.forEach(group => {
         const groupStartRow = rowIndex;
         let groupRowSpan = 0;
@@ -248,52 +381,66 @@ const exportToExcelAgent = (filteredData: ScheduleData, dates: Date[], title: st
                 merges.push({ s: { r: taskStartRow, c: 3 }, e: { r: taskStartRow + taskRowSpan - 1, c: 3 } });
             }
 
-            if (task.activities.length === 0) {
-                const row: any[] = [group.fa, group.componente, group.setor, task.title, ''];
-                dates.forEach(date => row.push(''));
-                body.push(row);
-                rowIndex++;
-            } else {
-                task.activities.forEach(activity => {
-                    const row: any[] = [group.fa, group.componente, group.setor, task.title, activity.name];
-                    dates.forEach(date => {
-                        row.push(activity.schedule[formatDate(date)] || '');
-                    });
-                    body.push(row);
-                    rowIndex++;
+            const activities = task.activities.length > 0 ? task.activities : [{ id: `empty-${task.id}`, name: '', schedule: {} }];
+            activities.forEach(activity => {
+                const row: any[] = [group.fa, group.componente, group.setor, task.title, activity.name];
+                dates.forEach(date => {
+                    const status = activity.schedule[formatDate(date)];
+                    row.push(status || '');
                 });
-            }
+                wsData.push(row);
+                rowIndex++;
+            });
         });
     });
 
-    let currentWeek = '';
-    let weekColStart = baseCols;
-    dateHeaders.forEach((h, i) => {
-        if (h.week !== currentWeek) {
-            if (currentWeek) {
-                merges.push({ s: { r: 0, c: weekColStart }, e: { r: 0, c: baseCols + i - 1 } });
-            }
-            currentWeek = h.week;
-            weekColStart = baseCols + i;
-        }
-    });
-    if (currentWeek) {
-        merges.push({ s: { r: 0, c: weekColStart }, e: { r: 0, c: baseCols + dateHeaders.length - 1 } });
-    }
-
-    const wsData = [header1, header2, header3, ...body];
     const ws = XLSX.utils.aoa_to_sheet(wsData);
     ws['!merges'] = merges;
-    
-    ws['!cols'] = [ {wch:15}, {wch:15}, {wch:15}, {wch:40}, {wch:35} ];
-    dates.forEach((_, i) => {
-        ws['!cols']![baseCols + i] = { wch: 4 };
-    });
+    ws['!cols'] = [ {wch:15}, {wch:15}, {wch:15}, {wch:40}, {wch:40}, ...Array(dates.length).fill({wch: 4}) ];
+
+    // --- Apply Styles ---
+    const borderStyle = { style: 'thin', color: { rgb: "000000" } };
+    const allBorders = { top: borderStyle, bottom: borderStyle, left: borderStyle, right: borderStyle };
+    const headerFill = { fgColor: { rgb: "DDEBF7" } };
+    const weekendFill = { fgColor: { rgb: "B4C6E7" } };
+    const programadoFill = { fgColor: { rgb: "FFFF00" } }; // Yellow
+    const realizadoFill = { fgColor: { rgb: "C6EFCE" } }; // Green
+    const centerAlign = { horizontal: 'center', vertical: 'center', wrapText: true };
+    const leftAlign = { vertical: 'center', wrapText: true };
+
+    for (let R = 0; R < wsData.length; ++R) {
+        for (let C = 0; C < wsData[R].length; ++C) {
+            const cell_address = { c: C, r: R };
+            const cell_ref = XLSX.utils.encode_cell(cell_address);
+            if (!ws[cell_ref]) ws[cell_ref] = { v: '' };
+            ws[cell_ref].s = { border: allBorders, alignment: (C < baseCols && R > 2) ? leftAlign : centerAlign };
+
+            // Header Styles
+            if (R < 3) {
+                ws[cell_ref].s.fill = headerFill;
+                ws[cell_ref].s.font = { bold: true };
+            }
+            // Weekend Styles
+            if (C >= baseCols) {
+                const dayName = dateHeaders[C - baseCols].dayName;
+                if (dayName === 'SÁB' || dayName === 'DOM') {
+                    ws[cell_ref].s.fill = weekendFill;
+                }
+            }
+            // Status Styles
+            if (R > 2) {
+                const status = ws[cell_ref].v;
+                if (status === Status.Programado) ws[cell_ref].s.fill = programadoFill;
+                if (status === Status.Realizado) ws[cell_ref].s.fill = realizadoFill;
+            }
+        }
+    }
 
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Cronograma');
     XLSX.writeFile(wb, `${title.replace(/ /g, '_')}.xlsx`);
 };
+
 
 const exportToPdfAgent = (filteredData: ScheduleData, dates: Date[], title: string, addToast: (message: string, type: 'success' | 'error') => void, lastModified: number, programmerName: string) => {
     if (filteredData.length === 0) {
@@ -357,11 +504,15 @@ const exportToPdfAgent = (filteredData: ScheduleData, dates: Date[], title: stri
     filteredData.forEach(group => {
         const groupRowSpan = group.tarefas.reduce((acc, t) => acc + (t.activities.length || 1), 0);
         let isFirstRowOfGroup = true;
-        group.tarefas.forEach((task) => {
+        let lastTaskInGroupIndex = group.tarefas.length - 1;
+
+        group.tarefas.forEach((task, taskIndex) => {
             const taskRowSpan = task.activities.length || 1;
             let isFirstRowOfTask = true;
+            let lastActivityInTaskIndex = task.activities.length - 1;
+
             if (task.activities.length === 0) {
-                const row = [];
+                const row: any[] = [];
                 if (isFirstRowOfGroup) {
                     row.push({ content: group.fa, rowSpan: groupRowSpan });
                     row.push({ content: group.componente, rowSpan: groupRowSpan });
@@ -371,9 +522,19 @@ const exportToPdfAgent = (filteredData: ScheduleData, dates: Date[], title: stri
                 row.push({ content: task.title, rowSpan: taskRowSpan });
                 row.push(''); // Empty activity cell
                 row.push(...Array(dates.length).fill(''));
+                
+                const isLastRowOfGroup = taskIndex === lastTaskInGroupIndex;
+                if(isLastRowOfGroup){
+                    row.forEach(cell => {
+                        if(typeof cell === 'object' && cell !== null) {
+                           (cell as any).styles = {...((cell as any).styles || {}), borderBottom: {width: 2, color: [200, 208, 216]}};
+                        }
+                    });
+                }
                 body.push(row);
+
             } else {
-                task.activities.forEach((activity) => {
+                task.activities.forEach((activity, activityIndex) => {
                     const row: any[] = [];
                     if (isFirstRowOfGroup) {
                         row.push({ content: group.fa, rowSpan: groupRowSpan });
@@ -387,21 +548,25 @@ const exportToPdfAgent = (filteredData: ScheduleData, dates: Date[], title: stri
                     }
                     row.push(activity.name);
                     dates.forEach(date => {
-                        const dayAbbr = getDayAbbr(date);
                         const status = activity.schedule[formatDate(date)];
-                        // FIX: Do not schedule activities on Sundays during export.
-                        if (dayAbbr === 'DOM') {
-                            row.push('');
-                        } else {
-                            row.push(status ? status : '');
-                        }
+                        row.push(status ? status : '');
                     });
+                     
+                    const isLastRowOfGroup = (taskIndex === lastTaskInGroupIndex && activityIndex === lastActivityInTaskIndex);
+                    if(isLastRowOfGroup){
+                        row.forEach(cell => {
+                            if(typeof cell === 'object' && cell !== null) {
+                                (cell as any).styles = {...((cell as any).styles || {}), borderBottom: {width: 2, color: [200, 208, 216]}};
+                            }
+                        });
+                    }
+
                     body.push(row);
                 });
             }
         });
     });
-
+    
     autoTable(doc, {
         head: head,
         body: body,
@@ -416,7 +581,7 @@ const exportToPdfAgent = (filteredData: ScheduleData, dates: Date[], title: stri
         },
         styles: { 
             fontSize: 7, 
-            cellPadding: 2, 
+            cellPadding: 6, 
             valign: 'middle' as const, 
             halign: 'center' as const,
             lineColor: [45, 55, 72],
@@ -430,24 +595,393 @@ const exportToPdfAgent = (filteredData: ScheduleData, dates: Date[], title: stri
             4: { cellWidth: 110, halign: 'left' as const },
         },
         didDrawCell: (data) => {
-             if (data.section === 'body' && data.column.index >= 5) {
+            if (data.section === 'body' && data.column.index >= 5) {
+                const dateIndex = data.column.index - 5;
+                const currentDate = dates[dateIndex];
+                const dayAbbr = getDayAbbr(currentDate);
+                const isHoliday = isBrazilianHoliday(currentDate);
+                const isWeekendOrHoliday = dayAbbr === 'SÁB' || dayAbbr === 'DOM' || isHoliday;
+
+                // Draw background for weekends/holidays
+                if (isWeekendOrHoliday) {
+                    doc.setFillColor(224, 236, 255); // Light blue
+                    doc.rect(data.cell.x, data.cell.y, data.cell.width, data.cell.height, 'F');
+                }
+                
+                // Draw status color on top
                 const status = data.cell.text[0] as Status;
-                 if (status && STATUS_COLOR_MAP[status]) {
-                     doc.setFillColor(STATUS_COLOR_MAP[status]);
-                     doc.rect(data.cell.x, data.cell.y, data.cell.width, data.cell.height, 'F');
-                     doc.setTextColor(50, 50, 50);
-                     doc.text(String(status), data.cell.x + data.cell.width / 2, data.cell.y + data.cell.height / 2, {
-                        align: 'center' as const,
-                        baseline: 'middle' as const
-                    });
-                 }
+                if (status && STATUS_COLOR_MAP[status]) {
+                    doc.setFillColor(STATUS_COLOR_MAP[status]);
+                    doc.rect(data.cell.x, data.cell.y, data.cell.width, data.cell.height, 'F');
+                }
+                
+                // Redraw text to ensure it's on top of any background
+                if (status) {
+                    doc.setTextColor(50, 50, 50);
+                    doc.text(String(status), data.cell.x + data.cell.width / 2, data.cell.y + data.cell.height / 2, {
+                       align: 'center' as const,
+                       baseline: 'middle' as const
+                   });
+                }
+                
+                // Redraw border to ensure it's visible over the fill
+                doc.setDrawColor(45, 55, 72); // Same as grid color
+                doc.setLineWidth(0.5);
+                doc.rect(data.cell.x, data.cell.y, data.cell.width, data.cell.height, 'S');
+            }
+        },
+         didParseCell: (data) => {
+            if (data.section === 'body' && Array.isArray(data.row.raw)) {
+                const cellWithBorder = data.row.raw.find((cell: any) =>
+                    typeof cell === 'object' && cell !== null && !Array.isArray(cell) && cell.styles?.borderBottom
+                );
+
+                if (cellWithBorder) {
+                    (data.cell.styles as any).borderBottom = (cellWithBorder as any).styles.borderBottom;
+                }
             }
         }
     });
     doc.save(`${title.replace(/ /g, '_')}.pdf`);
 };
 
+const exportManpowerToPdfAgent = (
+    roles: string[],
+    data: ManpowerAllocation['data'],
+    hasSecondShift: boolean,
+    weeks: string[],
+    title: string
+) => {
+    const doc = new jsPDF({ orientation: 'landscape', unit: 'pt' });
+
+    doc.setFontSize(16);
+    doc.text(`Alocação de Mão de Obra - ${title}`, 40, 40);
+
+    const generateTableForShift = (shiftKey: 'adm' | 'shift2', startY: number): number => {
+        doc.setFontSize(12);
+        doc.text(shiftKey === 'adm' ? "Turno ADM" : "2º Turno", 40, startY - 5);
+
+        const head: any[] = [[]];
+        head[0].push({ content: 'Mão de Obra', styles: { halign: 'left' } });
+        weeks.forEach(week => {
+            const [year, weekNum] = week.split('-');
+            const dateRange = getDateRangeOfWeek(week);
+            head[0].push({ content: `Semana ${weekNum} (${year})\n${dateRange}`, styles: { halign: 'center' } });
+        });
+        head[0].push('Total (H-Sem)');
+
+        const body: any[] = [];
+        const shiftData = data[shiftKey];
+        const weeklyTotals: Record<string, number> = {};
+        weeks.forEach(w => weeklyTotals[w] = 0);
+
+        roles.forEach(role => {
+            const rowData: (string|number)[] = [role];
+            let total = 0;
+            weeks.forEach(week => {
+                const quantity = shiftData[role]?.[week] || 0;
+                rowData.push(quantity > 0 ? quantity : '');
+                total += quantity;
+                weeklyTotals[week] += quantity;
+            });
+            rowData.push(total > 0 ? total : '');
+            body.push(rowData);
+        });
+        
+        const grandTotal = Object.values(weeklyTotals).reduce((sum, val) => sum + val, 0);
+
+        const foot: any[] = [[]];
+        foot[0].push({ content: 'TOTAL GERAL (H-Sem)', styles: { halign: 'left', fontStyle: 'bold' } });
+        weeks.forEach(week => {
+            const total = weeklyTotals[week];
+            foot[0].push({ content: total > 0 ? String(total) : '', styles: { fontStyle: 'bold' } });
+        });
+        foot[0].push({ content: grandTotal > 0 ? String(grandTotal) : '', styles: { fontStyle: 'bold' } });
+
+        autoTable(doc, {
+            head: head,
+            body: body,
+            foot: foot,
+            startY: startY,
+            theme: 'grid',
+            headStyles: { fillColor: [233, 238, 245], textColor: [45, 55, 72], fontStyle: 'bold' },
+            footStyles: { fillColor: [233, 238, 245], textColor: [45, 55, 72] },
+            styles: { fontSize: 8, cellPadding: 3, halign: 'center' },
+            columnStyles: { 0: { halign: 'left', fontStyle: 'bold' } }
+        });
+
+        return (doc as any).lastAutoTable.finalY;
+    };
+
+    let finalY = generateTableForShift('adm', 70);
+    if (hasSecondShift) {
+        generateTableForShift('shift2', finalY + 30);
+    }
+
+
+    doc.save(`Alocacao_MO_${title.replace(/ /g, '_')}.pdf`);
+};
+
+const exportDailyAllocationToPdfAgent = (
+    project: Project,
+    dates: Date[],
+    filteredData: ScheduleData,
+    title: string
+) => {
+    const doc = new jsPDF({ orientation: 'landscape', unit: 'pt', format: 'a3' });
+    doc.text(`Alocação Diária de Mão de Obra - ${title}`, 40, 40);
+
+    const head: any[][] = [[], []];
+    head[0].push({ content: 'Tarefa Principal', rowSpan: 2 });
+    head[0].push({ content: 'Atividade', rowSpan: 2 });
+
+    const weekHeaders: { content: string, colSpan: number }[] = [];
+    if (dates.length > 0) {
+        let currentWeek = getWeek(dates[0]);
+        let dayCount = 0;
+        dates.forEach((date, index) => {
+            const week = getWeek(date);
+            if (week !== currentWeek) {
+                weekHeaders.push({ content: `Semana ${currentWeek}`, colSpan: dayCount });
+                currentWeek = week;
+                dayCount = 1;
+            } else {
+                dayCount++;
+            }
+            if (index === dates.length - 1) {
+                weekHeaders.push({ content: `Semana ${currentWeek}`, colSpan: dayCount });
+            }
+        });
+    }
+    head[0].push(...weekHeaders as any);
+    head[1].push(...dates.map(date => `${getDayAbbr(date)} ${date.getUTCDate()}`));
+
+    const body: any[] = [];
+    filteredData.forEach(group => {
+        group.tarefas.forEach(task => {
+            task.activities.forEach(activity => {
+                const row: any[] = [{ content: task.title }, { content: activity.name }];
+                dates.forEach(date => {
+                    const dateStr = formatDate(date);
+                    const allocations = project.dailyManpowerAllocation[activity.id]?.[dateStr];
+                    if (allocations && Object.keys(allocations).length > 0) {
+                        const cellText = Object.entries(allocations)
+                            .map(([role, qty]) => `${getRoleAbbreviation(role)}: ${qty}`)
+                            .join('\n');
+                        row.push(cellText);
+                    } else {
+                        row.push('');
+                    }
+                });
+                body.push(row);
+            });
+        });
+    });
+
+    autoTable(doc, {
+        head: head,
+        body: body,
+        startY: 60,
+        theme: 'grid',
+        styles: { fontSize: 7, cellPadding: 2, valign: 'middle' },
+        headStyles: { halign: 'center', fillColor: [233, 238, 245], textColor: [45, 55, 72] },
+        columnStyles: {
+            0: { halign: 'left', cellWidth: 150 },
+            1: { halign: 'left', cellWidth: 150 },
+        },
+    });
+
+    doc.save(`Alocacao_Diaria_${title.replace(/ /g, '_')}.pdf`);
+};
+
+const exportDashboardToPdfAgent = (stats: any, chartImage: string | null, title: string, programmerName: string, selectedWeekInfo: string) => {
+    const doc = new jsPDF({ orientation: 'portrait', format: 'a4' });
+    const pageHeight = doc.internal.pageSize.getHeight();
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const margin = 14;
+
+    doc.setFontSize(16);
+    doc.text(`Dashboard do Projeto: ${title}`, margin, 20);
+    doc.setFontSize(10);
+    doc.text(`Responsável: ${programmerName}`, margin, 28);
+    doc.text(`Dados para: ${selectedWeekInfo}`, margin, 36);
+
+    const statData = [
+        ['Total Programado', stats.totalProgramado],
+        ['Total Realizado', stats.totalRealizado],
+        ['Total Cancelado', stats.totalCancelado],
+        ['Não Realizado', stats.totalNaoRealizado],
+    ];
+    autoTable(doc, {
+        startY: 42,
+        head: [['Métrica de Status', 'Valor']],
+        body: statData,
+        theme: 'striped',
+        margin: { left: margin, right: margin },
+    });
+
+    let finalY = (doc as any).lastAutoTable.finalY;
+
+    const componentData = Array.from(stats.tasksPerComponent.entries()).map(([componente, count]) => [componente, count]);
+    if(componentData.length > 0) {
+        autoTable(doc, {
+            startY: finalY + 10,
+            head: [['Componente', 'Nº de Atividades']],
+            body: componentData,
+            theme: 'striped',
+            margin: { left: margin, right: margin },
+        });
+        finalY = (doc as any).lastAutoTable.finalY;
+    }
+    
+    if (chartImage) {
+        const spaceForChart = pageHeight - finalY - margin - 10; // 10 for padding below
+        if (spaceForChart > 50) { // Only add if there's reasonable space
+            try {
+                const imgProps = doc.getImageProperties(chartImage);
+                const imgWidth = pageWidth - (margin * 2);
+                let imgHeight = (imgProps.height * imgWidth) / imgProps.width;
+                
+                if (imgHeight > spaceForChart) {
+                    imgHeight = spaceForChart; // Scale height to fit
+                }
+
+                doc.addImage(chartImage, 'PNG', margin, finalY + 10, imgWidth, imgHeight);
+            } catch(e) {
+                console.error("Error adding chart image to PDF:", e);
+                doc.text("Não foi possível renderizar o gráfico.", margin, finalY + 10);
+            }
+        }
+    }
+    
+    doc.save(`Dashboard_${title.replace(/ /g, '_')}.pdf`);
+};
+
+const exportManpowerDashboardToPdfAgent = (chartImage: string | null, title: string, programmerName: string, selectedWeekInfo: string) => {
+    const doc = new jsPDF({ orientation: 'landscape', format: 'a4' });
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const pageHeight = doc.internal.pageSize.getHeight();
+    const margin = 14;
+
+    doc.setFontSize(16);
+    doc.text(`Dashboard de Mão de Obra: ${title}`, margin, 20);
+    doc.setFontSize(10);
+    doc.text(`Responsável: ${programmerName}`, margin, 28);
+    doc.text(`Dados para: ${selectedWeekInfo}`, margin, 36);
+
+    if (chartImage) {
+        try {
+            const imgProps = doc.getImageProperties(chartImage);
+            const availableWidth = pageWidth - (margin * 2);
+            const availableHeight = pageHeight - 45 - margin;
+            let imgHeight = (imgProps.height * availableWidth) / imgProps.width;
+            let imgWidth = availableWidth;
+
+            if (imgHeight > availableHeight) {
+                imgHeight = availableHeight;
+                imgWidth = (imgProps.width * imgHeight) / imgProps.height;
+            }
+
+            doc.addImage(chartImage, 'PNG', margin, 45, imgWidth, imgHeight);
+        } catch(e) {
+            console.error("Error adding chart image to PDF:", e);
+            doc.text("Não foi possível renderizar o gráfico.", margin, 45);
+        }
+    } else {
+        doc.text("Gráfico não disponível.", margin, 45);
+    }
+    
+    doc.save(`Dashboard_MO_${title.replace(/ /g, '_')}.pdf`);
+};
+
 // --- AI SERVICE ---
+const analyzeDeletionImpactWithAI = async (
+    ai: GoogleGenAI,
+    data: ScheduleData,
+    itemsToDelete: SelectedItem[]
+): Promise<{ analysis: string; }> => {
+    // Schema for the response
+    const schema = {
+        type: Type.OBJECT,
+        properties: {
+            analysis: {
+                type: Type.STRING,
+                description: "Uma análise concisa em português sobre o impacto da exclusão do(s) item(ns), escrita de forma amigável para o usuário. Mencione os itens pelo nome, se forem poucos, ou resuma o impacto se forem muitos.",
+            },
+        },
+        required: ['analysis'],
+    };
+
+    const simplifiedData = data.map((g, gIdx) => ({
+        wbs: `${gIdx + 1}`,
+        id: g.id,
+        name: `${g.fa} / ${g.componente}`,
+        tasks: g.tarefas.map((t, tIdx) => ({
+            wbs: `${gIdx + 1}.${tIdx + 1}`,
+            id: t.id,
+            name: t.title,
+            activities: t.activities.map((a, aIdx) => ({
+                wbs: `${gIdx + 1}.${tIdx + 1}.${aIdx + 1}`,
+                id: a.id,
+                name: a.name
+            }))
+        }))
+    }));
+
+    const itemsList = itemsToDelete.map(item => 
+`- **Nome:** "${item.name}"
+- **Tipo:** "${item.type}"
+- **WBS:** "${item.wbsId}"`
+).join('\n');
+
+
+    const prompt = `Você é um assistente especialista em Planejamento e Controle de Produção (PCP). Sua tarefa é analisar um cronograma e o impacto da exclusão de um conjunto de itens.
+
+**Contexto:**
+O usuário solicitou a exclusão dos seguintes itens:
+${itemsList}
+
+**Cronograma Completo (formato simplificado):**
+\`\`\`json
+${JSON.stringify(simplifiedData, null, 2)}
+\`\`\`
+
+**Sua Tarefa:**
+
+1.  **Analise o Impacto Consolidado:** Com base nos nomes e na estrutura do cronograma, avalie o impacto da remoção de **TODOS** os itens listados em conjunto. Considere dependências lógicas e o efeito cascata. Por exemplo, se uma tarefa principal e várias de suas atividades forem selecionadas, descreva o impacto de remover o bloco inteiro.
+
+2.  **Formule uma Resposta JSON:**
+    - **analysis:** Escreva uma breve mensagem (2-3 frases) para o usuário explicando o impacto principal da exclusão em massa. Seja direto e claro. Ex: "Ao excluir a tarefa 'Montagem Estrutura X' e 2 atividades relacionadas, todo o progresso de montagem para este componente será removido. Isso pode afetar a sequência de soldagem dependente."
+
+**Formato de Saída:**
+- Retorne **APENAS** um objeto JSON válido que corresponda ao esquema fornecido.
+- Não inclua explicações, formatação markdown (como \`\`\`json\`\`\`) ou comentários. A resposta deve começar com \`{\` e terminar com \`}\`.`;
+
+    const response = await ai.models.generateContent({
+        model: "gemini-2.5-flash",
+        contents: prompt,
+        config: {
+            responseMimeType: "application/json",
+            responseSchema: schema,
+        },
+    });
+
+    try {
+        const jsonString = response.text.trim();
+        const parsedJson = JSON.parse(jsonString);
+        
+        if (typeof parsedJson.analysis !== 'string') {
+            throw new Error("Formato da resposta da IA inválido.");
+        }
+        
+        return parsedJson;
+
+    } catch (e) {
+        console.error("Falha ao analisar a resposta da IA como JSON (Deletion Analyzer). Resposta:", response.text, "Erro:", e);
+        throw new Error("A resposta da IA (Deletion Analyzer) não é um JSON válido.");
+    }
+};
+
 const parseFADetailWithAI = async (ai: GoogleGenAI, text: string, fileData: { mimeType: string, data: string } | null): Promise<Omit<Grupo, 'id'>[]> => {
     const schema = {
         type: Type.ARRAY,
@@ -640,7 +1174,7 @@ Esta é a parte mais importante.
 3.  Na intersecção de uma Atividade com uma data, **leia o texto da célula** (ex: "OK", "X", "N", "C").
 4.  **Mapeie o texto lido para o status correspondente** e adicione um objeto \`{ "date": "YYYY-MM-DD", "status": "STATUS_MAPEADO" }\` ao array \`schedule\` da atividade.
 5.  **Regras de Mapeamento de Status:**
-    - "Ok" ou similar => \`"Ok"\` (Concluído)
+    - "Ok" ou similar => \`"Ok"\` (Realizado)
     - "X", "P" ou uma marcação genérica => \`"X"\` (Programado)
     - "N" ou "NR" => \`"N"\` (Não Realizado)
     - "C" => \`"C"\` (Cancelado)
@@ -751,7 +1285,7 @@ type ScheduleAction =
     | { type: 'UNDO' }
     | { type: 'REDO' }
     | { type: 'ADD_ITEM'; payload: { type: 'group' | 'task' | 'activity'; parentId?: string } }
-    | { type: 'DELETE_ITEM'; payload: { type: 'group' | 'task' | 'activity'; id: string } }
+    | { type: 'BATCH_DELETE_ITEMS'; payload: { id: string; type: 'group' | 'task' | 'activity' }[] }
     | { type: 'UPDATE_TEXT'; payload: { id: string; field: 'componente' | 'setor' | 'fa' | 'tarefa' | 'atividade'; value: string } }
     | { type: 'UPDATE_SCHEDULE'; payload: ScheduleData }
     | { type: 'MOVE_GROUP'; payload: { fromId: string, toId: string | null } }
@@ -815,13 +1349,14 @@ const scheduleReducer = (state: ScheduleState, action: ScheduleAction): Schedule
             })();
             return createNewStateWithHistory(newData);
         }
-
-        case 'DELETE_ITEM': {
-            const { type, id } = action.payload;
-            const newData = aiDeletionAgent(state.liveData, id, type);
-            // By unconditionally creating a new state history entry, we trust React's core
-            // diffing algorithm to correctly and efficiently update the UI. The new agent
-            // ensures the changes are properly structured for this.
+        
+        case 'BATCH_DELETE_ITEMS': {
+            const newData = action.payload.reduce(
+                (currentData, itemToDelete) => {
+                    return aiDeletionAgent(currentData, itemToDelete.id, itemToDelete.type);
+                },
+                state.liveData
+            );
             return createNewStateWithHistory(newData);
         }
 
@@ -1089,7 +1624,7 @@ const AuthScreen = ({ onLogin, onRegister }: { onLogin: (u: string, p: string) =
     return (
         <div className="auth-screen">
             <div className="auth-form-container">
-                <h1>Bem-vindo!</h1>
+                <h1>Plataforma Avançada de Programação</h1>
                 <p>Acesse ou crie sua conta para continuar.</p>
                 <div className="auth-tabs">
                     <button className={isLogin ? 'active' : ''} onClick={() => handleTabSwitch(true)}>Login</button>
@@ -1108,6 +1643,7 @@ const AuthScreen = ({ onLogin, onRegister }: { onLogin: (u: string, p: string) =
                     </div>
                     <button type="submit" className="submit-button">{isLogin ? 'Entrar' : 'Criar Conta'}</button>
                 </form>
+                 <p className="developer-credit">Desenvolvido por: Waldenir Oliveira</p>
             </div>
         </div>
     );
@@ -1235,15 +1771,125 @@ const LoadModal = ({ schedules, onLoad, onDelete, onClose }: { schedules: Projec
     );
 };
 
+const DeletionModal = ({ isOpen, onClose, selectedItems, onConfirm, ai, data, addToast }: {
+    isOpen: boolean;
+    onClose: () => void;
+    selectedItems: SelectedItem[];
+    onConfirm: (itemsToDelete: { id: string, type: 'group' | 'task' | 'activity' }[]) => void;
+    ai: GoogleGenAI | null;
+    data: ScheduleData;
+    addToast: (message: string, type: 'success' | 'error') => void;
+}) => {
+    const [isLoading, setIsLoading] = useState(true);
+    const [analysis, setAnalysis] = useState('');
+
+    useEffect(() => {
+        if (isOpen && selectedItems.length > 0 && ai) {
+            const performAnalysis = async () => {
+                setIsLoading(true);
+                setAnalysis('');
+                try {
+                    const result = await analyzeDeletionImpactWithAI(ai, data, selectedItems);
+                    setAnalysis(result.analysis);
+                } catch (error) {
+                    addToast(`Erro do assistente de IA: ${error instanceof Error ? error.message : 'Erro desconhecido'}`, "error");
+                    setAnalysis("Não foi possível obter a análise da IA. A exclusão procederá de forma padrão.");
+                } finally {
+                    setIsLoading(false);
+                }
+            };
+            performAnalysis();
+        }
+    }, [isOpen, selectedItems, ai, data, addToast]);
+
+    if (!isOpen || selectedItems.length === 0) return null;
+
+    const handleConfirm = () => {
+        onConfirm(selectedItems);
+        onClose();
+    };
+
+    const typeLabels: Record<string, string> = { group: 'Grupo', task: 'Tarefa Principal', activity: 'Atividade' };
+
+    return (
+        <div className="modal-overlay">
+            <div className="modal-content wide" role="dialog" aria-modal="true" aria-labelledby="delete-modal-title">
+                <h2 id="delete-modal-title">Confirmação de Exclusão Inteligente</h2>
+                <p>Você está prestes a excluir os seguintes {selectedItems.length} itens:</p>
+                <ul className="item-to-delete-list">
+                    {selectedItems.map(item => (
+                        <li key={item.id}>
+                            <strong>{typeLabels[item.type]}:</strong> {item.name} (WBS: {item.wbsId})
+                        </li>
+                    ))}
+                </ul>
+
+                <div className="ai-analysis-section">
+                    {isLoading ? (
+                        <div className="loading-spinner">
+                            <span className="material-icons spin" aria-hidden="true">sync</span>
+                            <p>Analisando o impacto da exclusão...</p>
+                        </div>
+                    ) : (
+                        <div className="ai-analysis-result">
+                            <span className="material-icons" aria-hidden="true">smart_toy</span>
+                            <p>{analysis}</p>
+                        </div>
+                    )}
+                </div>
+
+                <div className="modal-actions">
+                    <button onClick={onClose} className="cancel-button" disabled={isLoading}>Cancelar</button>
+                    <button onClick={handleConfirm} className="submit-button danger" disabled={isLoading}>
+                        {isLoading ? 'Aguarde...' : `Confirmar Exclusão de ${selectedItems.length} Itens`}
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+const PrintScheduleModal = ({ isOpen, onClose, onConfirm, weeksToPrint, setWeeksToPrint }: {
+    isOpen: boolean;
+    onClose: () => void;
+    onConfirm: () => void;
+    weeksToPrint: number;
+    setWeeksToPrint: (weeks: number) => void;
+}) => {
+    if (!isOpen) return null;
+
+    return (
+        <div className="modal-overlay">
+            <div className="modal-content" role="dialog" aria-modal="true" aria-labelledby="print-modal-title">
+                <h2 id="print-modal-title">Configurar Impressão do Cronograma</h2>
+                <p>Selecione quantas semanas a partir da data de início você deseja incluir na impressão.</p>
+                <div className="form-group">
+                    <label htmlFor="weeks-to-print">Número de Semanas:</label>
+                    <input
+                        id="weeks-to-print"
+                        type="number"
+                        value={weeksToPrint}
+                        onChange={e => setWeeksToPrint(parseInt(e.target.value, 10) || 1)}
+                        min="1"
+                    />
+                </div>
+                <div className="modal-actions">
+                    <button onClick={onClose} className="cancel-button">Cancelar</button>
+                    <button onClick={onConfirm} className="submit-button">Confirmar Impressão</button>
+                </div>
+            </div>
+        </div>
+    );
+};
+
 const Sidebar = ({
     handleUndo, handleRedo, historyIndex, historyLength,
-    handleClearAll, handleSavePlan,
+    handleSavePlan,
     setImportModalOpen, setSaveModalOpen, setLoadModalOpen, handleSaveProject,
-    handleExportExcel, handleExportPdf,
+    handleExportExcel, onExportPdfClick,
     handleDateChange, startDate,
-    dateColumnWidth, handleZoomChange,
     goToWeekInput, setGoToWeekInput, handleGoToWeek,
-    selectedItem, handleDeleteSelectedItem,
+    selectedItems, handleDeleteSelectedItems, handleClearAll
 }) => {
     const typeLabels: Record<string, string> = {
         group: 'Grupo',
@@ -1265,7 +1911,6 @@ const Sidebar = ({
                 <button className="control-button" onClick={handleSavePlan} title="Salva o cronograma atual como o 'Planejado' para comparações futuras."><span className="material-icons" aria-hidden="true">bookmark_add</span> Definir como Base</button>
                 <button className="control-button" onClick={() => setSaveModalOpen(true)}><span className="material-icons" aria-hidden="true">create_new_folder</span> Novo Projeto</button>
                 <button className="control-button" onClick={() => setLoadModalOpen(true)}><span className="material-icons" aria-hidden="true">folder_open</span> Carregar Projeto</button>
-                <button className="control-button danger" onClick={handleClearAll}><span className="material-icons" aria-hidden="true">delete_sweep</span> Limpar Cronograma</button>
             </div>
 
             <div className="control-section">
@@ -1296,23 +1941,9 @@ const Sidebar = ({
             </div>
 
             <div className="control-section">
-                <h3>Visualização</h3>
-                <div className="zoom-control">
-                    <label htmlFor="zoom-slider">Zoom da Linha do Tempo ({dateColumnWidth}px)</label>
-                    <input
-                        id="zoom-slider"
-                        type="range"
-                        min="20"
-                        max="120"
-                        value={dateColumnWidth}
-                        onChange={e => handleZoomChange(Number(e.target.value))}
-                    />
-                </div>
-            </div>
-             <div className="control-section">
                 <h3>Exportar</h3>
                 <button className="control-button" onClick={handleExportExcel}><span className="material-icons" aria-hidden="true">download</span> Exportar para Excel</button>
-                <button className="control-button" onClick={handleExportPdf}><span className="material-icons" aria-hidden="true">picture_as_pdf</span> Exportar para PDF</button>
+                <button className="control-button" onClick={onExportPdfClick}><span className="material-icons" aria-hidden="true">picture_as_pdf</span> Exportar para PDF</button>
             </div>
 
             <div className="control-section ai-agent-status">
@@ -1321,21 +1952,31 @@ const Sidebar = ({
                     <span className="material-icons agent-active" aria-hidden="true">smart_toy</span>
                     <span>Agente de Organização: <strong>Ativo</strong></span>
                 </div>
-                {selectedItem ? (
+                {selectedItems.length === 0 ? (
+                    <p className="agent-description">
+                        Clique em uma linha para selecioná-la. Use Ctrl/Cmd+Click para selecionar múltiplos itens.
+                    </p>
+                ) : (
                     <div className="selection-info">
-                        <p><strong>ID:</strong> {selectedItem.wbsId}</p>
-                        <p><strong>Nome:</strong> {selectedItem.name}</p>
-                        <p><strong>Tipo:</strong> {typeLabels[selectedItem.type]}</p>
-                        <button className="control-button danger" onClick={handleDeleteSelectedItem}>
+                        {selectedItems.length === 1 ? (
+                            <>
+                                <p><strong>ID:</strong> {selectedItems[0].wbsId}</p>
+                                <p><strong>Nome:</strong> {selectedItems[0].name}</p>
+                                <p><strong>Tipo:</strong> {typeLabels[selectedItems[0].type]}</p>
+                            </>
+                        ) : (
+                            <p><strong>{selectedItems.length} itens selecionados.</strong></p>
+                        )}
+                         <button className="control-button danger" onClick={handleDeleteSelectedItems} disabled={selectedItems.length === 0}>
                             <span className="material-icons" aria-hidden="true">delete_forever</span>
-                            Excluir Item Selecionado
+                            Excluir {selectedItems.length > 1 ? 'Itens Selecionados' : 'Item Selecionado'}
                         </button>
                     </div>
-                ) : (
-                    <p className="agent-description">
-                        Clique em uma linha da tabela para selecioná-la para exclusão.
-                    </p>
                 )}
+                 <button className="control-button danger" onClick={handleClearAll} style={{width: '100%', marginTop: '12px'}}>
+                    <span className="material-icons" aria-hidden="true">delete_sweep</span>
+                    Limpar Todo o Cronograma
+                </button>
             </div>
 
             <div className="control-section">
@@ -1458,7 +2099,12 @@ const ScheduleHeader = ({ dates, headers, columnWidths, onResizeStart, stickyCol
                     const isFilterActive = activeFilters[columnKey]?.size > 0;
 
                     return (
-                        <th key={i} className={`col-sticky col-sticky-${i+1}`} style={{ width: columnWidths[i], left: stickyColumnPositions[i] }}>
+                        <th 
+                            key={i} 
+                            rowSpan={3}
+                            className={`col-sticky col-sticky-${i+1}`} 
+                            style={{ width: columnWidths[i], left: stickyColumnPositions[i], verticalAlign: 'middle', textAlign: 'center' }}
+                        >
                             <div className="header-content">
                                 <span>{header}</span>
                                 {isFilterable && (
@@ -1483,13 +2129,11 @@ const ScheduleHeader = ({ dates, headers, columnWidths, onResizeStart, stickyCol
                 ))}
             </tr>
             <tr>
-                {headers.map((_, i) => <th key={i} className={`col-sticky col-sticky-${i+1}`} style={{ width: columnWidths[i], left: stickyColumnPositions[i] }}></th>)}
-                {dates.map((date, i) => <th key={i} className={getDayAbbr(date) === 'SÁB' || getDayAbbr(date) === 'DOM' ? 'weekend' : ''}>{getDayAbbr(date)}</th>)}
+                {dates.map((date, i) => <th key={i} className={getDayAbbr(date) === 'SÁB' ? 'saturday-col' : getDayAbbr(date) === 'DOM' ? 'sunday-col' : ''}>{getDayAbbr(date)}</th>)}
             </tr>
             <tr>
-                {headers.map((_, i) => <th key={i} className={`col-sticky col-sticky-${i+1}`} style={{ width: columnWidths[i], left: stickyColumnPositions[i] }}></th>)}
                 {dates.map((date, i) => (
-                    <th key={i} style={{ width: columnWidths[headers.length + i] }} className={getDayAbbr(date) === 'SÁB' || getDayAbbr(date) === 'DOM' ? 'weekend' : ''}>
+                    <th key={i} style={{ width: columnWidths[headers.length + i] }} className={getDayAbbr(date) === 'SÁB' ? 'saturday-col' : getDayAbbr(date) === 'DOM' ? 'sunday-col' : ''}>
                         {date.getUTCDate()}
                         <div className="resize-handle" onMouseDown={e => onResizeStart(headers.length + i, e)}></div>
                     </th>
@@ -1502,7 +2146,7 @@ const ScheduleHeader = ({ dates, headers, columnWidths, onResizeStart, stickyCol
 const ScheduleBody = ({ 
     data, dates,
     isComparison, planType, columnWidths, stickyColumnPositions,
-    selectedItem, setSelectedItem,
+    selectedItems, onRowClick,
     // Optional props for full interactivity
     activeCell, onCellMouseDown, onCellMouseEnter, interaction,
     onTextUpdate, onAddItem, 
@@ -1514,8 +2158,8 @@ const ScheduleBody = ({
     planType: 'planned' | 'real' | null;
     columnWidths: number[];
     stickyColumnPositions: number[];
-    selectedItem?: SelectedItem | null;
-    setSelectedItem?: (item: SelectedItem | null) => void;
+    selectedItems?: SelectedItem[];
+    onRowClick?: (event: React.MouseEvent, item: SelectedItem) => void;
     activeCell?: { activityId: string; date: string } | null;
     onCellMouseDown?: (e: React.MouseEvent, activityId: string, dateStr: string) => void;
     onCellMouseEnter?: (activityId: string, dateStr: string) => void;
@@ -1534,12 +2178,8 @@ const ScheduleBody = ({
         const filteredData = data.filter(group => group.tarefas.length > 0 || (group.fa || group.componente));
 
         filteredData.forEach((group, groupIndex) => {
-            const visibleGroups = data.map((g, i) => ({...g, originalIndex: i})).filter(g => {
-                const groupWbs = `${g.originalIndex + 1}`;
-                return filteredData.some(fg => fg.id === g.id);
-            });
-            const wbsGroupIndex = visibleGroups.findIndex(g => g.id === group.id);
-            const groupWbs = `${wbsGroupIndex + 1}`;
+            const wbsGroupIndex = data.findIndex(g => g.id === group.id) + 1;
+            const groupWbs = `${wbsGroupIndex}`;
             
             if (group.tarefas.length === 0) {
                  rows.push({
@@ -1551,6 +2191,7 @@ const ScheduleBody = ({
                     renderTask: true,
                     taskRowSpan: 1,
                     wbsId: groupWbs,
+                    isLastInGroup: true,
                 });
                 return;
             }
@@ -1565,16 +2206,19 @@ const ScheduleBody = ({
                 let isFirstRowOfTask = true;
 
                 if (task.activities.length === 0) {
+                    const isLast = taskIndex === group.tarefas.length - 1;
                     rows.push({
                         group, task,
                         activity: { id: `empty-${task.id}`, name: '', schedule: {} },
                         renderGroup: isFirstRowOfGroup, groupRowSpan,
                         renderTask: isFirstRowOfTask, taskRowSpan: 1,
                         wbsId: taskWbs,
+                        isLastInGroup: isLast
                     });
                     isFirstRowOfGroup = false;
                 } else {
                     task.activities.forEach((activity, activityIndex) => {
+                        const isLast = (taskIndex === group.tarefas.length - 1) && (activityIndex === task.activities.length - 1);
                         const activityWbs = `${taskWbs}.${activityIndex + 1}`;
                         rows.push({
                             group, task, activity,
@@ -1583,6 +2227,7 @@ const ScheduleBody = ({
                             renderTask: isFirstRowOfTask,
                             taskRowSpan,
                             wbsId: activityWbs,
+                            isLastInGroup: isLast
                         });
                         isFirstRowOfGroup = false;
                         isFirstRowOfTask = false;
@@ -1605,25 +2250,26 @@ const ScheduleBody = ({
 
     return (
         <tbody onDragLeave={() => onDropTargetChange?.(null)}>
-            {renderableRows.map((row, rowIndex) => {
+            {renderableRows.map((row) => {
                 const isDraggingGroup = draggedGroupInfo?.group.id === row.group.id;
                 const isDropTarget = !isComparison && draggedGroupInfo && dropTargetId === row.group.id && draggedGroupInfo.group.id !== row.group.id;
                 
                 const rowEntity = getRowEntity(row);
-                const isSelected = !isComparison && selectedItem?.id === rowEntity.id;
+                const isSelected = !isComparison && selectedItems?.some(s => s.id === rowEntity.id);
                 
                 const trClass = [
                     isComparison ? (planType === 'planned' ? 'planned-row' : 'real-row') : '',
                     isDraggingGroup ? 'group-dragging' : '',
                     isSelected ? 'selected-row' : '',
-                    isDropTarget ? 'drop-target-top' : ''
+                    isDropTarget ? 'drop-target-top' : '',
+                    row.isLastInGroup ? 'group-divider' : '',
                 ].join(' ').trim();
 
                 return (
                     <tr 
                         key={row.activity.id + (planType || '')} 
                         className={trClass}
-                        onClick={() => !isComparison && setSelectedItem?.(isSelected ? null : rowEntity)}
+                        onClick={(e) => !isComparison && onRowClick?.(e, rowEntity)}
                         onDragOver={(e) => {
                             e.preventDefault();
                             if (!isComparison && onDropTargetChange) {
@@ -1723,12 +2369,12 @@ const ScheduleBody = ({
                             }
                             
                             const isActive = activeCell?.activityId === row.activity.id && activeCell?.date === dateStr;
-                            const isWeekend = getDayAbbr(date) === 'SÁB' || getDayAbbr(date) === 'DOM';
-                           
+                            const dayAbbr = getDayAbbr(date);
                             const cellClasses = ['status-cell'];
                             if(status) cellClasses.push(STATUS_CLASS_MAP[status]);
                             if(isActive) cellClasses.push('active-cell');
-                            if(isWeekend) cellClasses.push('weekend');
+                            if(dayAbbr === 'SÁB') cellClasses.push('saturday-col');
+                            if(dayAbbr === 'DOM') cellClasses.push('sunday-col');
                             if(isGhost) cellClasses.push('ghost');
                             if(isBeingDragged) cellClasses.push('is-being-dragged');
 
@@ -1799,35 +2445,79 @@ const ComparisonView = ({ savedPlan, liveData, dates, columnWidths, onResizeStar
     );
 };
 
-const DashboardView = ({ data }: { data: ScheduleData }) => {
+const DashboardView = ({ data, title, programmerName }: { data: ScheduleData, title: string, programmerName: string }) => {
   const chartRef = useRef<HTMLCanvasElement>(null);
   const chartInstance = useRef<Chart | null>(null);
+  const [selectedWeek, setSelectedWeek] = useState<string>('all');
+
+  const availableWeeks = useMemo(() => {
+    const weekSet = new Set<string>();
+    data.forEach(group => {
+        group.tarefas.forEach(task => {
+            task.activities.forEach(activity => {
+                Object.keys(activity.schedule).forEach(dateStr => {
+                    weekSet.add(getWeekYear(new Date(dateStr + 'T00:00:00Z')));
+                });
+            });
+        });
+    });
+    return Array.from(weekSet).sort();
+  }, [data]);
 
   const stats = useMemo(() => {
     let totalProgramado = 0;
-    let totalConcluido = 0;
+    let totalRealizado = 0;
     let totalCancelado = 0;
     let totalNaoRealizado = 0;
     const tasksPerComponent = new Map<string, number>();
 
+    let weekDates: Date[] | null = null;
+    if (selectedWeek !== 'all') {
+        weekDates = getDatesOfWeek(selectedWeek);
+    }
+    const weekDateStrings = weekDates ? new Set(weekDates.map(formatDate)) : null;
+
     data.forEach(group => {
       let taskCount = 0;
       group.tarefas.forEach(task => {
-        taskCount += task.activities.length;
+        let activityInWeek = false;
         task.activities.forEach(activity => {
-          Object.values(activity.schedule).forEach(status => {
-            if (status === Status.Programado) totalProgramado++;
-            if (status === Status.Concluido) totalConcluido++;
-            if (status === Status.Cancelado) totalCancelado++;
-            if (status === Status.NaoRealizado) totalNaoRealizado++;
+          let activityHasTaskInWeek = false;
+          Object.entries(activity.schedule).forEach(([date, status]) => {
+             if (weekDateStrings && !weekDateStrings.has(date)) {
+                return;
+             }
+             activityHasTaskInWeek = true;
+             if (status === Status.Programado) totalProgramado++;
+             if (status === Status.Realizado) totalRealizado++;
+             if (status === Status.Cancelado) totalCancelado++;
+             if (status === Status.NaoRealizado) totalNaoRealizado++;
           });
+          if(activityHasTaskInWeek) {
+            activityInWeek = true;
+          }
         });
+        if (activityInWeek) {
+             taskCount += task.activities.length;
+        }
       });
-      tasksPerComponent.set(group.componente, (tasksPerComponent.get(group.componente) || 0) + taskCount);
+      if(taskCount > 0){
+        tasksPerComponent.set(group.componente, (tasksPerComponent.get(group.componente) || 0) + taskCount);
+      }
     });
 
-    return { totalProgramado, totalConcluido, totalCancelado, totalNaoRealizado, tasksPerComponent };
-  }, [data]);
+    return { totalProgramado, totalRealizado, totalCancelado, totalNaoRealizado, tasksPerComponent };
+  }, [data, selectedWeek]);
+  
+  const handlePrint = () => {
+      let chartImage = null;
+      if (chartInstance.current) {
+          chartImage = chartInstance.current.toBase64Image();
+      }
+      const selectElement = document.querySelector('.dashboard-view select') as HTMLSelectElement;
+      const selectedWeekInfo = selectElement ? selectElement.options[selectElement.selectedIndex].text : 'Todas as Semanas';
+      exportDashboardToPdfAgent(stats, chartImage, title, programmerName, selectedWeekInfo);
+  };
 
   useEffect(() => {
     if (chartRef.current) {
@@ -1842,7 +2532,7 @@ const DashboardView = ({ data }: { data: ScheduleData }) => {
                     labels: Object.values(STATUS_LABELS),
                     datasets: [{
                         label: 'Status das Atividades',
-                        data: [stats.totalProgramado, stats.totalConcluido, stats.totalCancelado, stats.totalNaoRealizado],
+                        data: [stats.totalProgramado, stats.totalRealizado, stats.totalCancelado, stats.totalNaoRealizado],
                         backgroundColor: Object.values(STATUS_COLOR_MAP),
                     }]
                 },
@@ -1868,15 +2558,35 @@ const DashboardView = ({ data }: { data: ScheduleData }) => {
 
   return (
     <div className="dashboard-view">
-      <h2>Dashboard do Projeto</h2>
+      <div className="view-header">
+        <div>
+            <h2>Dashboard do Projeto</h2>
+            <p className="dashboard-subtitle">{title} - Responsável: {programmerName}</p>
+        </div>
+        <div className="dashboard-controls">
+            <select value={selectedWeek} onChange={e => setSelectedWeek(e.target.value)}>
+                <option value="all">Todas as Semanas</option>
+                {availableWeeks.map(week => {
+                    const [year, weekNum] = week.split('-');
+                    const dateRange = getDateRangeOfWeek(week);
+                    return (
+                        <option key={week} value={week}>Semana {weekNum} ({year}) {dateRange}</option>
+                    );
+                })}
+            </select>
+            <button className="control-button" onClick={handlePrint}>
+                <span className="material-icons" aria-hidden="true">print</span> Imprimir
+            </button>
+        </div>
+      </div>
       <div className="stats-grid">
         <div className="stat-card">
           <h3>Total Programado</h3>
           <p>{stats.totalProgramado}</p>
         </div>
         <div className="stat-card">
-          <h3>Total Concluído</h3>
-          <p style={{color: STATUS_COLOR_MAP[Status.Concluido]}}>{stats.totalConcluido}</p>
+          <h3>Total Realizado</h3>
+          <p style={{color: STATUS_COLOR_MAP[Status.Realizado]}}>{stats.totalRealizado}</p>
         </div>
         <div className="stat-card">
           <h3>Total Cancelado</h3>
@@ -1892,15 +2602,963 @@ const DashboardView = ({ data }: { data: ScheduleData }) => {
         </div>
         <div className="stat-card">
             <h3>Atividades por Componente</h3>
-            <ul>
-                {Array.from(stats.tasksPerComponent.entries()).map(([componente, count]) => (
-                    <li key={componente}><strong>{componente}:</strong> {count} atividades</li>
-                ))}
-            </ul>
+            {stats.tasksPerComponent.size > 0 ? (
+                 <ul>
+                    {Array.from(stats.tasksPerComponent.entries()).map(([componente, count]) => (
+                        <li key={componente}><strong>{componente}:</strong> {count} atividades</li>
+                    ))}
+                </ul>
+            ) : <p>Nenhuma atividade encontrada para a semana selecionada.</p>}
+           
         </div>
     </div>
   );
 };
+
+const ManpowerPrintModal = ({ isOpen, onClose, onConfirm, allWeeks, selectedWeeks, setSelectedWeeks }: {
+    isOpen: boolean;
+    onClose: () => void;
+    onConfirm: () => void;
+    allWeeks: string[];
+    selectedWeeks: Set<string>;
+    setSelectedWeeks: React.Dispatch<React.SetStateAction<Set<string>>>;
+}) => {
+    if (!isOpen) return null;
+
+    const handleToggleWeek = (week: string) => {
+        const newSelection = new Set(selectedWeeks);
+        if (newSelection.has(week)) {
+            newSelection.delete(week);
+        } else {
+            newSelection.add(week);
+        }
+        setSelectedWeeks(newSelection);
+    };
+
+    const handleSelectAll = () => setSelectedWeeks(new Set(allWeeks));
+    const handleClearAll = () => setSelectedWeeks(new Set());
+    
+    return (
+        <div className="modal-overlay">
+            <div className="modal-content">
+                <h2>Selecionar Semanas para Impressão</h2>
+                <div className="filter-quick-actions" style={{ justifyContent: 'flex-start', gap: '16px', paddingLeft: 0 }}>
+                     <button onClick={handleSelectAll}>Selecionar Todas</button>
+                     <button onClick={handleClearAll}>Limpar Seleção</button>
+                </div>
+                <ul className="weeks-to-print-list">
+                    {allWeeks.map(week => (
+                        <li key={week}>
+                            <label>
+                                <input
+                                    type="checkbox"
+                                    checked={selectedWeeks.has(week)}
+                                    onChange={() => handleToggleWeek(week)}
+                                />
+                                Semana {week.split('-')[1]} ({week.split('-')[0]})
+                            </label>
+                        </li>
+                    ))}
+                </ul>
+                 <div className="modal-actions">
+                    <button onClick={onClose} className="cancel-button">Cancelar</button>
+                    <button onClick={onConfirm} className="submit-button">Confirmar Impressão</button>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+
+const ManpowerAllocationTable = ({
+    shiftKey, shiftLabel, roles, data, weeks,
+    onQuantityChange, onAddRole, onDeleteRole, onRepeatWeek,
+    newRoleName, setNewRoleName
+}: {
+    shiftKey: 'adm' | 'shift2';
+    shiftLabel: string;
+    roles: string[];
+    data: ManpowerAllocationData;
+    weeks: string[];
+    onQuantityChange: (role: string, week: string, value: string) => void;
+    onAddRole: () => void;
+    onDeleteRole: (role: string) => void;
+    onRepeatWeek: (weekIndex: number) => void;
+    newRoleName?: string;
+    setNewRoleName?: React.Dispatch<React.SetStateAction<string>>;
+}) => {
+    const weeklyTotals = useMemo(() => {
+        const totals: Record<string, number> = {};
+        weeks.forEach(week => {
+            totals[week] = roles.reduce((sum, role) => sum + (data[role]?.[week] || 0), 0);
+        });
+        return totals;
+    }, [weeks, roles, data]);
+
+    const grandTotal = useMemo(() => Object.values(weeklyTotals).reduce((sum, val) => sum + val, 0), [weeklyTotals]);
+    
+    const handleRoleNameKeyDown = (e: React.KeyboardEvent) => {
+        if (e.key === 'Enter') { e.preventDefault(); onAddRole(); }
+    };
+
+    return (
+        <div className="shift-table-container">
+            <h3 className="shift-table-header">{shiftLabel}</h3>
+            <div className="table-wrapper">
+                <table className="manpower-table">
+                    <thead>
+                        <tr>
+                            <th className="sticky-col role-header">Mão de Obra</th>
+                            {weeks.map((week, index) => {
+                                const [year, weekNum] = week.split('-');
+                                return (
+                                    <th key={week}>
+                                        <div className="week-header-content">
+                                            <span>Semana {weekNum} ({year})</span>
+                                            {index > 0 && (
+                                                <button onClick={() => onRepeatWeek(index)} className="repeat-week-btn" title="Repetir alocação da semana anterior">
+                                                    <span className="material-icons">replay</span>
+                                                </button>
+                                            )}
+                                        </div>
+                                        <small className="week-date-range">{getDateRangeOfWeek(week)}</small>
+                                    </th>
+                                );
+                            })}
+                             <th className="total-col-end">Total (H-Sem)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {roles.map(role => {
+                            const rowTotal = Object.values(data[role] || {}).reduce((sum, val) => sum + val, 0);
+                            return (
+                                <tr key={role}>
+                                    <td className="sticky-col role-cell">
+                                        <span>{role}</span>
+                                        <button onClick={() => onDeleteRole(role)} className="delete-role-btn" title={`Excluir ${role}`}>
+                                            <span className="material-icons">delete_outline</span>
+                                        </button>
+                                    </td>
+                                    {weeks.map(week => {
+                                        const currentValue = data[role]?.[week] || 0;
+                                        return (
+                                            <td key={week}>
+                                                <div className="custom-number-input">
+                                                    <button onClick={() => onQuantityChange(role, week, String(Math.max(0, currentValue - 1)))}>-</button>
+                                                    <span className="number-display">{currentValue}</span>
+                                                    <button onClick={() => onQuantityChange(role, week, String(currentValue + 1))}>+</button>
+                                                </div>
+                                            </td>
+                                        );
+                                    })}
+                                    <td className="total-col-end">{rowTotal > 0 ? rowTotal : ''}</td>
+                                </tr>
+                            );
+                        })}
+                    </tbody>
+                    <tfoot>
+                         <tr className="summary-total-row">
+                            <td className="sticky-col"><strong>TOTAL (H-Sem)</strong></td>
+                            {weeks.map(week => (
+                                <td key={week}>
+                                    <strong>{weeklyTotals[week] > 0 ? weeklyTotals[week] : ''}</strong>
+                                </td>
+                            ))}
+                            <td className="total-col-end">
+                                <strong>{grandTotal > 0 ? grandTotal : ''}</strong>
+                            </td>
+                        </tr>
+                        {newRoleName !== undefined && setNewRoleName && (
+                        <tr>
+                            <td className="sticky-col add-role-cell">
+                                <input
+                                    type="text"
+                                    value={newRoleName}
+                                    onChange={e => setNewRoleName(e.target.value)}
+                                    onKeyDown={handleRoleNameKeyDown}
+                                    placeholder="Digitar outra mão de obra"
+                                />
+                            </td>
+                            <td colSpan={weeks.length + 1} className="add-role-cell">
+                                <button onClick={onAddRole} className="control-button">Adicionar</button>
+                            </td>
+                        </tr>
+                        )}
+                    </tfoot>
+                </table>
+            </div>
+        </div>
+    );
+};
+
+
+const ManpowerAllocationView = ({ project, setProject, dates, title }: {
+    project: Project,
+    setProject: React.Dispatch<React.SetStateAction<Project | null>>,
+    dates: Date[],
+    title: string,
+}) => {
+    const [newRoleName, setNewRoleName] = useState('');
+    const [hideEmptyRoles, setHideEmptyRoles] = useState(false);
+    const [isPrintModalOpen, setIsPrintModalOpen] = useState(false);
+    const [selectedWeeksForPrint, setSelectedWeeksForPrint] = useState<Set<string>>(new Set());
+
+    const weeks = useMemo(() => {
+        const weekSet = new Set<string>();
+        dates.forEach(date => {
+            weekSet.add(getWeekYear(date));
+        });
+        return Array.from(weekSet).sort();
+    }, [dates]);
+    
+    if (!project.manpowerAllocation) {
+        return <div className="placeholder-view">Dados de alocação de mão de obra não encontrados.</div>;
+    }
+
+    const { roles, data, hasSecondShift } = project.manpowerAllocation;
+    
+    const handleQuantityChange = (shift: 'adm' | 'shift2') => (role: string, week: string, value: string) => {
+        const quantity = parseInt(value, 10);
+        setProject(prevProject => {
+            if (!prevProject) return null;
+            const newProject = deepClone(prevProject);
+            const shiftData = newProject.manpowerAllocation.data[shift];
+            if (!shiftData[role]) {
+                shiftData[role] = {};
+            }
+            if (isNaN(quantity) || quantity <= 0) {
+                delete shiftData[role][week];
+            } else {
+                shiftData[role][week] = quantity;
+            }
+            return newProject;
+        });
+    };
+
+    const handleAddRole = () => {
+        if (newRoleName.trim() === '') return;
+        setProject(prevProject => {
+            if (!prevProject) return null;
+            if (prevProject.manpowerAllocation.roles.includes(newRoleName.trim())) return prevProject;
+            const newProject = deepClone(prevProject);
+            newProject.manpowerAllocation.roles.push(newRoleName.trim());
+            return newProject;
+        });
+        setNewRoleName('');
+    };
+    
+    const handleDeleteRole = (roleToDelete: string) => {
+        if (window.confirm(`Tem certeza que deseja excluir a mão de obra "${roleToDelete}"? Esta ação não pode ser desfeita.`)) {
+            setProject(prevProject => {
+                if (!prevProject) return null;
+                const newProject = deepClone(prevProject);
+                newProject.manpowerAllocation.roles = newProject.manpowerAllocation.roles.filter(r => r !== roleToDelete);
+                delete newProject.manpowerAllocation.data.adm[roleToDelete];
+                delete newProject.manpowerAllocation.data.shift2[roleToDelete];
+                return newProject;
+            });
+        }
+    };
+    
+    const handleRepeatWeek = (shift: 'adm' | 'shift2') => (weekIndex: number) => {
+        if (weekIndex === 0) return;
+        const currentWeek = weeks[weekIndex];
+        const prevWeek = weeks[weekIndex - 1];
+        setProject(prevProject => {
+            if (!prevProject) return null;
+            const newProject = deepClone(prevProject);
+            const { roles, data } = newProject.manpowerAllocation;
+            const shiftData = data[shift];
+            roles.forEach(role => {
+                const prevWeekValue = shiftData[role]?.[prevWeek];
+                if (!shiftData[role]) shiftData[role] = {};
+                if (prevWeekValue !== undefined && prevWeekValue > 0) {
+                    shiftData[role][currentWeek] = prevWeekValue;
+                } else {
+                    delete shiftData[role][currentWeek];
+                }
+            });
+            return newProject;
+        });
+    };
+    
+    const handleToggleShift = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const isChecked = e.target.checked;
+        setProject(p => {
+            if (!p) return null;
+            const newProject = deepClone(p);
+            newProject.manpowerAllocation.hasSecondShift = isChecked;
+            if (!isChecked) {
+                newProject.manpowerAllocation.data.shift2 = {}; // Clear data when disabling
+            }
+            return newProject;
+        });
+    };
+    
+    const filteredRoles = useMemo(() => {
+        if (!hideEmptyRoles) return roles;
+        return roles.filter(role => {
+            const totalAdm = Object.values(data.adm[role] || {}).reduce((sum, val) => sum + val, 0);
+            const totalShift2 = Object.values(data.shift2[role] || {}).reduce((sum, val) => sum + val, 0);
+            return (totalAdm + totalShift2) > 0;
+        });
+    }, [roles, data, hideEmptyRoles]);
+
+    const handlePrint = () => {
+        setSelectedWeeksForPrint(new Set(weeks));
+        setIsPrintModalOpen(true);
+    };
+
+    const handleConfirmPrint = () => {
+        const weeksToPrint = Array.from(selectedWeeksForPrint).sort();
+        if (weeksToPrint.length === 0) {
+            setIsPrintModalOpen(false);
+            return;
+        }
+        
+        exportManpowerToPdfAgent(filteredRoles, data, hasSecondShift, weeksToPrint, title);
+        setIsPrintModalOpen(false);
+    };
+
+    return (
+        <div className="manpower-view">
+            <div className="view-header">
+                <h2>Alocação de Mão de Obra por Semana</h2>
+                <div className="view-controls">
+                     <label className="toggle-switch">
+                        <input type="checkbox" checked={hasSecondShift} onChange={handleToggleShift} />
+                        <span className="slider"></span>
+                         Habilitar 2º Turno
+                    </label>
+                    <label className="toggle-switch">
+                        <input type="checkbox" checked={hideEmptyRoles} onChange={e => setHideEmptyRoles(e.target.checked)} />
+                        <span className="slider"></span>
+                         Ocultar MO não alocada
+                    </label>
+                    <button className="control-button" onClick={handlePrint}>
+                        <span className="material-icons" aria-hidden="true">print</span> Imprimir Programação
+                    </button>
+                </div>
+            </div>
+            
+            <ManpowerAllocationTable
+                shiftKey="adm"
+                shiftLabel="Turno ADM"
+                roles={filteredRoles}
+                data={data.adm}
+                weeks={weeks}
+                onQuantityChange={handleQuantityChange('adm')}
+                onAddRole={handleAddRole}
+                onDeleteRole={handleDeleteRole}
+                onRepeatWeek={handleRepeatWeek('adm')}
+                newRoleName={newRoleName}
+                setNewRoleName={setNewRoleName}
+            />
+
+            {hasSecondShift && (
+                 <ManpowerAllocationTable
+                    shiftKey="shift2"
+                    shiftLabel="2º Turno"
+                    roles={filteredRoles}
+                    data={data.shift2}
+                    weeks={weeks}
+                    onQuantityChange={handleQuantityChange('shift2')}
+                    onAddRole={handleAddRole}
+                    onDeleteRole={handleDeleteRole}
+                    onRepeatWeek={handleRepeatWeek('shift2')}
+                />
+            )}
+            
+            <ManpowerPrintModal 
+                isOpen={isPrintModalOpen}
+                onClose={() => setIsPrintModalOpen(false)}
+                onConfirm={handleConfirmPrint}
+                allWeeks={weeks}
+                selectedWeeks={selectedWeeksForPrint}
+                setSelectedWeeks={setSelectedWeeksForPrint}
+            />
+        </div>
+    );
+};
+
+const DailyAllocationView = ({ project, setProject, dates, filteredData, title }: {
+    project: Project;
+    setProject: React.Dispatch<React.SetStateAction<Project | null>>;
+    dates: Date[];
+    filteredData: ScheduleData;
+    title: string;
+}) => {
+    const [editingCell, setEditingCell] = useState<{ activityId: string; date: string } | null>(null);
+    const [draggedRole, setDraggedRole] = useState<string | null>(null);
+    const [dropTarget, setDropTarget] = useState<{ activityId: string; date: string } | null>(null);
+    const [dateColWidth, setDateColWidth] = useState(80);
+
+    const columnWidths = useMemo(() => {
+        const staticWidths = [50, 180, 180];
+        const dateWidths = Array(dates.length).fill(dateColWidth);
+        return [...staticWidths, ...dateWidths];
+    }, [dates.length, dateColWidth]);
+
+    const handleCellDoubleClick = (activityId: string, date: string) => {
+        setEditingCell({ activityId, date });
+    };
+    
+    const handlePrint = () => {
+        exportDailyAllocationToPdfAgent(project, dates, filteredData, title);
+    };
+
+    const handleAllocationChange = (activityId: string, date: string, role: string, quantityStr: string) => {
+        const quantity = parseInt(quantityStr, 10);
+        setProject(prev => {
+            if (!prev) return null;
+            const newProject = deepClone(prev);
+            const allocations = newProject.dailyManpowerAllocation;
+            if (!allocations[activityId]) allocations[activityId] = {};
+            if (!allocations[activityId][date]) allocations[activityId][date] = {};
+
+            if (isNaN(quantity) || quantity <= 0) {
+                delete allocations[activityId][date][role];
+                if (Object.keys(allocations[activityId][date]).length === 0) {
+                    delete allocations[activityId][date];
+                }
+            } else {
+                allocations[activityId][date][role] = quantity;
+            }
+            return newProject;
+        });
+    };
+
+    const handleDrop = (activityId: string, date: string) => {
+        if (!draggedRole) return;
+        
+        const currentQty = project.dailyManpowerAllocation[activityId]?.[date]?.[draggedRole] || 0;
+        const newQty = currentQty + 1;
+        handleAllocationChange(activityId, date, draggedRole, String(newQty));
+        
+        setDraggedRole(null);
+        setDropTarget(null);
+    };
+    
+    const dailyTotals = useMemo(() => {
+        const totals: Record<string, Record<string, number>> = {};
+        for (const date of dates) {
+            const dateStr = formatDate(date);
+            totals[dateStr] = {};
+            project.manpowerAllocation.roles.forEach(role => {
+                totals[dateStr][role] = 0;
+            });
+        }
+        
+        filteredData.forEach(group => {
+            group.tarefas.forEach(task => {
+                task.activities.forEach(activity => {
+                    if(project.dailyManpowerAllocation[activity.id]) {
+                        Object.entries(project.dailyManpowerAllocation[activity.id]).forEach(([dateStr, roles]) => {
+                            if (totals[dateStr]) {
+                                Object.entries(roles).forEach(([role, quantity]) => {
+                                    if(totals[dateStr][role] !== undefined) {
+                                        totals[dateStr][role] += quantity;
+                                    }
+                                });
+                            }
+                        });
+                    }
+                });
+            });
+        });
+        
+        return totals;
+    }, [project, dates, filteredData]);
+    
+    const weeklyAvailable = useMemo(() => {
+        const available: Record<string, Record<string, number>> = {}; // { [weekYear]: { [role]: quantity } }
+        const { roles, data, hasSecondShift } = project.manpowerAllocation;
+        dates.forEach(date => {
+            const weekYear = getWeekYear(date);
+            if (!available[weekYear]) {
+                available[weekYear] = {};
+                roles.forEach(role => {
+                    const admQty = data.adm[role]?.[weekYear] || 0;
+                    const shift2Qty = hasSecondShift ? (data.shift2[role]?.[weekYear] || 0) : 0;
+                    available[weekYear][role] = admQty + shift2Qty;
+                });
+            }
+        });
+        return available;
+    }, [project.manpowerAllocation, dates]);
+
+    const dailyGrandTotals = useMemo(() => {
+        const grandTotals: Record<string, { allocated: number; available: number }> = {};
+        for (const date of dates) {
+            const dateStr = formatDate(date);
+            const weekYear = getWeekYear(date);
+
+            const allocated = Object.values(dailyTotals[dateStr] || {}).reduce((sum, val) => sum + val, 0);
+            const available = Object.values(weeklyAvailable[weekYear] || {}).reduce((sum, val) => sum + val, 0);
+            
+            grandTotals[dateStr] = { allocated, available };
+        }
+        return grandTotals;
+    }, [dates, dailyTotals, weeklyAvailable]);
+    
+    const weekHeaders = useMemo(() => {
+        const weekMap = new Map<string, number>();
+        dates.forEach(date => {
+            const weekYear = getWeekYear(date);
+            weekMap.set(weekYear, (weekMap.get(weekYear) || 0) + 1);
+        });
+        return Array.from(weekMap.entries()).map(([week, count]) => ({ name: `Semana ${week.split('-')[1]}`, count }));
+    }, [dates]);
+
+    return (
+        <div className="daily-allocation-view">
+            <div className="view-header">
+                <h2>Alocação Diária de Mão de Obra</h2>
+                <div className="view-controls daily-allocation-controls">
+                     <div className="zoom-control">
+                        <span className="material-icons">zoom_out</span>
+                        <input
+                            type="range"
+                            min="40"
+                            max="150"
+                            value={dateColWidth}
+                            onChange={e => setDateColWidth(Number(e.target.value))}
+                        />
+                        <span className="material-icons">zoom_in</span>
+                    </div>
+                    <button className="control-button" onClick={handlePrint}>
+                        <span className="material-icons" aria-hidden="true">print</span> Imprimir Alocação
+                    </button>
+                </div>
+            </div>
+             <div className="daily-allocation-content">
+                 <div className="mo-draggables-panel">
+                    <h3>Mão de Obra</h3>
+                    {Object.entries(MANPOWER_CATEGORIES).map(([category, rolesInCategory]) => (
+                        <details key={category} open>
+                            <summary>{category}</summary>
+                            {rolesInCategory
+                                .filter(role => project.manpowerAllocation.roles.includes(role))
+                                .map(role => (
+                                <div 
+                                    key={role}
+                                    className="mo-draggable-item"
+                                    draggable
+                                    onDragStart={(e) => {
+                                        setDraggedRole(role);
+                                        e.dataTransfer.setData("text/plain", role);
+                                        e.dataTransfer.effectAllowed = "copy";
+                                    }}
+                                    onDragEnd={() => setDraggedRole(null)}
+                                >
+                                    {role}
+                                </div>
+                            ))}
+                        </details>
+                    ))}
+                    {(() => {
+                        const customRoles = project.manpowerAllocation.roles.filter(r => !PREDEFINED_MANPOWER_ROLES.includes(r));
+                        if (customRoles.length === 0) return null;
+                        return (
+                            <details open>
+                                <summary>Outros</summary>
+                                {customRoles.map(role => (
+                                    <div 
+                                        key={role}
+                                        className="mo-draggable-item"
+                                        draggable
+                                        onDragStart={(e) => {
+                                            setDraggedRole(role);
+                                            e.dataTransfer.setData("text/plain", role);
+                                            e.dataTransfer.effectAllowed = "copy";
+                                        }}
+                                        onDragEnd={() => setDraggedRole(null)}
+                                    >
+                                        {role}
+                                    </div>
+                                ))}
+                            </details>
+                        );
+                    })()}
+                </div>
+                <div className="table-wrapper">
+                    <table className="daily-allocation-table" style={{ width: columnWidths.reduce((a, b) => a + b, 0) }}>
+                        <thead>
+                            <tr className="week-header-row">
+                                <th style={{width: columnWidths[0]}}></th>
+                                <th style={{width: columnWidths[1]}}></th>
+                                <th style={{width: columnWidths[2]}}></th>
+                                {weekHeaders.map((week, index) => (
+                                     <th key={index} colSpan={week.count}>{week.name}</th>
+                                ))}
+                            </tr>
+                            <tr>
+                                <th style={{width: columnWidths[0]}}>ID</th>
+                                <th style={{width: columnWidths[1]}}>Tarefa Principal</th>
+                                <th style={{width: columnWidths[2]}}>Atividade</th>
+                                {dates.map((date, i) => (
+                                    <th key={formatDate(date)} style={{width: columnWidths[3 + i]}} className={getDayAbbr(date) === 'SÁB' ? 'saturday-col' : getDayAbbr(date) === 'DOM' ? 'sunday-col' : ''}>
+                                        {getDayAbbr(date)}<br/>{date.getUTCDate()}
+                                    </th>
+                                ))}
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {filteredData.flatMap((group, gIdx) =>
+                                group.tarefas.flatMap((task, tIdx) =>
+                                    task.activities.map((activity, aIdx) => {
+                                        const wbs = `${gIdx + 1}.${tIdx + 1}.${aIdx + 1}`;
+                                        return (
+                                        <tr key={activity.id}>
+                                            <td>{wbs}</td>
+                                            <td>{task.title}</td>
+                                            <td>{activity.name}</td>
+                                            {dates.map(date => {
+                                                const dateStr = formatDate(date);
+                                                const dayAbbr = getDayAbbr(date);
+                                                const cellAllocation = project.dailyManpowerAllocation[activity.id]?.[dateStr] || {};
+                                                const isEditing = editingCell?.activityId === activity.id && editingCell?.date === dateStr;
+                                                const scheduleStatus = activity.schedule[dateStr];
+                                                const isDropTarget = dropTarget?.activityId === activity.id && dropTarget?.date === dateStr;
+
+                                                const cellClasses = [
+                                                    'allocation-cell',
+                                                    dayAbbr === 'SÁB' ? 'saturday-col' : '',
+                                                    dayAbbr === 'DOM' ? 'sunday-col' : '',
+                                                    isDropTarget ? 'drop-target' : '',
+                                                    scheduleStatus ? STATUS_CLASS_MAP[scheduleStatus] : '',
+                                                ].filter(Boolean).join(' ');
+
+                                                return (
+                                                    <td
+                                                        key={dateStr}
+                                                        className={cellClasses}
+                                                        onDoubleClick={() => handleCellDoubleClick(activity.id, dateStr)}
+                                                        onDragOver={(e) => {
+                                                            if (draggedRole) {
+                                                                e.preventDefault();
+                                                                setDropTarget({ activityId: activity.id, date: dateStr });
+                                                            }
+                                                        }}
+                                                        onDragLeave={() => setDropTarget(null)}
+                                                        onDrop={(e) => {
+                                                            e.preventDefault();
+                                                            handleDrop(activity.id, dateStr);
+                                                        }}
+                                                    >
+                                                    {isEditing ? (
+                                                        <div className="allocation-cell-editor" onClick={e => e.stopPropagation()}>
+                                                            {project.manpowerAllocation.roles.map(role => (
+                                                                <div key={role} className="editor-row">
+                                                                    <label>{role}</label>
+                                                                    <input
+                                                                        type="number"
+                                                                        min="0"
+                                                                        value={cellAllocation[role] || ''}
+                                                                        onChange={e => handleAllocationChange(activity.id, dateStr, role, e.target.value)}
+                                                                        placeholder="0"
+                                                                        autoFocus={role === project.manpowerAllocation.roles[0]}
+                                                                    />
+                                                                </div>
+                                                            ))}
+                                                             <button onClick={() => setEditingCell(null)}>Fechar</button>
+                                                        </div>
+                                                    ) : (
+                                                        <div className="allocation-summary">
+                                                            {Object.entries(cellAllocation).map(([role, qty]) => (
+                                                                <div key={role}>{getRoleAbbreviation(role)}: <strong>{qty}</strong></div>
+                                                            ))}
+                                                        </div>
+                                                    )}
+                                                    </td>
+                                                );
+                                            })}
+                                        </tr>
+                                    )})
+                                )
+                            )}
+                        </tbody>
+                        <tfoot>
+                            <tr className="summary-header-row">
+                                <th colSpan={3}>Resumo de Alocação Diária</th>
+                                {dates.map(date => <th key={formatDate(date)}>{getDayAbbr(date)}</th>)}
+                            </tr>
+                            {project.manpowerAllocation.roles.map(role => {
+                                return (
+                                    <tr key={role} className="summary-total-row">
+                                        <td colSpan={3}>{role}</td>
+                                        {dates.map(date => {
+                                            const dateStr = formatDate(date);
+                                            const weekYear = getWeekYear(date);
+                                            const totalDaily = dailyTotals[dateStr]?.[role] || 0;
+                                            const availableWeekly = weeklyAvailable[weekYear]?.[role] || 0;
+                                            const isSuperAllocated = totalDaily > availableWeekly;
+                                            return (
+                                                <td key={dateStr} className={isSuperAllocated ? 'super-allocated' : ''}>
+                                                    {totalDaily} / {availableWeekly}
+                                                </td>
+                                            );
+                                        })}
+                                    </tr>
+                                );
+                            })}
+                             <tr className="summary-total-row grand-total">
+                                <td colSpan={3}><strong>TOTAL GERAL</strong></td>
+                                {dates.map(date => {
+                                    const dateStr = formatDate(date);
+                                    const totals = dailyGrandTotals[dateStr];
+                                    const isSuperAllocated = totals.allocated > totals.available;
+                                    return (
+                                        <td key={dateStr} className={isSuperAllocated ? 'super-allocated' : ''}>
+                                            <strong>{totals.allocated} / {totals.available}</strong>
+                                        </td>
+                                    );
+                                })}
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+             </div>
+        </div>
+    );
+};
+
+const ManpowerDashboardView = ({ project, dates, title, programmerName }: {
+    project: Project;
+    dates: Date[];
+    title: string;
+    programmerName: string;
+}) => {
+    const chartRef = useRef<HTMLCanvasElement>(null);
+    const chartInstance = useRef<Chart | null>(null);
+    const [chartMode, setChartMode] = useState<'byRole' | 'byWeek'>('byRole');
+    
+    const availableWeeks = useMemo(() => {
+        const weekSet = new Set<string>();
+        dates.forEach(date => {
+            weekSet.add(getWeekYear(date));
+        });
+        const manpowerWeeks = new Set(Object.keys(project.manpowerAllocation.data.adm).concat(Object.keys(project.manpowerAllocation.data.shift2)));
+        manpowerWeeks.forEach(w => {
+            if (Object.values(project.manpowerAllocation.data.adm).some(roleData => roleData[w] > 0) ||
+                Object.values(project.manpowerAllocation.data.shift2).some(roleData => roleData[w] > 0)) {
+                weekSet.add(w);
+            }
+        });
+        return Array.from(weekSet).sort();
+    }, [dates, project.manpowerAllocation.data]);
+    
+    const [selectedWeek, setSelectedWeek] = useState<string>(() => availableWeeks[0] || 'all');
+
+    useEffect(() => {
+        if (availableWeeks.length > 0 && !availableWeeks.includes(selectedWeek)) {
+            setSelectedWeek(availableWeeks[0]);
+        }
+    }, [availableWeeks, selectedWeek]);
+    
+    const chartData = useMemo(() => {
+        const { roles, data, hasSecondShift } = project.manpowerAllocation;
+        if (chartMode === 'byRole') {
+            if (selectedWeek === 'all' || !selectedWeek) return { labels: [], datasets: [] };
+        
+            const labels = roles.filter(role => {
+                const admQty = data.adm[role]?.[selectedWeek] || 0;
+                const shift2Qty = data.shift2[role]?.[selectedWeek] || 0;
+                return admQty > 0 || shift2Qty > 0;
+            });
+
+            const admData = labels.map(role => data.adm[role]?.[selectedWeek] || 0);
+            const shift2Data = hasSecondShift ? labels.map(role => data.shift2[role]?.[selectedWeek] || 0) : [];
+            
+            const datasets: any[] = [{
+                label: 'Turno ADM',
+                data: admData,
+                backgroundColor: 'rgba(74, 144, 226, 0.8)',
+                borderColor: 'rgba(74, 144, 226, 1)',
+                borderWidth: 1
+            }];
+
+            if (hasSecondShift) {
+                datasets.push({
+                    label: '2º Turno',
+                    data: shift2Data,
+                    backgroundColor: 'rgba(255, 159, 64, 0.8)',
+                    borderColor: 'rgba(255, 159, 64, 1)',
+                    borderWidth: 1
+                });
+            }
+            return { labels, datasets };
+        } else { // byWeek mode
+            const weeklyTotals: { [week: string]: { adm: number; shift2: number } } = {};
+            availableWeeks.forEach(week => {
+                let admTotal = 0;
+                let shift2Total = 0;
+                roles.forEach(role => {
+                    admTotal += data.adm[role]?.[week] || 0;
+                    if(data.shift2[role]) {
+                       shift2Total += data.shift2[role][week] || 0;
+                    }
+                });
+                weeklyTotals[week] = { adm: admTotal, shift2: shift2Total };
+            });
+
+            const labels = availableWeeks.map(w => `Semana ${w.split('-')[1]}`);
+            const admData = availableWeeks.map(w => weeklyTotals[w].adm);
+            const shift2Data = hasSecondShift ? availableWeeks.map(w => weeklyTotals[w].shift2) : [];
+            
+            const datasets: any[] = [{
+                label: 'Turno ADM',
+                data: admData,
+                backgroundColor: 'rgba(74, 144, 226, 0.8)',
+            }];
+
+            if (hasSecondShift) {
+                datasets.push({
+                    label: '2º Turno',
+                    data: shift2Data,
+                    backgroundColor: 'rgba(255, 159, 64, 0.8)',
+                });
+            }
+            return { labels, datasets };
+        }
+
+    }, [chartMode, selectedWeek, project.manpowerAllocation, availableWeeks]);
+
+    useEffect(() => {
+        // Plugin to draw data labels on bars
+        const dataLabelsPlugin = {
+            id: 'customDataLabels',
+            afterDatasetsDraw: (chart: Chart) => {
+                const { ctx } = chart;
+                ctx.save();
+        
+                chart.data.datasets.forEach((dataset, i) => {
+                    const meta = chart.getDatasetMeta(i);
+                    if (!meta.hidden) {
+                        ctx.font = 'bold 11px var(--font-family)';
+                        ctx.textAlign = 'center';
+                        ctx.textBaseline = 'middle';
+                        
+                        meta.data.forEach((element, index) => {
+                            const dataVal = dataset.data[index];
+                            if (dataVal && typeof dataVal === 'number' && dataVal > 0) {
+                                const { x, y, base } = element.getProps(['x', 'y', 'base']);
+                                const barHeight = base - y;
+                                
+                                if (barHeight > 15) { // Only draw if bar is tall enough
+                                    const yPos = y + (barHeight / 2);
+                                    
+                                    // Use a contrasting color for the text
+                                    const barColor = (dataset.backgroundColor as string[] | string);
+                                    const color = Array.isArray(barColor) ? barColor[index] : barColor;
+                                    const r = parseInt(color.substring(color.indexOf('(') + 1, color.indexOf(',')));
+                                    const g = parseInt(color.substring(color.indexOf(',') + 1, color.lastIndexOf(',')));
+                                    const b = parseInt(color.substring(color.lastIndexOf(',') + 1, color.indexOf(')')));
+                                    const brightness = ((r * 299) + (g * 587) + (b * 114)) / 1000;
+                                    ctx.fillStyle = brightness > 155 ? '#2d3748' : '#ffffff';
+                                    
+                                    ctx.fillText(String(dataVal), x, yPos);
+                                }
+                            }
+                        });
+                    }
+                });
+                ctx.restore();
+            },
+        };
+        
+        if (chartRef.current) {
+            if (chartInstance.current) {
+                chartInstance.current.destroy();
+            }
+            const ctx = chartRef.current.getContext('2d');
+            if (ctx) {
+                chartInstance.current = new Chart(ctx, {
+                    type: 'bar',
+                    data: chartData,
+                    plugins: [dataLabelsPlugin],
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: { position: 'top' },
+                            title: { 
+                                display: true, 
+                                text: chartMode === 'byRole' 
+                                    ? `Histograma de Mão de Obra para a Semana ${selectedWeek.split('-')[1]}`
+                                    : 'Total de Mão de Obra por Semana'
+                            }
+                        },
+                        scales: {
+                            x: { stacked: chartMode === 'byRole' },
+                            y: { stacked: chartMode === 'byRole', beginAtZero: true, title: { display: true, text: 'Quantidade de Pessoas' } }
+                        }
+                    }
+                });
+            }
+        }
+        return () => {
+            if (chartInstance.current) {
+                chartInstance.current.destroy();
+                chartInstance.current = null;
+            }
+        };
+    }, [chartData, selectedWeek, chartMode]);
+
+    const handlePrint = () => {
+        let chartImage = null;
+        if (chartInstance.current) {
+            chartImage = chartInstance.current.toBase64Image();
+        }
+        const selectElement = document.getElementById('week-select-mo') as HTMLSelectElement;
+        const selectedWeekInfo = chartMode === 'byRole' 
+            ? (selectElement ? selectElement.options[selectElement.selectedIndex].text : 'N/A')
+            : 'Todas as Semanas';
+        exportManpowerDashboardToPdfAgent(chartImage, title, programmerName, selectedWeekInfo);
+    };
+    
+    return (
+        <div className="manpower-dashboard-view">
+            <div className="view-header">
+                <div>
+                    <h2>Dashboard de Mão de Obra</h2>
+                    <p className="dashboard-subtitle">{title} - Responsável: {programmerName}</p>
+                </div>
+                <div className="dashboard-controls">
+                     <div className="chart-mode-toggle">
+                        <button className={chartMode === 'byRole' ? 'active' : ''} onClick={() => setChartMode('byRole')}>Por Função</button>
+                        <button className={chartMode === 'byWeek' ? 'active' : ''} onClick={() => setChartMode('byWeek')}>Total por Semana</button>
+                    </div>
+                    {chartMode === 'byRole' && (
+                    <>
+                        <label htmlFor="week-select-mo">Selecionar Semana:</label>
+                        <select id="week-select-mo" value={selectedWeek} onChange={e => setSelectedWeek(e.target.value)}>
+                            {availableWeeks.map(week => {
+                                const [year, weekNum] = week.split('-');
+                                const dateRange = getDateRangeOfWeek(week);
+                                return (
+                                <option key={week} value={week}>Semana {weekNum} ({year}) {dateRange}</option>
+                                );
+                            })}
+                        </select>
+                    </>
+                    )}
+                    <button className="control-button" onClick={handlePrint}>
+                        <span className="material-icons" aria-hidden="true">print</span> Imprimir
+                    </button>
+                </div>
+            </div>
+            <div className="chart-container">
+                {chartData.labels.length > 0 ? (
+                    <canvas ref={chartRef}></canvas>
+                ) : (
+                    <p>Nenhuma mão de obra alocada para a(s) semana(s) selecionada(s).</p>
+                )}
+            </div>
+        </div>
+    );
+};
+
 
 // --- MAIN APP COMPONENT ---
 const App = () => {
@@ -1922,16 +3580,18 @@ const App = () => {
   
   const [isImportModalOpen, setImportModalOpen] = useState(false);
   const [isLoadModalOpen, setLoadModalOpen] = useState(false);
-  const [isSaveModalOpen, setSaveModalOpen] = useState(false);
+  const [isSaveModalOpen, setisSaveModalOpen] = useState(false);
+  const [isDeletionModalOpen, setDeletionModalOpen] = useState(false);
+  const [isPrintModalOpen, setPrintModalOpen] = useState(false);
+  const [weeksToPrint, setWeeksToPrint] = useState(4);
   const [isSidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [currentPage, setCurrentPage] = useState<Page>('schedule');
-  const [selectedItem, setSelectedItem] = useState<SelectedItem | null>(null);
+  const [selectedItems, setSelectedItems] = useState<SelectedItem[]>([]);
   
   const [draggedGroupInfo, setDraggedGroupInfo] = useState<{ group: Grupo, index: number } | null>(null);
   const [dropTargetId, setDropTargetId] = useState<string | null>(null);
 
-  const [columnWidths, setColumnWidths] = useState<number[]>([50, 120, 130, 130, 280, 250, 80].concat(Array(28).fill(35)));
-  const [dateColumnWidth, setDateColumnWidth] = useState(35);
+  const [columnWidths, setColumnWidths] = useState<number[]>([50, 120, 130, 130, 280, 250].concat(Array(28).fill(35)));
   const [resizingInfo, setResizingInfo] = useState({ isResizing: false, columnIndex: null as number | null, startX: 0, startWidth: 0 });
   const gridRef = useRef<HTMLDivElement>(null);
 
@@ -1987,8 +3647,7 @@ const App = () => {
         const lastActiveId = localStorage.getItem(`pcp-lastActive-${currentUser}`);
         const projectToLoad = userProjects[lastActiveId!] || Object.values(userProjects).sort((a,b) => b.lastModified - a.lastModified)[0];
         if (projectToLoad) {
-          setActiveProject(projectToLoad);
-          dispatch({ type: 'LOAD_DATA', payload: projectToLoad.liveData });
+          handleLoadProject(projectToLoad.id);
         }
     }
   }, [currentUser, projects, activeProject]);
@@ -2038,7 +3697,7 @@ const App = () => {
     dispatch({ type: 'LOAD_DATA', payload: newProject.liveData });
     updateAndPersistProjects(updatedProjects);
     localStorage.setItem(`pcp-lastActive-${currentUser}`, newProject.id);
-    setSaveModalOpen(false);
+    setisSaveModalOpen(false);
     addToast(`Projeto '${name}' criado com sucesso!`, 'success');
   };
   
@@ -2057,6 +3716,19 @@ const App = () => {
     if (!currentUser) return;
     const projectToLoad = projects[currentUser]?.[projectId];
     if (projectToLoad) {
+        // Backwards compatibility for manpower shifts
+        if (projectToLoad.manpowerAllocation && !(projectToLoad.manpowerAllocation.data as any).adm) {
+            const oldData = projectToLoad.manpowerAllocation.data as unknown as ManpowerAllocationData;
+            projectToLoad.manpowerAllocation.data = {
+                adm: oldData,
+                shift2: {}
+            };
+            projectToLoad.manpowerAllocation.hasSecondShift = false;
+        }
+
+        if (!projectToLoad.dailyManpowerAllocation) {
+            projectToLoad.dailyManpowerAllocation = {};
+        }
         setActiveProject(projectToLoad);
         setCurrentStartDate(new Date(projectToLoad.startDate + 'T00:00:00Z'));
         dispatch({ type: 'LOAD_DATA', payload: projectToLoad.liveData });
@@ -2112,6 +3784,10 @@ const App = () => {
   
   const handleSavePlan = useCallback(() => {
     if (!activeProject || !currentUser) return;
+    if (liveData.length === 0) {
+        addToast("Não é possível definir um cronograma vazio como base.", "error");
+        return;
+    }
     if (window.confirm("Deseja salvar o estado atual como o novo 'Planejamento Base'? Esta ação substituirá o plano anterior.")) {
       const projectWithSavedPlan = { ...activeProject, savedPlan: deepClone(liveData), lastModified: Date.now() };
       setActiveProject(projectWithSavedPlan);
@@ -2129,23 +3805,24 @@ const App = () => {
       dispatch({ type: 'ADD_ITEM', payload: { type, parentId } });
   }, []);
 
-  const handleDeleteSelectedItem = useCallback(() => {
-    if (!selectedItem) return;
+  const handleConfirmDeletion = useCallback((itemsToDelete: { id: string, type: 'group' | 'task' | 'activity' }[]) => {
+    dispatch({ type: 'BATCH_DELETE_ITEMS', payload: itemsToDelete });
+    const message = itemsToDelete.length > 1
+        ? `${itemsToDelete.length} itens foram excluídos com sucesso.`
+        : `O item selecionado foi excluído com sucesso.`;
+    addToast(message, 'success');
+    setSelectedItems([]); // Clear selection after deletion
+  }, [addToast]);
 
-    const { type, id, name } = selectedItem;
-    const typeLabels = { group: 'Grupo', task: 'Tarefa', activity: 'Atividade' };
-
-    if (window.confirm(`Tem certeza que deseja excluir o item selecionado?\n\nTipo: ${typeLabels[type]}\nNome: ${name}`)) {
-        dispatch({ type: 'DELETE_ITEM', payload: { type, id } });
-        addToast(`Item '${name}' excluído com sucesso.`, 'success');
-        setSelectedItem(null); // Clear selection after deletion
-    }
-  }, [selectedItem, addToast]);
+  const handleDeleteSelectedItems = useCallback(() => {
+    if (selectedItems.length === 0) return;
+    setDeletionModalOpen(true);
+  }, [selectedItems]);
 
   const handleClearAll = useCallback(() => {
     if (window.confirm("TEM CERTEZA? Esta ação vai apagar TODOS os grupos, tarefas e atividades do projeto. A ação pode ser desfeita com o botão 'Desfazer'.")) {
         dispatch({ type: 'CLEAR_ALL' });
-        setSelectedItem(null);
+        setSelectedItems([]);
     }
   }, []);
   
@@ -2240,7 +3917,7 @@ const App = () => {
           [column]: selections
       }));
       setOpenFilter(null);
-      setSelectedItem(null); // Deselect when filters change
+      setSelectedItems([]); // Deselect when filters change
   }, []);
   
   const filterOptions = useMemo(() => {
@@ -2298,30 +3975,36 @@ const App = () => {
 
   const handleDateChange = useCallback((newDateStr: string) => {
     const newDate = new Date(newDateStr + 'T00:00:00Z');
+    if (isNaN(newDate.getTime())) {
+        addToast("Data de início inválida.", "error");
+        return;
+    }
     setCurrentStartDate(newDate);
     if(activeProject){
         setActiveProject(p => p ? { ...p, startDate: newDateStr } : null);
     }
-  }, [activeProject]);
+  }, [activeProject, addToast]);
 
   const handleExportExcel = () => exportToExcelAgent(filteredData, dates, title, addToast);
-  const handleExportPdf = () => exportToPdfAgent(filteredData, dates, title, addToast, activeProject!.lastModified, activeProject!.programmerName);
+  
+  const handleConfirmPrint = () => {
+    if (!activeProject) return;
+    if (weeksToPrint <= 0) {
+        addToast("O número de semanas deve ser maior que zero.", "error");
+        return;
+    }
+    const printDates = Array.from({ length: weeksToPrint * 7 }, (_, i) => {
+        const d = new Date(currentStartDate);
+        d.setUTCDate(currentStartDate.getUTCDate() + i);
+        return d;
+    });
+    exportToPdfAgent(filteredData, printDates, title, addToast, activeProject.lastModified, activeProject.programmerName);
+    setPrintModalOpen(false);
+  };
   
   const scheduleHeaders = useMemo(() => ['ID', 'Fase/Agrupador', 'COMPONENTE', 'SETOR', 'TAREFA PRINCIPAL', 'ATIVIDADE'], []);
   const comparisonHeaders = useMemo(() => ['ID', 'Fase/Agrupador', 'COMPONENTE', 'SETOR', 'TAREFA PRINCIPAL', 'ATIVIDADE', 'PLANO'], []);
   const headers = currentPage === 'comparison' ? comparisonHeaders : scheduleHeaders;
-
-  const handleZoomChange = useCallback((newWidth: number) => {
-    setDateColumnWidth(newWidth);
-    setColumnWidths(currentWidths => {
-        const newWidths = [...currentWidths];
-        const dateStartIndex = headers.length;
-        for (let i = dateStartIndex; i < newWidths.length; i++) {
-            newWidths[i] = newWidth;
-        }
-        return newWidths;
-    });
-  }, [headers]);
 
   const handleGoToWeek = useCallback(() => {
     if (!goToWeekInput || goToWeekInput < 1 || goToWeekInput > 53) {
@@ -2349,11 +4032,7 @@ const App = () => {
       handleDragEnd();
       return;
     }
-    
-    const fromId = draggedGroupInfo.group.id;
-    const toId = dropTargetId; // Can be a group ID or null for the end
-
-    dispatch({ type: 'MOVE_GROUP', payload: { fromId, toId } });
+    dispatch({ type: 'MOVE_GROUP', payload: { fromId: draggedGroupInfo.group.id, toId: dropTargetId } });
     handleDragEnd();
   }, [draggedGroupInfo, dropTargetId]);
   
@@ -2361,211 +4040,177 @@ const App = () => {
       setDraggedGroupInfo(null);
       setDropTargetId(null);
   }, []);
-
-  useEffect(() => {
-      const handleGlobalKeyDown = (e: KeyboardEvent) => {
-        if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') { e.preventDefault(); handleUndo(); }
-        if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'y') { e.preventDefault(); handleRedo(); }
-        if (e.key === 'Delete' && activeCell) {
-          e.preventDefault();
-          const newData = deepClone(liveData);
-          const activity = newData.flatMap(g => g.tarefas.flatMap(t => t.activities)).find(a => a.id === activeCell.activityId);
-          if (activity && activity.schedule[activeCell.date]) {
-              delete activity.schedule[activeCell.date];
-              dispatch({ type: 'UPDATE_SCHEDULE', payload: newData });
-          }
-          setActiveCell(null);
-        }
-      };
-      const handleClickOutside = (e: MouseEvent) => {
-        const target = e.target as HTMLElement;
-        if (activeCell && !target.closest('.status-cell')) setActiveCell(null);
-        if (openFilter && !target.closest('.filter-dropdown')) handleCloseFilter();
-        if (selectedItem && !target.closest('.schedule-table, .ai-agent-status')) setSelectedItem(null);
-      };
-      window.addEventListener('keydown', handleGlobalKeyDown);
-      document.addEventListener('click', handleClickOutside);
-      return () => {
-          window.removeEventListener('keydown', handleGlobalKeyDown);
-          document.removeEventListener('click', handleClickOutside);
-      };
-  }, [handleUndo, handleRedo, activeCell, liveData, openFilter, handleCloseFilter, selectedItem]);
   
-
-  const stickyColumnPositions = useMemo(() => {
-    const positions: number[] = [0];
-    let accumulatedWidth = 0;
-    for (let i = 0; i < headers.length; i++) {
-        accumulatedWidth += columnWidths[i] || 0;
-        positions.push(accumulatedWidth);
-    }
-    return positions.slice(0, -1);
-  }, [columnWidths, headers]);
-
-  useEffect(() => {
-    const handleMouseMove = (e: MouseEvent) => {
-        if (resizingInfo.isResizing && resizingInfo.columnIndex !== null) {
-            const newWidth = resizingInfo.startWidth + e.clientX - resizingInfo.startX;
-            if (newWidth > 40) {
-                setColumnWidths(currentWidths => {
-                    const newWidths = [...currentWidths];
-                    newWidths[resizingInfo.columnIndex!] = newWidth;
-                    return newWidths;
-                });
+  const handleRowClick = useCallback((event: React.MouseEvent, item: SelectedItem) => {
+    const isCtrlPressed = event.ctrlKey || event.metaKey;
+    setSelectedItems(prev => {
+        const isAlreadySelected = prev.some(s => s.id === item.id);
+        if (isCtrlPressed) {
+            if (isAlreadySelected) {
+                return prev.filter(s => s.id !== item.id);
+            } else {
+                return [...prev, item];
             }
+        } else {
+            if (isAlreadySelected && prev.length === 1) {
+                return [];
+            }
+            return [item];
         }
-    };
-    const handleMouseUp = () => {
-        if (resizingInfo.isResizing) {
-            document.body.style.cursor = 'default';
-            setResizingInfo({ isResizing: false, columnIndex: null, startX: 0, startWidth: 0 });
-        }
-    };
-    
-    if (resizingInfo.isResizing) document.body.style.cursor = 'col-resize';
-    window.addEventListener('mousemove', handleMouseMove);
-    window.addEventListener('mouseup', handleMouseUp);
-    return () => {
-        window.removeEventListener('mousemove', handleMouseMove);
-        window.removeEventListener('mouseup', handleMouseUp);
-    };
-  }, [resizingInfo]);
+    });
+  }, []);
+  
+  // Column resizing logic
+  const stickyColumnPositions = useMemo(() => {
+    const positions = [0];
+    for (let i = 0; i < columnWidths.length -1; i++) {
+        positions.push(positions[i] + columnWidths[i]);
+    }
+    return positions;
+  }, [columnWidths]);
 
   const handleResizeStart = useCallback((columnIndex: number, e: React.MouseEvent) => {
-      e.preventDefault();
-      setResizingInfo({
-          isResizing: true,
-          columnIndex,
-          startX: e.clientX,
-          startWidth: columnWidths[columnIndex]
-      });
+    e.preventDefault();
+    setResizingInfo({
+      isResizing: true,
+      columnIndex,
+      startX: e.clientX,
+      startWidth: columnWidths[columnIndex]
+    });
   }, [columnWidths]);
-  
-  // --- RENDER LOGIC ---
-  if (!currentUser) {
-      return <AuthScreen onLogin={handleLogin} onRegister={handleRegister} />;
-  }
 
-  if (!activeProject) {
-    return (
-        <div className="app-wrapper">
-             <div className="no-project-view">
-                 <h2>Bem-vindo, {currentUser}!</h2>
-                 <p>Você não tem nenhum projeto ativo. Crie um novo ou carregue um existente.</p>
-                 <div className="header-controls">
-                    <button className="submit-button" onClick={() => setSaveModalOpen(true)}>Criar Novo Projeto</button>
-                    <button className="control-button" onClick={() => setLoadModalOpen(true)} disabled={!projects[currentUser] || Object.keys(projects[currentUser]).length === 0}>Carregar Projeto</button>
-                    <button className="control-button" onClick={handleLogout} title="Sair">Sair</button>
-                 </div>
-             </div>
-             {isSaveModalOpen && <SaveModal onClose={() => setSaveModalOpen(false)} onSave={handleNewProject} />}
-             {isLoadModalOpen && currentUser && <LoadModal schedules={Object.values(projects[currentUser] || {})} onLoad={handleLoadProject} onDelete={handleDeleteProject} onClose={() => setLoadModalOpen(false)} />}
-             <ToastContainer toasts={toasts} setToasts={setToasts} />
-        </div>
-    )
+  const handleResize = useCallback((e: MouseEvent) => {
+    if (!resizingInfo.isResizing || resizingInfo.columnIndex === null) return;
+    const dx = e.clientX - resizingInfo.startX;
+    const newWidth = Math.max(30, resizingInfo.startWidth + dx);
+    setColumnWidths(currentWidths => {
+      const newWidths = [...currentWidths];
+      newWidths[resizingInfo.columnIndex!] = newWidth;
+      return newWidths;
+    });
+  }, [resizingInfo]);
+
+  const handleResizeEnd = useCallback(() => {
+    setResizingInfo({ isResizing: false, columnIndex: null, startX: 0, startWidth: 0 });
+  }, []);
+
+  useEffect(() => {
+    if (resizingInfo.isResizing) {
+      window.addEventListener('mousemove', handleResize);
+      window.addEventListener('mouseup', handleResizeEnd);
+    }
+    return () => {
+      window.removeEventListener('mousemove', handleResize);
+      window.removeEventListener('mouseup', handleResizeEnd);
+    };
+  }, [resizingInfo.isResizing, handleResize, handleResizeEnd]);
+
+  if (!currentUser) {
+    return <AuthScreen onLogin={handleLogin} onRegister={handleRegister} />;
   }
 
   return (
     <div className={`app-wrapper ${isSidebarCollapsed ? 'sidebar-collapsed' : ''}`}>
-        <header className="app-header">
+      <ToastContainer toasts={toasts} setToasts={setToasts} />
+      {isImportModalOpen && <ImportModal isOpen={isImportModalOpen} onClose={() => setImportModalOpen(false)} onImportSchedule={handleImportSchedule} onImportFA={handleImportFA} />}
+      {isLoadModalOpen && <LoadModal schedules={Object.values(projects[currentUser] || {})} onLoad={handleLoadProject} onDelete={handleDeleteProject} onClose={() => setLoadModalOpen(false)} />}
+      {isSaveModalOpen && <SaveModal onClose={() => setisSaveModalOpen(false)} onSave={handleNewProject}/>}
+      {isDeletionModalOpen && <DeletionModal isOpen={isDeletionModalOpen} onClose={() => setDeletionModalOpen(false)} selectedItems={selectedItems} onConfirm={handleConfirmDeletion} ai={ai} data={liveData} addToast={addToast}/>}
+      {isPrintModalOpen && <PrintScheduleModal isOpen={isPrintModalOpen} onClose={() => setPrintModalOpen(false)} onConfirm={handleConfirmPrint} weeksToPrint={weeksToPrint} setWeeksToPrint={setWeeksToPrint} />}
+      {openFilter && <FilterDropdown columnKey={openFilter.column} allOptions={filterOptions[openFilter.column]} activeSelections={activeFilters[openFilter.column] || new Set()} onApply={handleApplyFilter} onClose={handleCloseFilter} position={openFilter.rect}/>}
+      
+      <div className="app-content">
+        <div className="app-header">
            <div className="header-left">
-              <button className="control-button sidebar-toggle" onClick={() => setSidebarCollapsed(c => !c)} aria-label={isSidebarCollapsed ? "Mostrar menu" : "Ocultar menu"}>
-                  <span className="material-icons" aria-hidden="true">{isSidebarCollapsed ? "menu" : "menu_open"}</span>
-              </button>
-              <h1 contentEditable suppressContentEditableWarning onBlur={e => handleTextUpdate('', 'title', e.currentTarget.textContent || '')} >{title}</h1>
-               <div className="header-item-editable">
+            <button className="sidebar-toggle control-button" onClick={() => setSidebarCollapsed(!isSidebarCollapsed)} aria-label="Alternar barra lateral">
+                <span className="material-icons">{isSidebarCollapsed ? 'menu_open' : 'menu'}</span>
+            </button>
+            <h1 contentEditable suppressContentEditableWarning onBlur={e => handleTextUpdate('', 'title', e.currentTarget.textContent || '')}>{title}</h1>
+            <nav className="header-nav">
+                <button className={`nav-tab ${currentPage === 'schedule' ? 'active' : ''}`} onClick={() => setCurrentPage('schedule')}>Programação</button>
+                <button className={`nav-tab ${currentPage === 'manpower' ? 'active' : ''}`} onClick={() => setCurrentPage('manpower')}>Alocação de MO</button>
+                <button className={`nav-tab ${currentPage === 'dailyAllocation' ? 'active' : ''}`} onClick={() => setCurrentPage('dailyAllocation')}>Alocação Diária</button>
+                <button className={`nav-tab ${currentPage === 'dashboard' ? 'active' : ''}`} onClick={() => setCurrentPage('dashboard')}>Dashboard</button>
+                <button className={`nav-tab ${currentPage === 'manpowerDashboard' ? 'active' : ''}`} onClick={() => setCurrentPage('manpowerDashboard')}>Dashboard de MO</button>
+                <button className={`nav-tab ${currentPage === 'comparison' ? 'active' : ''}`} onClick={() => setCurrentPage('comparison')} disabled={!savedPlan}>Comparativo</button>
+            </nav>
+           </div>
+           <div className="header-controls">
+                <div className="header-item-editable">
                     <span className="label">Responsável:</span>
-                    <span
-                        contentEditable
-                        suppressContentEditableWarning
-                        onBlur={e => handleTextUpdate('', 'programmerName', e.currentTarget.textContent?.trim() || 'Não definido')}
-                        className="editable-field"
-                    >
-                        {activeProject.programmerName || 'Não definido'}
-                    </span>
+                    <span className="editable-field" contentEditable suppressContentEditableWarning onBlur={e => handleTextUpdate('', 'programmerName', e.currentTarget.textContent || '')}>{activeProject?.programmerName}</span>
                 </div>
-               <div className="header-nav">
-                  <button className={`nav-tab ${currentPage === 'schedule' ? 'active' : ''}`} onClick={() => setCurrentPage('schedule')}>Cronograma</button>
-                  <button className={`nav-tab ${currentPage === 'dashboard' ? 'active' : ''}`} onClick={() => setCurrentPage('dashboard')}>Dashboard</button>
-                  <button className={`nav-tab ${currentPage === 'comparison' ? 'active' : ''}`} onClick={() => setCurrentPage('comparison')} disabled={!savedPlan}>Comparativo</button>
-              </div>
-          </div>
-          <div className="header-controls">
-              <div className="user-info">
-                  <span className="material-icons" aria-hidden="true">person</span>
-                  <span>{currentUser}</span>
-              </div>
-              <button className="control-button" onClick={handleLogout} aria-label="Sair"><span className="material-icons" aria-hidden="true">logout</span></button>
-          </div>
-        </header>
-
-        <main className="app-container">
-            <Sidebar 
-                handleUndo={handleUndo} handleRedo={handleRedo} historyIndex={historyIndex} historyLength={history.length}
-                handleClearAll={handleClearAll}
-                handleSavePlan={handleSavePlan}
-                setImportModalOpen={setImportModalOpen} setSaveModalOpen={setSaveModalOpen} setLoadModalOpen={setLoadModalOpen}
-                handleSaveProject={handleSaveProject}
-                handleExportExcel={handleExportExcel} handleExportPdf={handleExportPdf}
-                startDate={currentStartDate} handleDateChange={handleDateChange}
-                dateColumnWidth={dateColumnWidth} handleZoomChange={handleZoomChange}
-                goToWeekInput={goToWeekInput} setGoToWeekInput={setGoToWeekInput} handleGoToWeek={handleGoToWeek}
-                selectedItem={selectedItem}
-                handleDeleteSelectedItem={handleDeleteSelectedItem}
-            />
-            <div className="main-content">
-                {currentPage === 'schedule' && (
-                    <div className="table-wrapper" ref={gridRef}>
-                        <table className="schedule-table" style={{ width: columnWidths.reduce((a, b) => a + b, 0) }}>
-                             <ScheduleHeader dates={dates} headers={scheduleHeaders} columnWidths={columnWidths} onResizeStart={handleResizeStart} stickyColumnPositions={stickyColumnPositions} onOpenFilter={handleOpenFilter} activeFilters={activeFilters}/>
-                             <ScheduleBody 
-                                data={filteredData} 
-                                dates={dates} 
-                                activeCell={activeCell}
-                                onCellMouseDown={handleCellMouseDown}
-                                onCellMouseEnter={handleCellMouseEnter}
-                                interaction={interaction}
-                                onTextUpdate={handleTextUpdate}
-                                onAddItem={handleAddItem}
-                                isComparison={false}
-                                planType={null}
-                                columnWidths={columnWidths}
-                                stickyColumnPositions={stickyColumnPositions}
-                                draggedGroupInfo={draggedGroupInfo}
-                                onGroupDragStart={handleGroupDragStart}
-                                onGroupDrop={handleGroupDrop}
-                                onDragEnd={handleDragEnd}
-                                onDropTargetChange={setDropTargetId}
-                                dropTargetId={dropTargetId}
-                                selectedItem={selectedItem}
-                                setSelectedItem={setSelectedItem}
-                             />
-                        </table>
-                    </div>
-                )}
-                {currentPage === 'dashboard' && <DashboardView data={liveData} />}
-                {currentPage === 'comparison' && <ComparisonView savedPlan={savedPlan} liveData={liveData} dates={dates} columnWidths={columnWidths} onResizeStart={handleResizeStart} stickyColumnPositions={stickyColumnPositions} title={title}/>}
+                <div className="user-info">
+                    <span className="material-icons">account_circle</span>
+                    <span>{currentUser}</span>
+                </div>
+                <button className="control-button" onClick={handleLogout} aria-label="Sair"><span className="material-icons">logout</span></button>
             </div>
-        </main>
-        
-        <footer className="app-footer">
-            Programação Semanal v3.1 - Aprimorado por IA
-        </footer>
-
-        <ToastContainer toasts={toasts} setToasts={setToasts} />
-        {openFilter && (
-            <FilterDropdown
-                columnKey={openFilter.column}
-                allOptions={filterOptions[openFilter.column as keyof typeof filterOptions]}
-                activeSelections={activeFilters[openFilter.column] || new Set()}
-                onApply={handleApplyFilter}
-                onClose={handleCloseFilter}
-                position={openFilter.rect}
-            />
-        )}
-        {isImportModalOpen && <ImportModal isOpen={isImportModalOpen} onClose={() => setImportModalOpen(false)} onImportSchedule={handleImportSchedule} onImportFA={handleImportFA} />}
-        {isSaveModalOpen && <SaveModal onClose={() => setSaveModalOpen(false)} onSave={handleNewProject} currentName={activeProject?.name} />}
-        {isLoadModalOpen && currentUser && <LoadModal schedules={Object.values(projects[currentUser] || {})} onLoad={handleLoadProject} onDelete={handleDeleteProject} onClose={() => setLoadModalOpen(false)} />}
+        </div>
+        <div className="app-container">
+            {!isSidebarCollapsed && (
+              <Sidebar 
+                handleUndo={handleUndo} handleRedo={handleRedo} historyIndex={historyIndex} historyLength={history.length}
+                handleSavePlan={handleSavePlan}
+                setImportModalOpen={setImportModalOpen} setSaveModalOpen={setisSaveModalOpen} setLoadModalOpen={setLoadModalOpen}
+                handleSaveProject={handleSaveProject}
+                handleExportExcel={handleExportExcel} onExportPdfClick={() => setPrintModalOpen(true)}
+                handleDateChange={handleDateChange} startDate={currentStartDate}
+                goToWeekInput={goToWeekInput} setGoToWeekInput={setGoToWeekInput} handleGoToWeek={handleGoToWeek}
+                selectedItems={selectedItems} handleDeleteSelectedItems={handleDeleteSelectedItems} handleClearAll={handleClearAll}
+              />
+            )}
+            <main className="main-content" ref={gridRef}>
+              {!activeProject ? (
+                <div className="no-project-view">
+                    <span className="material-icons" style={{ fontSize: '4rem', color: '#94a3b8' }}>folder_off</span>
+                    <h2>Nenhum Projeto Ativo</h2>
+                    <p>Crie um novo projeto ou carregue um existente para começar.</p>
+                </div>
+              ) : (
+                <>
+                  {currentPage === 'schedule' && (
+                    <div className="table-wrapper">
+                      <table className="schedule-table" style={{ width: columnWidths.reduce((a, b) => a + b, 0) }}>
+                          <ScheduleHeader dates={dates} headers={headers} columnWidths={columnWidths} onResizeStart={handleResizeStart} stickyColumnPositions={stickyColumnPositions} onOpenFilter={handleOpenFilter} activeFilters={activeFilters}/>
+                          <ScheduleBody
+                              data={filteredData}
+                              dates={dates}
+                              isComparison={false}
+                              planType={null}
+                              columnWidths={columnWidths}
+                              stickyColumnPositions={stickyColumnPositions}
+                              selectedItems={selectedItems}
+                              onRowClick={handleRowClick}
+                              activeCell={activeCell}
+                              onCellMouseDown={handleCellMouseDown}
+                              onCellMouseEnter={handleCellMouseEnter}
+                              interaction={interaction}
+                              onTextUpdate={handleTextUpdate}
+                              onAddItem={handleAddItem}
+                              draggedGroupInfo={draggedGroupInfo}
+                              onGroupDragStart={handleGroupDragStart}
+                              onGroupDrop={handleGroupDrop}
+                              onDragEnd={handleDragEnd}
+                              onDropTargetChange={setDropTargetId}
+                              dropTargetId={dropTargetId}
+                          />
+                      </table>
+                    </div>
+                  )}
+                  {currentPage === 'dashboard' && <DashboardView data={liveData} title={title} programmerName={activeProject.programmerName}/>}
+                  {currentPage === 'comparison' && <ComparisonView savedPlan={savedPlan} liveData={liveData} dates={dates} columnWidths={[50, 120, 130, 130, 280, 250, 80].concat(Array(dates.length).fill(35))} onResizeStart={handleResizeStart} stickyColumnPositions={stickyColumnPositions} title={title}/>}
+                  {currentPage === 'manpower' && <ManpowerAllocationView project={activeProject} setProject={setActiveProject} dates={dates} title={title}/>}
+                  {currentPage === 'dailyAllocation' && <DailyAllocationView project={activeProject} setProject={setActiveProject} dates={dates} filteredData={filteredData} title={title}/>}
+                  {currentPage === 'manpowerDashboard' && <ManpowerDashboardView project={activeProject} dates={dates} title={title} programmerName={activeProject.programmerName}/>}
+                  </>
+              )}
+            </main>
+        </div>
+      </div>
+      <footer className="app-footer">
+          Plataforma de Programação Avançada-V5
+      </footer>
     </div>
   );
 };
