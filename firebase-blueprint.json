@@ -1,0 +1,30 @@
+{
+  "entities": {
+    "Project": {
+      "title": "Project",
+      "description": "Represents a weekly schedule project.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "ownerId": { "type": "string" },
+        "obra": { "type": "string" },
+        "lastModified": { "type": "number" },
+        "title": { "type": "string" },
+        "startDate": { "type": "string" },
+        "programmerName": { "type": "string" },
+        "liveData": { "type": "string" },
+        "savedPlan": { "type": "string" },
+        "manpowerAllocation": { "type": "string" },
+        "dailyManpowerAllocation": { "type": "string" }
+      },
+      "required": ["id", "name", "ownerId", "lastModified", "title", "startDate"]
+    }
+  },
+  "firestore": {
+    "/projects/{projectId}": {
+      "schema": { "$ref": "#/entities/Project" },
+      "description": "User projects"
+    }
+  }
+}

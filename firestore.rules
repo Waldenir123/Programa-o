@@ -1,0 +1,63 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: [projects]
+    // Document ID: [projectId]
+    // ...
+
+    // Helper Functions
+    function isAuthenticated() {
+       return request.auth != null;
+    }
+    
+    function isAdmin() {
+       return isAuthenticated() && request.auth.token.email.lower() == "waldeniruerj006@gmail.com";
+    }
+    
+    function isOwner(data) {
+       return isAuthenticated() && request.auth.uid == data.ownerId;
+    }
+
+    function hasRequiredFields(fields) {
+       return request.resource.data.keys().hasAll(fields);
+    }
+    
+    function validStringLength(field, maxLen) {
+       return request.resource.data[field] is string && request.resource.data[field].size() <= maxLen;
+    }
+
+    function validOptionalStringLength(field, maxLen) {
+       return !(field in request.resource.data) || (request.resource.data[field] is string && request.resource.data[field].size() <= maxLen);
+    }
+
+    function isValidProject() {
+       let data = request.resource.data;
+       return hasRequiredFields(['id', 'name', 'ownerId', 'lastModified', 'title', 'startDate']) &&
+              validStringLength('id', 100) &&
+              validStringLength('name', 200) &&
+              validStringLength('title', 200) &&
+              validStringLength('ownerId', 128) &&
+              data.lastModified is number &&
+              validStringLength('startDate', 20) &&
+              validOptionalStringLength('obra', 200) &&
+              validOptionalStringLength('programmerName', 100);
+    }
+
+    match /projects/{projectId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && 
+                    isValidProject() && 
+                    request.resource.data.id == projectId &&
+                    request.resource.data.ownerId == request.auth.uid;
+      allow update: if isAuthenticated() && 
+                    isValidProject() && 
+                    request.resource.data.id == resource.data.id &&
+                    (isAdmin() || isOwner(resource.data));
+      allow delete: if isAdmin() || isOwner(resource.data);
+    }
+  }
+}
