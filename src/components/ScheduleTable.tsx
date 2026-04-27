@@ -62,6 +62,7 @@ interface ScheduleRowProps {
     visibleColumns?: Record<string, boolean>;
     selectedItems: SelectedItem[];
     draggedGroupInfo: any;
+    draggedActivityInfo: any;
     dropTargetId: string | null;
     activeCell: { activityId: string; date: string } | null;
     selectionBlock: any;
@@ -70,6 +71,8 @@ interface ScheduleRowProps {
     ghostBlockCells: Set<string>;
     onRowClick: (e: React.MouseEvent, item: SelectedItem) => void;
     onGroupDragStart: (group: Grupo, index: number) => void;
+    onActivityDragStart: (activity: Atividade, taskId: string) => void;
+    onActivityDrop: (targetTaskId: string, targetActivityId: string | null) => void;
     onDragEnd: () => void;
     onDropTargetChange: (targetId: string | null) => void;
     onAddItem: (type: 'group' | 'task' | 'activity', parentId?: string) => void;
@@ -79,16 +82,18 @@ interface ScheduleRowProps {
     onCellMouseEnter: (activityId: string, date: string) => void;
     onCellRightClick: (e: React.MouseEvent, activityId: string, date: string) => void;
     isCellInBlock: (activityId: string, date: string, block: any) => boolean;
+    onMoveItem: (id: string, direction: 'up' | 'down') => void;
 }
 
 const ScheduleRow = memo((props: ScheduleRowProps) => {
     const { 
         row, index, dates, dynamicColumns, columnWidths, stickyColumnPositions, visibleColumns,
-        selectedItems, draggedGroupInfo, dropTargetId, activeCell,
+        selectedItems, draggedGroupInfo, draggedActivityInfo, dropTargetId, activeCell,
         selectionBlock, cutSelectionBlock, isMovingBlock, ghostBlockCells,
-        onRowClick, onGroupDragStart, onDragEnd, onDropTargetChange,
+        onRowClick, onGroupDragStart, onActivityDragStart, onActivityDrop, onDragEnd, onDropTargetChange,
         onAddItem, onDeleteItem, onTextUpdate,
-        onCellMouseDown, onCellMouseEnter, onCellRightClick, isCellInBlock
+        onCellMouseDown, onCellMouseEnter, onCellRightClick, isCellInBlock,
+        onMoveItem
     } = props;
 
     const dynamicColumnsBefore = useMemo(() => dynamicColumns.filter(c => c.position !== 'after'), [dynamicColumns]);
@@ -98,16 +103,28 @@ const ScheduleRow = memo((props: ScheduleRowProps) => {
 
     const isGroupSelected = selectedItems.some(item => item.type === 'group' && item.id === group.id);
     const isTaskSelected = selectedItems.some(item => item.type === 'task' && item.id === task.id);
-    const isActivitySelected = selectedItems.some(item => item.type === 'activity' && item.id === activity.id);
+    const isActivitySelected = selectedItems.some(item => item.type === 'activity' && item.id === activity?.id);
     const isSelected = isActivitySelected || isTaskSelected || isGroupSelected;
     
     const isGroupBeingDragged = draggedGroupInfo?.group.id === group.id;
-    const isDropTarget = dropTargetId === group.id;
+    const isActivityBeingDragged = draggedActivityInfo?.activity.id === activity?.id;
+    const isDropTarget = dropTargetId === group.id || (dropTargetId === activity?.id); // dropTargetId handles both group and activity drops by id
 
     return (
         <tr
-            className={`${isSelected ? 'selected-row' : ''} ${isLastInGroup ? 'group-divider' : ''} ${isLastInTask ? 'task-divider' : ''} ${isGroupBeingDragged ? 'group-dragging' : ''} ${isDropTarget ? 'drop-target-top' : ''}`}
-            onDragOver={(e) => { e.preventDefault(); onDropTargetChange(group.id); }}
+            className={`${isSelected ? 'selected-row' : ''} ${isLastInGroup ? 'group-divider' : ''} ${isLastInTask ? 'task-divider' : ''} ${isGroupBeingDragged || isActivityBeingDragged ? 'group-dragging' : ''} ${isDropTarget ? 'drop-target-top' : ''}`}
+            onDragOver={(e) => { 
+              e.preventDefault(); 
+              if (draggedGroupInfo) onDropTargetChange(group.id);
+              if (draggedActivityInfo && activity) onDropTargetChange(activity.id);
+              if (draggedActivityInfo && !activity) onDropTargetChange(task.id + '_empty'); // When dropping on empty task
+            }}
+            onDrop={(e) => {
+              if (draggedActivityInfo) {
+                 e.preventDefault();
+                 onActivityDrop(task.id, activity ? activity.id : null);
+              }
+            }}
         >
             <td className="col-sticky col-sticky-1 id-cell" style={{ width: columnWidths[0], left: stickyColumnPositions[0], display: visibleColumns && visibleColumns['ID'] === false ? 'none' : 'table-cell' }}>
                 <div
@@ -194,10 +211,37 @@ const ScheduleRow = memo((props: ScheduleRowProps) => {
             })}
             
             <td className={`col-sticky col-sticky-${dynamicColumns.length + 3}`} style={{ width: columnWidths[dynamicColumns.length + 2], left: stickyColumnPositions[dynamicColumns.length + 2], display: visibleColumns && visibleColumns['ATIVIDADE'] === false ? 'none' : 'table-cell' }} onClick={(e) => activity && onRowClick(e, { id: activity.id, name: activity.name, type: 'activity', wbsId })}>
-                 <div contentEditable={!!activity} suppressContentEditableWarning onBlur={e => activity && onTextUpdate(activity.id, 'atividade', e.currentTarget.textContent || '')}>
-                    {activity ? activity.name : <span style={{ color: '#94a3b8', fontStyle: 'italic' }}>(Sem atividades)</span>}
-                </div>
+                 <div style={{ display: 'flex', alignItems: 'center' }}>
+                     {activity && (
+                         <span
+                             className="drag-handle material-icons"
+                             style={{ cursor: 'grab', marginRight: '4px', fontSize: '16px', color: '#cbd5e1' }}
+                             draggable
+                             onDragStart={(e) => {
+                                 // Stop propagation to prevent group drag from triggering
+                                 e.stopPropagation();
+                                 onActivityDragStart(activity, task.id);
+                             }}
+                             onDragEnd={onDragEnd}
+                         >
+                             drag_indicator
+                         </span>
+                     )}
+                     <div contentEditable={!!activity} suppressContentEditableWarning onBlur={e => activity && onTextUpdate(activity.id, 'atividade', e.currentTarget.textContent || '')} style={{ flexGrow: 1 }}>
+                        {activity ? activity.name : <span style={{ color: '#94a3b8', fontStyle: 'italic' }}>(Sem atividades)</span>}
+                     </div>
+                 </div>
                 <div className="cell-actions" style={{ display: 'flex', gap: '4px', zIndex: 10 }}>
+                    {activity && (
+                        <>
+                            <button onClick={(e) => { e.stopPropagation(); onMoveItem(activity.id, 'up'); }} title="Mover para Cima" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#e2e8f0', borderRadius: '4px', width: '24px', height: '24px', pointerEvents: 'auto' }}>
+                                <span className="material-icons" style={{ fontSize: '16px', color: '#64748b' }}>arrow_upward</span>
+                            </button>
+                            <button onClick={(e) => { e.stopPropagation(); onMoveItem(activity.id, 'down'); }} title="Mover para Baixo" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#e2e8f0', borderRadius: '4px', width: '24px', height: '24px', pointerEvents: 'auto' }}>
+                                <span className="material-icons" style={{ fontSize: '16px', color: '#64748b' }}>arrow_downward</span>
+                            </button>
+                        </>
+                    )}
                     <button onClick={(e) => { e.stopPropagation(); onAddItem('activity', task.id); }} title="Adicionar Atividade" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#e2e8f0', borderRadius: '4px', width: '24px', height: '24px', pointerEvents: 'auto' }}>
                         <span className="material-icons" style={{ fontSize: '18px', color: '#10b981' }}>add</span>
                     </button>
@@ -452,13 +496,16 @@ interface ScheduleBodyProps {
     onTextUpdate: (id: string, field: string, value: string) => void;
     onAddItem: (type: 'group' | 'task' | 'activity', parentId?: string) => void;
     onDeleteItem: (id: string, type: 'group' | 'task' | 'activity') => void;
+    onMoveItem: (id: string, direction: 'up' | 'down') => void;
     draggedGroupInfo: { group: Grupo, index: number } | null;
+    draggedActivityInfo: { activity: Atividade, taskId: string } | null;
     onGroupDragStart: (group: Grupo, index: number) => void;
     onGroupDrop: () => void;
+    onActivityDragStart: (activity: Atividade, taskId: string) => void;
+    onActivityDrop: (targetTaskId: string, targetActivityId: string | null) => void;
     onDragEnd: () => void;
     onDropTargetChange: (id: string | null) => void;
     dropTargetId: string | null;
-    visibleColumns?: Record<string, boolean>;
 }
 
 export const ScheduleBody: React.FC<ScheduleBodyProps> = (props) => {
@@ -466,8 +513,10 @@ export const ScheduleBody: React.FC<ScheduleBodyProps> = (props) => {
         renderableRows, dates, dynamicColumns, columnWidths, stickyColumnPositions, 
         selectedItems, onRowClick, activeCell, onCellMouseDown, onCellMouseEnter, onCellRightClick,
         selectionBlock, cutSelectionBlock, isMovingBlock, ghostBlockCells,
-        onTextUpdate, onAddItem, onDeleteItem,
-        draggedGroupInfo, onGroupDragStart, onGroupDrop, onDragEnd, onDropTargetChange, dropTargetId,
+        onTextUpdate, onAddItem, onDeleteItem, onMoveItem,
+        draggedGroupInfo, draggedActivityInfo, onGroupDragStart, onGroupDrop, 
+        onActivityDragStart, onActivityDrop,
+        onDragEnd, onDropTargetChange, dropTargetId,
         visibleColumns
     } = props;
 
@@ -515,6 +564,7 @@ export const ScheduleBody: React.FC<ScheduleBodyProps> = (props) => {
                     visibleColumns={visibleColumns}
                     selectedItems={selectedItems}
                     draggedGroupInfo={draggedGroupInfo}
+                    draggedActivityInfo={draggedActivityInfo}
                     dropTargetId={dropTargetId}
                     activeCell={activeCell}
                     selectionBlock={selectionBlock}
@@ -523,10 +573,13 @@ export const ScheduleBody: React.FC<ScheduleBodyProps> = (props) => {
                     ghostBlockCells={ghostBlockCells}
                     onRowClick={onRowClick}
                     onGroupDragStart={onGroupDragStart}
+                    onActivityDragStart={onActivityDragStart}
+                    onActivityDrop={onActivityDrop}
                     onDragEnd={onDragEnd}
                     onDropTargetChange={onDropTargetChange}
                     onAddItem={onAddItem}
                     onDeleteItem={onDeleteItem}
+                    onMoveItem={onMoveItem}
                     onTextUpdate={onTextUpdate}
                     onCellMouseDown={onCellMouseDown}
                     onCellMouseEnter={onCellMouseEnter}

@@ -100,7 +100,7 @@ export interface Project {
 }
 export type UserProjects = Record<string, Project>;
 
-export type Page = 'schedule' | 'dashboard' | 'comparison' | 'manpower' | 'dailyAllocation' | 'manpowerDashboard' | 'machines' | 'dailyMachineAllocation';
+export type Page = 'schedule' | 'dashboard' | 'comparison' | 'manpower' | 'dailyAllocation' | 'manpowerDashboard' | 'machines' | 'dailyMachineAllocation' | 'dailySummary';
 
 export enum MachineStatus {
   Funcionamento = 'Em funcionamento',

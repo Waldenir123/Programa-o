@@ -23,6 +23,8 @@ export type ScheduleAction =
     | { type: 'BATCH_UPDATE_STATUS'; payload: { activityId: string; date: string; status: Status | null }[] }
     | { type: 'UPDATE_SCHEDULE'; payload: ScheduleData }
     | { type: 'MOVE_GROUP'; payload: { fromId: string, toId: string | null } }
+    | { type: 'MOVE_ACTIVITY'; payload: { id: string, direction: 'up' | 'down' } }
+    | { type: 'MOVE_ACTIVITY_DND'; payload: { draggedId: string, targetId: string | null, taskId: string } }
     | { type: 'CLEAR_ALL' };
 
 // The reducer function that handles state transitions
@@ -210,6 +212,73 @@ export const scheduleReducer = (state: ScheduleState, action: ScheduleAction): S
                 data.splice(toIndex, 0, movedGroup);
             }
             return createNewStateWithHistory(data);
+        }
+
+        case 'MOVE_ACTIVITY': {
+            const { id, direction } = action.payload;
+            
+            let hasChanged = false;
+            const newData = state.liveData.map(group => {
+                let groupChanged = false;
+                const newTarefas = group.tarefas.map(task => {
+                    const activityIndex = task.activities.findIndex(a => a.id === id);
+                    if (activityIndex === -1) return task;
+                    
+                    if (direction === 'up' && activityIndex > 0) {
+                        const newActivities = [...task.activities];
+                        [newActivities[activityIndex - 1], newActivities[activityIndex]] = [newActivities[activityIndex], newActivities[activityIndex - 1]];
+                        groupChanged = true;
+                        hasChanged = true;
+                        return { ...task, activities: newActivities };
+                    }
+                    if (direction === 'down' && activityIndex < task.activities.length - 1) {
+                        const newActivities = [...task.activities];
+                        [newActivities[activityIndex], newActivities[activityIndex + 1]] = [newActivities[activityIndex + 1], newActivities[activityIndex]];
+                        groupChanged = true;
+                        hasChanged = true;
+                        return { ...task, activities: newActivities };
+                    }
+                    return task;
+                });
+                return groupChanged ? { ...group, tarefas: newTarefas } : group;
+            });
+            
+            if (!hasChanged) return state;
+            return createNewStateWithHistory(newData);
+        }
+
+        case 'MOVE_ACTIVITY_DND': {
+            const { draggedId, targetId, taskId } = action.payload;
+            
+            let hasChanged = false;
+            const newData = state.liveData.map(group => {
+                let groupChanged = false;
+                const newTarefas = group.tarefas.map(task => {
+                    if (task.id !== taskId) return task;
+                    
+                    const draggedIndex = task.activities.findIndex(a => a.id === draggedId);
+                    if (draggedIndex === -1) return task;
+
+                    const newActivities = [...task.activities];
+                    const [draggedActivity] = newActivities.splice(draggedIndex, 1);
+                    
+                    let targetIndex = newActivities.length; // Default to end if target is null
+                    if (targetId) {
+                        targetIndex = newActivities.findIndex(a => a.id === targetId);
+                        if (targetIndex === -1) targetIndex = newActivities.length; // Fallback
+                    }
+
+                    newActivities.splice(targetIndex, 0, draggedActivity);
+                    
+                    groupChanged = true;
+                    hasChanged = true;
+                    return { ...task, activities: newActivities };
+                });
+                return groupChanged ? { ...group, tarefas: newTarefas } : group;
+            });
+            
+            if (!hasChanged) return state;
+            return createNewStateWithHistory(newData);
         }
 
         case 'UNDO': {

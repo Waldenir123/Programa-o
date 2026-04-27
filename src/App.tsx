@@ -76,6 +76,7 @@ import { DashboardView } from './components/DashboardView';
 import { ManpowerAllocationView } from './components/ManpowerAllocationView';
 import { DailyAllocationView } from './components/DailyAllocationView';
 import { ManpowerDashboardView } from './components/ManpowerDashboardView';
+import { DailySummaryView } from './components/DailySummaryView';
 import { MachineListView } from './components/MachineListView';
 import { DailyMachineAllocationView } from './components/DailyMachineAllocationView';
 
@@ -152,6 +153,7 @@ export const App = () => {
   const [selectedItems, setSelectedItems] = useState<SelectedItem[]>([]);
   
   const [draggedGroupInfo, setDraggedGroupInfo] = useState<{ group: ScheduleData[0], index: number } | null>(null);
+  const [draggedActivityInfo, setDraggedActivityInfo] = useState<{ activity: Atividade, taskId: string } | null>(null);
   const [dropTargetId, setDropTargetId] = useState<string | null>(null);
 
   // Column resizing and zoom state
@@ -581,6 +583,10 @@ export const App = () => {
       dispatch({ type: 'ADD_ITEM', payload: { type, parentId } });
   }, []);
 
+  const handleMoveItem = useCallback((id: string, direction: 'up' | 'down') => {
+      dispatch({ type: 'MOVE_ACTIVITY', payload: { id, direction } });
+  }, []);
+
   const handleConfirmDeletion = useCallback(async (itemsToDelete: { id: string, type: 'group' | 'task' | 'activity' }[]) => {
     if (!activeProject) return;
 
@@ -960,9 +966,32 @@ export const App = () => {
     dispatch({ type: 'MOVE_GROUP', payload: { fromId: draggedGroupInfo.group.id, toId: dropTargetId } });
     handleDragEnd();
   }, [draggedGroupInfo, dropTargetId]);
+
+  const handleActivityDragStart = useCallback((activity: Atividade, taskId: string) => {
+    setDraggedActivityInfo({ activity, taskId });
+  }, []);
+
+  const handleActivityDrop = useCallback((targetTaskId: string, targetActivityId: string | null) => {
+    if (!draggedActivityInfo) {
+      handleDragEnd();
+      return;
+    }
+    if (draggedActivityInfo.taskId !== targetTaskId) {
+      // Only move within the same task as requested
+      handleDragEnd();
+      return;
+    }
+    if (draggedActivityInfo.activity.id === targetActivityId) {
+      handleDragEnd();
+      return;
+    }
+    dispatch({ type: 'MOVE_ACTIVITY_DND', payload: { draggedId: draggedActivityInfo.activity.id, targetId: targetActivityId, taskId: targetTaskId } });
+    handleDragEnd();
+  }, [draggedActivityInfo]);
   
   const handleDragEnd = useCallback(() => {
       setDraggedGroupInfo(null);
+      setDraggedActivityInfo(null);
       setDropTargetId(null);
   }, []);
   
@@ -1286,6 +1315,7 @@ export const App = () => {
                     <span className="material-icons" style={{ fontSize: '18px' }}>folder_open</span> Abrir Projeto
                 </button>
                 <button className={`nav-tab ${currentPage === 'schedule' ? 'active' : ''}`} onClick={() => setCurrentPage('schedule')}>Programação</button>
+                <button className={`nav-tab ${currentPage === 'dailySummary' ? 'active' : ''}`} onClick={() => setCurrentPage('dailySummary')}>Resumo Diário</button>
                 <button className={`nav-tab ${currentPage === 'manpower' ? 'active' : ''}`} onClick={() => setCurrentPage('manpower')}>Quantitativo de MO</button>
                 <button className={`nav-tab ${currentPage === 'dailyAllocation' ? 'active' : ''}`} onClick={() => setCurrentPage('dailyAllocation')}>Alocação Diária de MO</button>
                 <button className={`nav-tab ${currentPage === 'machines' ? 'active' : ''}`} onClick={() => setCurrentPage('machines')}>Máquinas</button>
@@ -1402,9 +1432,13 @@ export const App = () => {
                               onDeleteItem={(id, type) => {
                                   handleConfirmDeletion([{ id, type }]);
                               }}
+                              onMoveItem={handleMoveItem}
                               draggedGroupInfo={draggedGroupInfo}
+                              draggedActivityInfo={draggedActivityInfo}
                               onGroupDragStart={handleGroupDragStart}
                               onGroupDrop={handleGroupDrop}
+                              onActivityDragStart={handleActivityDragStart}
+                              onActivityDrop={handleActivityDrop}
                               onDragEnd={handleDragEnd}
                               onDropTargetChange={setDropTargetId}
                               dropTargetId={dropTargetId}
@@ -1413,6 +1447,7 @@ export const App = () => {
                       </table>
                     </div>
                   )}
+                  {currentPage === 'dailySummary' && <DailySummaryView data={liveData} dates={dates} />}
                   {currentPage === 'dashboard' && <DashboardView data={liveData} title={title} programmerName={activeProject.programmerName} dynamicColumns={activeProject.dynamicColumns}/>}
                   {currentPage === 'comparison' && <ComparisonView savedPlan={savedPlan} liveData={liveData} dates={dates} columnWidths={comparisonTableColumnWidths} onResizeStart={handleResizeStart} stickyColumnPositions={stickyColumnPositions} title={title} dynamicColumns={activeProject.dynamicColumns}/>}
                   {currentPage === 'manpower' && <ManpowerAllocationView project={activeProject} setProject={setActiveProject} dates={dates} title={title} zoomLevel={zoomLevels.manpower} />}
