@@ -18,8 +18,9 @@ export const FilterDropdown: React.FC<FilterDropdownProps> = ({ columnKey, allOp
     }, [activeSelections]);
 
     const filteredOptions = useMemo(() => {
-        if (!searchTerm) return allOptions;
-        return allOptions.filter(option => option.toLowerCase().includes(searchTerm.toLowerCase()));
+        const safeOptions = allOptions || [];
+        if (!searchTerm) return safeOptions;
+        return safeOptions.filter(option => option.toLowerCase().includes(searchTerm.toLowerCase()));
     }, [allOptions, searchTerm]);
 
     const handleToggle = (option: string) => {
@@ -33,7 +34,7 @@ export const FilterDropdown: React.FC<FilterDropdownProps> = ({ columnKey, allOp
     };
 
     const handleSelectAll = () => {
-        setSelections(new Set(allOptions));
+        setSelections(new Set(allOptions || []));
     };
 
     const handleClearAll = () => {

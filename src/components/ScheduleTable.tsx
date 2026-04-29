@@ -41,7 +41,13 @@ const ScheduleCell = memo(({
         <td 
             data-cell-id={activity ? `${activity.id}-${dateStr}` : `empty-${dateStr}`}
             className={cellClasses}
-            onMouseDown={(e) => activity && onMouseDown(e, activity.id, dateStr)}
+            tabIndex={0}
+            onMouseDown={(e) => {
+                if (activity) {
+                    e.currentTarget.focus();
+                    onMouseDown(e, activity.id, dateStr);
+                }
+            }}
             onMouseEnter={() => activity && onMouseEnter(activity.id, dateStr)}
             onContextMenu={(e) => activity && onRightClick(e, activity.id, dateStr)}
         >
@@ -83,6 +89,7 @@ interface ScheduleRowProps {
     onCellRightClick: (e: React.MouseEvent, activityId: string, date: string) => void;
     isCellInBlock: (activityId: string, date: string, block: any) => boolean;
     onMoveItem: (id: string, direction: 'up' | 'down') => void;
+    onToggleHideActivity: (id: string) => void;
 }
 
 const ScheduleRow = memo((props: ScheduleRowProps) => {
@@ -93,11 +100,11 @@ const ScheduleRow = memo((props: ScheduleRowProps) => {
         onRowClick, onGroupDragStart, onActivityDragStart, onActivityDrop, onDragEnd, onDropTargetChange,
         onAddItem, onDeleteItem, onTextUpdate,
         onCellMouseDown, onCellMouseEnter, onCellRightClick, isCellInBlock,
-        onMoveItem
+        onMoveItem, onToggleHideActivity
     } = props;
 
-    const dynamicColumnsBefore = useMemo(() => dynamicColumns.filter(c => c.position !== 'after'), [dynamicColumns]);
-    const dynamicColumnsAfter = useMemo(() => dynamicColumns.filter(c => c.position === 'after'), [dynamicColumns]);
+    const dynamicColumnsBefore = useMemo(() => (dynamicColumns || []).filter(c => c.position !== 'after'), [dynamicColumns]);
+    const dynamicColumnsAfter = useMemo(() => (dynamicColumns || []).filter(c => c.position === 'after'), [dynamicColumns]);
 
     const { group, task, activity, renderGroup, groupRowSpan, renderTask, taskRowSpan, wbsId, isLastInGroup, isLastInTask } = row;
 
@@ -113,6 +120,7 @@ const ScheduleRow = memo((props: ScheduleRowProps) => {
     return (
         <tr
             className={`${isSelected ? 'selected-row' : ''} ${isLastInGroup ? 'group-divider' : ''} ${isLastInTask ? 'task-divider' : ''} ${isGroupBeingDragged || isActivityBeingDragged ? 'group-dragging' : ''} ${isDropTarget ? 'drop-target-top' : ''}`}
+            style={{ opacity: activity?.isHidden ? 0.5 : 1, transition: 'opacity 0.2s' }}
             onDragOver={(e) => { 
               e.preventDefault(); 
               if (draggedGroupInfo) onDropTargetChange(group.id);
@@ -227,13 +235,16 @@ const ScheduleRow = memo((props: ScheduleRowProps) => {
                              drag_indicator
                          </span>
                      )}
-                     <div contentEditable={!!activity} suppressContentEditableWarning onBlur={e => activity && onTextUpdate(activity.id, 'atividade', e.currentTarget.textContent || '')} style={{ flexGrow: 1 }}>
+                     <div data-activity-id={activity?.id} data-column-type="atividade" contentEditable={!!activity} suppressContentEditableWarning onBlur={e => activity && onTextUpdate(activity.id, 'atividade', e.currentTarget.textContent || '')} style={{ flexGrow: 1 }}>
                         {activity ? activity.name : <span style={{ color: '#94a3b8', fontStyle: 'italic' }}>(Sem atividades)</span>}
                      </div>
                  </div>
                 <div className="cell-actions" style={{ display: 'flex', gap: '4px', zIndex: 10 }}>
                     {activity && (
                         <>
+                            <button onClick={(e) => { e.stopPropagation(); onToggleHideActivity(activity.id); }} title={activity.isHidden ? "Mostrar Atividade" : "Ocultar Atividade"} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#e2e8f0', borderRadius: '4px', width: '24px', height: '24px', pointerEvents: 'auto' }}>
+                                <span className="material-icons" style={{ fontSize: '16px', color: activity.isHidden ? '#94a3b8' : '#64748b' }}>{activity.isHidden ? 'visibility_off' : 'visibility'}</span>
+                            </button>
                             <button onClick={(e) => { e.stopPropagation(); onMoveItem(activity.id, 'up'); }} title="Mover para Cima" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#e2e8f0', borderRadius: '4px', width: '24px', height: '24px', pointerEvents: 'auto' }}>
                                 <span className="material-icons" style={{ fontSize: '16px', color: '#64748b' }}>arrow_upward</span>
                             </button>
@@ -252,7 +263,7 @@ const ScheduleRow = memo((props: ScheduleRowProps) => {
                     )}
                 </div>
             </td>
-            {dates.map(date => {
+            {(dates || []).map(date => {
                 const dateStr = formatDate(date);
                 const isSelectedInBlock = activity ? isCellInBlock(activity.id, dateStr, selectionBlock) : false;
                 return (
@@ -299,8 +310,8 @@ export const ScheduleHeader: React.FC<ScheduleHeaderProps> = ({
     onColumnNameUpdate, onAddColumn, onRemoveColumn, onMoveColumn
 }) => {
     
-    const dynamicColumnsBefore = useMemo(() => dynamicColumns.filter(c => c.position !== 'after'), [dynamicColumns]);
-    const dynamicColumnsAfter = useMemo(() => dynamicColumns.filter(c => c.position === 'after'), [dynamicColumns]);
+    const dynamicColumnsBefore = useMemo(() => (dynamicColumns || []).filter(c => c.position !== 'after'), [dynamicColumns]);
+    const dynamicColumnsAfter = useMemo(() => (dynamicColumns || []).filter(c => c.position === 'after'), [dynamicColumns]);
 
     const weekSpans = useMemo(() => {
         if (dates.length === 0) return [];
@@ -506,6 +517,8 @@ interface ScheduleBodyProps {
     onDragEnd: () => void;
     onDropTargetChange: (id: string | null) => void;
     dropTargetId: string | null;
+    visibleColumns?: Record<string, boolean>;
+    onToggleHideActivity: (id: string) => void;
 }
 
 export const ScheduleBody: React.FC<ScheduleBodyProps> = (props) => {
@@ -517,7 +530,7 @@ export const ScheduleBody: React.FC<ScheduleBodyProps> = (props) => {
         draggedGroupInfo, draggedActivityInfo, onGroupDragStart, onGroupDrop, 
         onActivityDragStart, onActivityDrop,
         onDragEnd, onDropTargetChange, dropTargetId,
-        visibleColumns
+        visibleColumns, onToggleHideActivity
     } = props;
 
     const activityIdToRowIndex = useMemo(() => {
@@ -527,7 +540,7 @@ export const ScheduleBody: React.FC<ScheduleBodyProps> = (props) => {
        });
        return map;
     }, [renderableRows]);
-    const dateToColIndex = useMemo(() => new Map(dates.map((d, i) => [formatDate(d), i])), [dates]);
+    const dateToColIndex = useMemo(() => new Map((dates || []).map((d, i) => [formatDate(d), i])), [dates]);
     
     const isCellInBlock = useCallback((activityId: string, dateStr: string, block: typeof selectionBlock) => {
         if (!block) return false;
@@ -552,7 +565,7 @@ export const ScheduleBody: React.FC<ScheduleBodyProps> = (props) => {
 
     return (
         <tbody onMouseUp={onGroupDrop}>
-             {renderableRows.map((row, index) => (
+             {(renderableRows || []).map((row, index) => (
                 <ScheduleRow
                     key={row.activity?.id || `empty-${row.task.id}-${index}`}
                     index={index}
@@ -585,6 +598,7 @@ export const ScheduleBody: React.FC<ScheduleBodyProps> = (props) => {
                     onCellMouseEnter={onCellMouseEnter}
                     onCellRightClick={onCellRightClick}
                     isCellInBlock={isCellInBlock}
+                    onToggleHideActivity={onToggleHideActivity}
                 />
             ))}
             <tr className="add-group-row" onDragOver={(e) => { e.preventDefault(); onDropTargetChange(null); }}>

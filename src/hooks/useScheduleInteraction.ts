@@ -24,8 +24,12 @@ export const useScheduleInteraction = (
     const [clipboard, setClipboard] = useState<ClipboardData | null>(null);
     const [cutSelectionBlock, setCutSelectionBlock] = useState<SelectionBlock | null>(null);
     
-    const activityIdToRowIndex = useMemo(() => new Map(renderableRows.map((r, i) => [r.activity.id, i])), [renderableRows]);
-    const dateToColIndex = useMemo(() => new Map(dates.map((d, i) => [formatDate(d), i])), [dates]);
+    const activityIdToRowIndex = useMemo(() => new Map(
+        (renderableRows || [])
+            .filter(r => r.activity)
+            .map((r, i) => [r.activity!.id, renderableRows.indexOf(r)])
+    ), [renderableRows]);
+    const dateToColIndex = useMemo(() => new Map((dates || []).map((d, i) => [formatDate(d), i])), [dates]);
 
     const getBlockIndices = useCallback((block: SelectionBlock) => {
         const anchorRow = activityIdToRowIndex.get(block.anchor.activityId);
@@ -53,7 +57,6 @@ export const useScheduleInteraction = (
 
     const handleCellMouseDown = useCallback((event: React.MouseEvent, activityId: string, dateStr: string) => {
         if (event.button !== 0 || activityId.startsWith('empty-')) return;
-        event.preventDefault();
 
         // Check if clicking inside an existing selection to start a move
         if (selectionBlock && isCellInBlock(activityId, dateStr, selectionBlock)) {
@@ -116,9 +119,12 @@ export const useScheduleInteraction = (
                         const targetRow = r + rowDelta;
                         const targetCol = c + colDelta;
                         if (targetRow >= 0 && targetRow < renderableRows.length && targetCol >= 0 && targetCol < dates.length) {
-                            const ghostActivityId = renderableRows[targetRow].activity.id;
-                            const ghostDateStr = formatDate(dates[targetCol]);
-                            newGhostCells.add(`${ghostActivityId}-${ghostDateStr}`);
+                            const targetActivity = renderableRows[targetRow].activity;
+                            if (targetActivity) {
+                                const ghostActivityId = targetActivity.id;
+                                const ghostDateStr = formatDate(dates[targetCol]);
+                                newGhostCells.add(`${ghostActivityId}-${ghostDateStr}`);
+                            }
                         }
                     }
                 }
@@ -137,7 +143,7 @@ export const useScheduleInteraction = (
         }
         if (isMovingBlock && dragStartCell && selectionBlock && ghostBlockCells.size > 0) {
             const newData = deepClone(liveData);
-            const activityMap = new Map(newData.flatMap(g => g.tarefas.flatMap(t => t.activities)).map(a => [a.id, a]));
+            const activityMap = new Map((newData || []).flatMap(g => (g.tarefas || []).flatMap(t => t.activities || [])).map(a => [a.id, a]));
             
             const blockIndices = getBlockIndices(selectionBlock);
             if (!blockIndices) return;
@@ -145,11 +151,16 @@ export const useScheduleInteraction = (
             const statusesToMove: (Status | null)[][] = [];
             for (let r = blockIndices.minRow; r <= blockIndices.maxRow; r++) {
                 const row: (Status | null)[] = [];
-                const sourceActivity = activityMap.get(renderableRows[r].activity.id)!;
+                const sourceActivityId = renderableRows[r].activity?.id;
+                const sourceActivity = sourceActivityId ? activityMap.get(sourceActivityId) : undefined;
                 for (let c = blockIndices.minCol; c <= blockIndices.maxCol; c++) {
                     const sourceDateStr = formatDate(dates[c]);
-                    row.push(sourceActivity.schedule[sourceDateStr] || null);
-                    delete sourceActivity.schedule[sourceDateStr];
+                    if (sourceActivity) {
+                        row.push(sourceActivity.schedule[sourceDateStr] || null);
+                        delete sourceActivity.schedule[sourceDateStr];
+                    } else {
+                        row.push(null);
+                    }
                 }
                 statusesToMove.push(row);
             }
@@ -166,15 +177,18 @@ export const useScheduleInteraction = (
             statusesToMove.forEach((row, rIdx) => {
                 const targetRow = minGhostRow + rIdx;
                 if (targetRow < renderableRows.length) {
-                    const targetActivity = activityMap.get(renderableRows[targetRow].activity.id)!;
-                    row.forEach((status, cIdx) => {
-                        const targetCol = minGhostCol + cIdx;
-                        if (targetCol < dates.length) {
-                            const targetDateStr = formatDate(dates[targetCol]);
-                            if (status) targetActivity.schedule[targetDateStr] = status;
-                            else delete targetActivity.schedule[targetDateStr];
-                        }
-                    });
+                    const targetActivityId = renderableRows[targetRow].activity?.id;
+                    const targetActivity = targetActivityId ? activityMap.get(targetActivityId) : undefined;
+                    if (targetActivity) {
+                        row.forEach((status, cIdx) => {
+                            const targetCol = minGhostCol + cIdx;
+                            if (targetCol < dates.length) {
+                                const targetDateStr = formatDate(dates[targetCol]);
+                                if (status) targetActivity.schedule[targetDateStr] = status;
+                                else delete targetActivity.schedule[targetDateStr];
+                            }
+                        });
+                    }
                 }
             });
             
@@ -185,7 +199,8 @@ export const useScheduleInteraction = (
             const updateCell = (cell: CellIdentifier) => {
                 const r = activityIdToRowIndex.get(cell.activityId)! + rowDelta;
                 const c = dateToColIndex.get(cell.date)! + colDelta;
-                return { activityId: renderableRows[r].activity.id, date: formatDate(dates[c]) };
+                const targetActivityId = renderableRows[r].activity?.id || `empty-${r}`;
+                return { activityId: targetActivityId, date: formatDate(dates[c]) };
             };
             const newSelectionBlock = { anchor: updateCell(selectionBlock.anchor), end: updateCell(selectionBlock.end) };
             setSelectionBlock(newSelectionBlock);
@@ -230,6 +245,10 @@ export const useScheduleInteraction = (
                     }
                     setClipboard({ statuses: copiedStatuses, sourceBlock: selectionBlock });
                     setCutSelectionBlock(null);
+                    
+                    const textToCopy = copiedStatuses.map(row => row.map(s => s || '').join('\t')).join('\n');
+                    navigator.clipboard.writeText(textToCopy).catch(console.error);
+                    
                     addToast("Copiado!", 'success');
                     return;
                 case 'x':
@@ -253,60 +272,11 @@ export const useScheduleInteraction = (
                     }
                     setClipboard({ statuses: cutStatuses, sourceBlock: selectionBlock });
                     setCutSelectionBlock(selectionBlock);
+                    
+                    const textToCut = cutStatuses.map(row => row.map(s => s || '').join('\t')).join('\n');
+                    navigator.clipboard.writeText(textToCut).catch(console.error);
+                    
                     addToast("Recortado!", 'success');
-                    return;
-                case 'v':
-                    event.preventDefault();
-                    if (!clipboard || !activeCell) return;
-                    
-                    const startRow = activityIdToRowIndex.get(activeCell.activityId);
-                    const startCol = dateToColIndex.get(activeCell.date);
-                    if (startRow === undefined || startCol === undefined) return;
-                    
-                    const newData = deepClone(liveData);
-                    const activityMap = new Map(newData.flatMap(g => g.tarefas.flatMap(t => t.activities)).map(a => [a.id, a]));
-                    
-                    clipboard.statuses.forEach((row, rIdx) => {
-                        const targetRowIndex = startRow + rIdx;
-                        if (targetRowIndex < renderableRows.length) {
-                            const targetActivityId = renderableRows[targetRowIndex].activity.id;
-                            const activityToUpdate = activityMap.get(targetActivityId);
-                            if (activityToUpdate) {
-                                row.forEach((status, cIdx) => {
-                                    const targetColIndex = startCol + cIdx;
-                                    if (targetColIndex < dates.length) {
-                                        const targetDateStr = formatDate(dates[targetColIndex]);
-                                        if (status) {
-                                            activityToUpdate.schedule[targetDateStr] = status;
-                                        } else {
-                                            delete activityToUpdate.schedule[targetDateStr];
-                                        }
-                                    }
-                                });
-                            }
-                        }
-                    });
-
-                    if (cutSelectionBlock) {
-                        const cutIndices = getBlockIndices(cutSelectionBlock);
-                        if (cutIndices) {
-                            for (let r = cutIndices.minRow; r <= cutIndices.maxRow; r++) {
-                                const activityToClearId = renderableRows[r].activity.id;
-                                const activityToUpdate = activityMap.get(activityToClearId);
-                                if (activityToUpdate) {
-                                    for (let c = cutIndices.minCol; c <= cutIndices.maxCol; c++) {
-                                        const dateToClearStr = formatDate(dates[c]);
-                                        delete activityToUpdate.schedule[dateToClearStr];
-                                    }
-                                }
-                            }
-                        }
-                        setCutSelectionBlock(null);
-                        setClipboard(null); // Clear clipboard after cut and paste
-                    }
-                    
-                    dispatch({ type: 'UPDATE_SCHEDULE', payload: newData });
-                    addToast("Colado!", 'success');
                     return;
             }
         }
@@ -376,10 +346,127 @@ export const useScheduleInteraction = (
         }
     }, [activeCell, liveData, dispatch, renderableRows, dates, selectionBlock, clipboard, cutSelectionBlock, addToast, getBlockIndices, activityIdToRowIndex, dateToColIndex]);
     
+    const handlePaste = useCallback((event: ClipboardEvent) => {
+        const pastedText = event.clipboardData?.getData('text/plain');
+        if (!pastedText) return;
+
+        const isTSV = pastedText.includes('\t') || pastedText.includes('\n');
+        const activeElement = document.activeElement as HTMLElement;
+
+        // Scenario 1: Focus is on Grid cell (activeCell set, focus is not inside an editable block)
+        if (activeCell && !activeElement?.isContentEditable && !['INPUT', 'TEXTAREA'].includes(activeElement?.tagName || '')) {
+            event.preventDefault();
+            const startRow = activityIdToRowIndex.get(activeCell.activityId);
+            const startCol = dateToColIndex.get(activeCell.date);
+            if (startRow === undefined || startCol === undefined) return;
+
+            const rowsText = pastedText.split(/\r?\n/).filter(r => r.length > 0);
+            const newData = deepClone(liveData);
+            const activityMap = new Map((newData || []).flatMap((g: any) => (g.tarefas || []).flatMap((t: any) => t.activities || [])).map((a: any) => [a.id, a]));
+
+            rowsText.forEach((rowStr, rIdx) => {
+                const targetRowIndex = startRow + rIdx;
+                if (targetRowIndex < renderableRows.length) {
+                    const targetActivityId = renderableRows[targetRowIndex].activity?.id;
+                    if (!targetActivityId) return;
+                    const activityToUpdate = activityMap.get(targetActivityId);
+                    if (activityToUpdate) {
+                        const colsText = rowStr.split('\t');
+                        colsText.forEach((colStr, cIdx) => {
+                            const targetColIndex = startCol + cIdx;
+                            if (targetColIndex < dates.length) {
+                                const targetDateStr = formatDate(dates[targetColIndex]);
+                                const statusValue = colStr.trim() || null;
+                                
+                                // Map pasted values to actual Status enum values or clear if empty/"null"
+                                let finalStatus: Status | null = null;
+                                const lowerStr = statusValue ? statusValue.toLowerCase() : '';
+                                if (lowerStr === 'ok') finalStatus = Status.Realizado;
+                                else if (lowerStr === 'x') finalStatus = Status.Programado;
+                                else if (lowerStr === 'x2') finalStatus = 'X2' as any; // Allow X2 as a fallback string even if not in enum yet
+                                else if (lowerStr === 'n') finalStatus = Status.NaoRealizado;
+                                else if (lowerStr === 'c') finalStatus = Status.Cancelado;
+                                else if (statusValue && statusValue !== 'null') { // Fallback if they copy exactly innerText "OK" or something
+                                   if (Object.values(Status).includes(statusValue as Status)) finalStatus = statusValue as Status;
+                                   else finalStatus = Status.Programado; // if copying some random text from excel, maybe assume X?
+                                }
+
+                                if (finalStatus) {
+                                    activityToUpdate.schedule[targetDateStr] = finalStatus;
+                                } else {
+                                    delete activityToUpdate.schedule[targetDateStr];
+                                }
+                            }
+                        });
+                    }
+                }
+            });
+
+            if (cutSelectionBlock) {
+                const cutIndices = getBlockIndices(cutSelectionBlock);
+                if (cutIndices) {
+                    for (let r = cutIndices.minRow; r <= cutIndices.maxRow; r++) {
+                        const activityToClearId = renderableRows[r].activity?.id;
+                        const activityToUpdate = activityToClearId ? activityMap.get(activityToClearId) : undefined;
+                        if (activityToUpdate) {
+                            for (let c = cutIndices.minCol; c <= cutIndices.maxCol; c++) {
+                                const dateToClearStr = formatDate(dates[c]);
+                                delete activityToUpdate.schedule[dateToClearStr];
+                            }
+                        }
+                    }
+                }
+                setCutSelectionBlock(null);
+                setClipboard(null);
+            }
+
+            dispatch({ type: 'UPDATE_SCHEDULE', payload: newData });
+            addToast("Dados colados no cronograma!", 'success');
+            return;
+        }
+
+        // Scenario 2: Focus is on an editable cell (like Atividade name), but they pasted multiple lines
+        if (activeElement?.isContentEditable && isTSV) {
+            const activityId = activeElement.getAttribute('data-activity-id');
+            const columnType = activeElement.getAttribute('data-column-type');
+            
+            if (activityId && columnType === 'atividade') {
+                event.preventDefault();
+                const startRow = activityIdToRowIndex.get(activityId);
+                if (startRow === undefined) return;
+
+                const rowsText = pastedText.split(/\r?\n/).filter(r => r.length > 0);
+                const newData = deepClone(liveData);
+                const activityMap = new Map((newData || []).flatMap((g: any) => (g.tarefas || []).flatMap((t: any) => t.activities || [])).map((a: any) => [a.id, a]));
+
+                rowsText.forEach((rowStr, rIdx) => {
+                    const targetRowIndex = startRow + rIdx;
+                    if (targetRowIndex < renderableRows.length) {
+                        const targetActivityId = renderableRows[targetRowIndex].activity?.id;
+                        if (!targetActivityId) return;
+                        const activityToUpdate = activityMap.get(targetActivityId);
+                        if (activityToUpdate) {
+                            activityToUpdate.name = rowStr.trim();
+                        }
+                    }
+                });
+
+                dispatch({ type: 'UPDATE_SCHEDULE', payload: newData });
+                activeElement.blur();
+                addToast("Atividades coladas!", 'success');
+                return;
+            }
+        }
+    }, [activeCell, liveData, dispatch, renderableRows, dates, activityIdToRowIndex, dateToColIndex, addToast, cutSelectionBlock, getBlockIndices]);
+
     useEffect(() => {
         window.addEventListener('keydown', handleKeyDown);
-        return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [handleKeyDown]);
+        window.addEventListener('paste', handlePaste);
+        return () => {
+             window.removeEventListener('keydown', handleKeyDown);
+             window.removeEventListener('paste', handlePaste);
+        };
+    }, [handleKeyDown, handlePaste]);
 
     return { 
         activeCell, 

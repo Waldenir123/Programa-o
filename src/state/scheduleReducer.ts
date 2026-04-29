@@ -25,6 +25,7 @@ export type ScheduleAction =
     | { type: 'MOVE_GROUP'; payload: { fromId: string, toId: string | null } }
     | { type: 'MOVE_ACTIVITY'; payload: { id: string, direction: 'up' | 'down' } }
     | { type: 'MOVE_ACTIVITY_DND'; payload: { draggedId: string, targetId: string | null, taskId: string } }
+    | { type: 'TOGGLE_HIDE_ACTIVITY'; payload: string }
     | { type: 'CLEAR_ALL' };
 
 // The reducer function that handles state transitions
@@ -57,6 +58,19 @@ export const scheduleReducer = (state: ScheduleState, action: ScheduleAction): S
         case 'CLEAR_ALL':
             return createNewStateWithHistory([]);
 
+        case 'TOGGLE_HIDE_ACTIVITY': {
+            const targetId = action.payload;
+            return createNewStateWithHistory(
+                (state.liveData || []).map(group => ({
+                    ...group,
+                    tarefas: (group.tarefas || []).map(task => ({
+                        ...task,
+                        activities: (task.activities || []).map(act => act.id === targetId ? { ...act, isHidden: !act.isHidden } : act)
+                    }))
+                }))
+            );
+        }
+
         case 'ADD_ITEM': {
             const { type, parentId } = action.payload;
             const newActivity = { id: generateId(), name: 'Nova Atividade', schedule: {} };
@@ -65,21 +79,21 @@ export const scheduleReducer = (state: ScheduleState, action: ScheduleAction): S
 
             const newData = (() => {
                 if (type === 'group') {
-                    return [...state.liveData, newGroup];
+                    return [...(state.liveData || []), newGroup];
                 }
                 if (type === 'task' && parentId) {
-                    return state.liveData.map(group =>
+                    return (state.liveData || []).map(group =>
                         group.id === parentId
-                            ? { ...group, tarefas: [...group.tarefas, newTask] }
+                            ? { ...group, tarefas: [...(group.tarefas || []), newTask] }
                             : group
                     );
                 }
                 if (type === 'activity' && parentId) {
-                    return state.liveData.map(group => ({
+                    return (state.liveData || []).map(group => ({
                         ...group,
-                        tarefas: group.tarefas.map(task =>
+                        tarefas: (group.tarefas || []).map(task =>
                             task.id === parentId
-                                ? { ...task, activities: [...task.activities, newActivity] }
+                                ? { ...task, activities: [...(task.activities || []), newActivity] }
                                 : task
                         ),
                     }));
@@ -101,14 +115,14 @@ export const scheduleReducer = (state: ScheduleState, action: ScheduleAction): S
 
         case 'UPDATE_TEXT': {
             const { id, field, value } = action.payload;
-            const newData = state.liveData.map(group => {
+            const newData = (state.liveData || []).map(group => {
                 // If it's a structural field update for a group
                 if (group.id === id && !['tarefa', 'tarefa_fa', 'atividade'].includes(field)) {
                     return { ...group, customValues: { ...group.customValues, [field]: value } };
                 }
                 
                 let taskUpdated = false;
-                const newTarefas = group.tarefas.map(tarefa => {
+                const newTarefas = (group.tarefas || []).map(tarefa => {
                     if (field === 'tarefa' && tarefa.id === id) {
                         taskUpdated = true;
                         return { ...tarefa, title: value };
@@ -118,10 +132,14 @@ export const scheduleReducer = (state: ScheduleState, action: ScheduleAction): S
                         return { ...tarefa, fa: value };
                     }
                     let activityUpdated = false;
-                    const newActivities = tarefa.activities.map(activity => {
+                    const newActivities = (tarefa.activities || []).map(activity => {
                         if (field === 'atividade' && activity.id === id) {
                             activityUpdated = true;
                             return { ...activity, name: value };
+                        }
+                        if (field === 'sector' && activity.id === id) {
+                            activityUpdated = true;
+                            return { ...activity, sector: value };
                         }
                         return activity;
                     });
@@ -142,11 +160,11 @@ export const scheduleReducer = (state: ScheduleState, action: ScheduleAction): S
 
         case 'UPDATE_STATUS': {
             const { activityId, date, status } = action.payload;
-            const newData = state.liveData.map(group => ({
+            const newData = (state.liveData || []).map(group => ({
                 ...group,
-                tarefas: group.tarefas.map(task => ({
+                tarefas: (group.tarefas || []).map(task => ({
                     ...task,
-                    activities: task.activities.map(activity => {
+                    activities: (task.activities || []).map(activity => {
                         if (activity.id === activityId) {
                             const newSchedule = { ...activity.schedule };
                             if (status === null) {
@@ -169,11 +187,11 @@ export const scheduleReducer = (state: ScheduleState, action: ScheduleAction): S
             let newData = state.liveData;
             
             // To be more efficient, we can optimize this but let's start with a correct implementation
-            newData = state.liveData.map(group => ({
+            newData = (state.liveData || []).map(group => ({
                 ...group,
-                tarefas: group.tarefas.map(task => ({
+                tarefas: (group.tarefas || []).map(task => ({
                     ...task,
-                    activities: task.activities.map(activity => {
+                    activities: (task.activities || []).map(activity => {
                         const activityUpdates = updates.filter(u => u.activityId === activity.id);
                         if (activityUpdates.length > 0) {
                             const newSchedule = { ...activity.schedule };
@@ -218,9 +236,9 @@ export const scheduleReducer = (state: ScheduleState, action: ScheduleAction): S
             const { id, direction } = action.payload;
             
             let hasChanged = false;
-            const newData = state.liveData.map(group => {
+            const newData = (state.liveData || []).map(group => {
                 let groupChanged = false;
-                const newTarefas = group.tarefas.map(task => {
+                const newTarefas = (group.tarefas || []).map(task => {
                     const activityIndex = task.activities.findIndex(a => a.id === id);
                     if (activityIndex === -1) return task;
                     
@@ -251,9 +269,9 @@ export const scheduleReducer = (state: ScheduleState, action: ScheduleAction): S
             const { draggedId, targetId, taskId } = action.payload;
             
             let hasChanged = false;
-            const newData = state.liveData.map(group => {
+            const newData = (state.liveData || []).map(group => {
                 let groupChanged = false;
-                const newTarefas = group.tarefas.map(task => {
+                const newTarefas = (group.tarefas || []).map(task => {
                     if (task.id !== taskId) return task;
                     
                     const draggedIndex = task.activities.findIndex(a => a.id === draggedId);

@@ -1,0 +1,160 @@
+src/state/scheduleReducer.ts:64:                (state.liveData || []).map(group => ({
+src/state/scheduleReducer.ts:66:                    tarefas: (group.tarefas || []).map(task => ({
+src/state/scheduleReducer.ts:68:                        activities: (task.activities || []).map(act => act.id === targetId ? { ...act, isHidden: !act.isHidden } : act)
+src/state/scheduleReducer.ts:85:                    return (state.liveData || []).map(group =>
+src/state/scheduleReducer.ts:92:                    return (state.liveData || []).map(group => ({
+src/state/scheduleReducer.ts:94:                        tarefas: (group.tarefas || []).map(task =>
+src/state/scheduleReducer.ts:118:            const newData = (state.liveData || []).map(group => {
+src/state/scheduleReducer.ts:125:                const newTarefas = (group.tarefas || []).map(tarefa => {
+src/state/scheduleReducer.ts:135:                    const newActivities = (tarefa.activities || []).map(activity => {
+src/state/scheduleReducer.ts:163:            const newData = (state.liveData || []).map(group => ({
+src/state/scheduleReducer.ts:165:                tarefas: (group.tarefas || []).map(task => ({
+src/state/scheduleReducer.ts:167:                    activities: (task.activities || []).map(activity => {
+src/state/scheduleReducer.ts:190:            newData = (state.liveData || []).map(group => ({
+src/state/scheduleReducer.ts:192:                tarefas: (group.tarefas || []).map(task => ({
+src/state/scheduleReducer.ts:194:                    activities: (task.activities || []).map(activity => {
+src/state/scheduleReducer.ts:239:            const newData = (state.liveData || []).map(group => {
+src/state/scheduleReducer.ts:241:                const newTarefas = (group.tarefas || []).map(task => {
+src/state/scheduleReducer.ts:272:            const newData = (state.liveData || []).map(group => {
+src/state/scheduleReducer.ts:274:                const newTarefas = (group.tarefas || []).map(task => {
+src/components/Toast.tsx:25:            {toasts.map(toast => {
+src/components/Modals.tsx:166:                                    {Object.keys(groupedSchedules).map(obra => (
+src/components/Modals.tsx:231:                            {groupedSchedules[selectedObra].length > 0 ? groupedSchedules[selectedObra].map(s => (
+src/components/Modals.tsx:325:                    {selectedItems.map(item => (
+src/components/Modals.tsx:502:                    {allWeeks.map(week => (
+src/components/DailyMachineAllocationView.tsx:125:            {fixedColumnWidths.map((width, index) => <col key={`col-fixed-${index}`} style={{ width: `${width}px` }} />)}
+src/components/DailyMachineAllocationView.tsx:126:            {dates.map(date => <col key={`col-date-${formatDate(date)}`} style={{ width: `${dateColumnWidth}px`, minWidth: `${dateColumnWidth}px` }} />)}
+src/components/DailyMachineAllocationView.tsx:154:                    {headers.map((header, index) => (
+src/components/DailyMachineAllocationView.tsx:165:                    {weekSpans.map(s => <th key={s.week} colSpan={s.count} className="week-header">Semana {s.week}</th>)}
+src/components/DailyMachineAllocationView.tsx:168:                    {dates.map(d => {
+src/components/DailyMachineAllocationView.tsx:175:                    {dates.map(d => {
+src/components/DailyMachineAllocationView.tsx:195:                {MACHINE_CATEGORIES.map(category => {
+src/components/DailyMachineAllocationView.tsx:206:                                    {machines.map(machine => (
+src/components/DailyMachineAllocationView.tsx:237:                                    task.activities.map((activity, aIdx) => {
+src/components/DailyMachineAllocationView.tsx:245:                                                {dates.map(date => {
+src/components/DailyMachineAllocationView.tsx:264:                                                                    .map(u => u.projectName);
+src/components/DailyMachineAllocationView.tsx:282:                                                                {allocatedIds.map(mid => (
+src/components/ComparisonView.tsx:42:        return ['ID', ...(dynamicColumns || []).map(c => c.name), 'TAREFA PRINCIPAL', 'ATIVIDADE', 'PLANO'];
+src/components/ComparisonView.tsx:75:                            {headerNames.map((header, index) => (
+src/components/ComparisonView.tsx:81:                            {weekSpans.map(span => (
+src/components/ComparisonView.tsx:88:                            {dates.map(date => {
+src/components/ComparisonView.tsx:96:                            {dates.map(date => {
+src/components/ComparisonView.tsx:105:                        {flatLiveData.map((liveRow, index) => {
+src/components/ComparisonView.tsx:112:                                    {(dynamicColumns || []).map((col, idx) => (
+src/components/ComparisonView.tsx:120:                                    {dates.map(date => {
+src/components/ComparisonView.tsx:130:                                    {dates.map(date => {
+src/components/MachineListView.tsx:41:            machines: prev.machines.map(m => m.id === id ? { ...m, status } : m)
+src/components/MachineListView.tsx:50:            const machinesWithIds = parsed.map(m => ({ ...m, id: generateId() }));
+src/components/MachineListView.tsx:81:                    {MACHINE_CATEGORIES.map(category => (
+src/components/MachineListView.tsx:100:                                            {groupedMachines[category].map(machine => (
+src/components/MachineListView.tsx:115:                                                            {Object.values(MachineStatus).map(s => <option key={s} value={s}>{s}</option>)}
+src/components/MachineListView.tsx:156:                                {MACHINE_CATEGORIES.map(cat => <option key={cat} value={cat}>{cat}</option>)}
+src/components/DailySummaryView.tsx:37:                datesStr: weekDates.map(formatDate)
+src/components/DailySummaryView.tsx:115:            .map(([category, tasks]) => ({ category, tasks }));
+src/components/DailySummaryView.tsx:191:                .map(([category, tasks]) => ({ category, tasks }));
+src/components/DailySummaryView.tsx:276:                                {dates.map(d => (
+src/components/DailySummaryView.tsx:292:                                    {weeksOptions.map(w => (
+src/components/DailySummaryView.tsx:327:                            {dailySummary.map(({ category, tasks }) => (
+src/components/DailySummaryView.tsx:336:                                        {tasks.map((item, idx) => (
+src/components/DailySummaryView.tsx:375:                                                    {item.activities.map((act, actIdx) => (
+src/components/DailySummaryView.tsx:444:                            {weeklySummaryByDay.map((daySummary, dayIdx) => daySummary.categories.length > 0 && (
+src/components/DailySummaryView.tsx:451:                                        {daySummary.categories.map(({ category, tasks }) => (
+src/components/DailySummaryView.tsx:455:                                                    {tasks.map((item: any, idx: number) => (
+src/components/DailySummaryView.tsx:494:                                                                {item.activities.map((act: any, actIdx: number) => (
+src/components/ManpowerAllocationView.tsx:156:                            {weeks.map((week, index) => (
+src/components/ManpowerAllocationView.tsx:176:                        {filteredRoles.map(role => (
+src/components/ManpowerAllocationView.tsx:189:                                {weeks.map(week => {
+src/components/ManpowerAllocationView.tsx:208:                            {weeks.map(week => <td key={week}><strong>{totals.weeklyTotals[shiftKey][week] || 0}</strong></td>)}
+src/components/FilterDropdown.tsx:69:                    {filteredOptions.map(option => (
+src/components/DailyAllocationView.tsx:66:                {project.manpowerAllocation.roles.map(role => {
+src/components/DailyAllocationView.tsx:264:            {fixedColumnWidths.map((width, index) => <col key={`col-fixed-${index}`} style={{ width: `${width}px` }} />)}
+src/components/DailyAllocationView.tsx:265:            {dates.map(date => <col key={`col-date-${formatDate(date)}`} style={{ width: `${dateColumnWidth}px`, minWidth: `${dateColumnWidth}px` }} />)}
+src/components/DailyAllocationView.tsx:293:                    {headers.map((header, index) => (
+src/components/DailyAllocationView.tsx:304:                    {weekSpans.map(s => <th key={s.week} colSpan={s.count} className="week-header">Semana {s.week}</th>)}
+src/components/DailyAllocationView.tsx:307:                    {dates.map(d => {
+src/components/DailyAllocationView.tsx:314:                    {dates.map(d => {
+src/components/DailyAllocationView.tsx:353:                            {weekSpans.map(span => <th key={`summary-week-${span.week}`} colSpan={span.count} className="week-header">Semana {span.week}</th>)}
+src/components/DailyAllocationView.tsx:356:                            {dates.map(date => {
+src/components/DailyAllocationView.tsx:363:                            {dates.map(date => {
+src/components/DailyAllocationView.tsx:371:                        {project.manpowerAllocation.roles.map(role => (
+src/components/DailyAllocationView.tsx:376:                                {dates.map(date => {
+src/components/DailyAllocationView.tsx:397:                            {dates.map(date => {
+src/components/DailyAllocationView.tsx:422:                {Object.entries(MANPOWER_CATEGORIES).map(([category, roles]) => (
+src/components/DailyAllocationView.tsx:430:                                {roles.filter(r => project.manpowerAllocation.roles.includes(r)).map(role => (
+src/components/DailyAllocationView.tsx:450:                            .map(role => (
+src/components/DailyAllocationView.tsx:475:                                    task.activities.map((activity, aIdx) => {
+src/components/DailyAllocationView.tsx:483:                                                {dates.map(date => {
+src/components/DailyAllocationView.tsx:487:                                                    const cellText = allocations ? Object.entries(allocations).map(([role, qty]) => `${getRoleAbbreviation(role)}: ${qty}`).join('\n') : '';
+src/components/DashboardView.tsx:28:        return [sortedWeeks, sortedWeeks.map(w => ({ value: w, label: `Semana ${w}` }))];
+src/components/DashboardView.tsx:127:                            {availableWeeks.map(w => <option key={w.value} value={w.value}>{w.label}</option>)}
+src/components/DashboardView.tsx:146:                        {Array.from(stats.tasksPerComponent.entries()).map(([component, count]) => (
+src/components/Sidebar.tsx:105:                    {Object.keys(visibleColumns).map(col => (
+src/components/Sidebar.tsx:160:                    {Object.entries(STATUS_LABELS).map(([key, label]) => (
+src/components/ScheduleTable.tsx:162:            {dynamicColumnsBefore.map((col, idx) => {
+src/components/ScheduleTable.tsx:202:            {dynamicColumnsAfter.map((col, idx) => {
+src/components/ScheduleTable.tsx:266:            {(dates || []).map(date => {
+src/components/ScheduleTable.tsx:352:                {dynamicColumnsBefore.map((col, idx) => {
+src/components/ScheduleTable.tsx:410:                {dynamicColumnsAfter.map((col, idx) => {
+src/components/ScheduleTable.tsx:464:                {weekSpans.map(span => (
+src/components/ScheduleTable.tsx:471:                {dates.map(date => {
+src/components/ScheduleTable.tsx:479:                {dates.map(date => {
+src/components/ScheduleTable.tsx:543:    const dateToColIndex = useMemo(() => new Map((dates || []).map((d, i) => [formatDate(d), i])), [dates]);
+src/components/ScheduleTable.tsx:568:             {(renderableRows || []).map((row, index) => (
+src/components/ManpowerDashboardView.tsx:76:            const labels = allProjectWeeks.map(w => `Semana ${w.split('-')[1]}`);
+src/components/ManpowerDashboardView.tsx:77:            const admData = allProjectWeeks.map(week =>
+src/components/ManpowerDashboardView.tsx:80:            const shift2Data = allProjectWeeks.map(week =>
+src/components/ManpowerDashboardView.tsx:105:            const admData = roles.map(role => data.adm[role]?.[selectedWeek] || 0);
+src/components/ManpowerDashboardView.tsx:106:            const shift2Data = roles.map(role => hasSecondShift ? (data.shift2[role]?.[selectedWeek] || 0) : 0);
+src/components/ManpowerDashboardView.tsx:178:                                {allProjectWeeks.map(w => <option key={w} value={w}>Semana {w.split('-')[1]} ({w.split('-')[0]}) {getDateRangeOfWeek(w)}</option>)}
+src/utils/exportAgents.ts:25:    const visibleDynamicColsMapping = dynamicColumns.map(col => {
+src/utils/exportAgents.ts:49:    const dateHeaders = dates.map(d => ({
+src/utils/exportAgents.ts:302:    head[1].push(...dates.map(date => ({ content: getDayAbbr(date), styles: { halign: 'center' } })));
+src/utils/exportAgents.ts:303:    head[2].push(...dates.map(date => ({ content: date.getUTCDate().toString(), styles: { halign: 'center' } })));
+src/utils/exportAgents.ts:538:    head[1].push(...dates.map(date => ({ content: getDayAbbr(date), styles: { halign: 'center' } })));
+src/utils/exportAgents.ts:539:    head[2].push(...dates.map(date => ({ content: date.getUTCDate().toString(), styles: { halign: 'center' } })));
+src/utils/exportAgents.ts:554:                        ? Object.entries(allocations).map(([role, qty]) => `${getRoleAbbreviation(role)}: ${qty}`).join('\n')
+src/utils/exportAgents.ts:581:                const wbsParts = wbs.split('.').map((n: string) => parseInt(n, 10) - 1);
+src/utils/exportAgents.ts:670:    const summaryHead: any[][] = [[ 'Mão de Obra', ...dates.map(d => `${getDayAbbr(d)}\n${d.getUTCDate()}`) ]];
+src/utils/exportAgents.ts:694:        ...dates.map(date => {
+src/utils/exportAgents.ts:748:    const componentData = Array.from(stats.tasksPerComponent.entries()).map(([componente, count]) => [componente, count]);
+src/utils/dataUtils.ts:26:    const [year, weekNo] = weekYear.split('-').map(Number);
+src/utils/dataUtils.ts:39:    const [year, weekNo] = weekYear.split('-').map(Number);
+src/utils/dataUtils.ts:87:        return words.map(w => w.substring(0, 1)).join('').toUpperCase() + words[words.length - 1].substring(0, 3);
+src/utils/dataUtils.ts:110:        .map(d => new Date(d + 'T00:00:00Z'))
+src/utils/dataUtils.ts:113:    const formattedDates = sortedDates.map(formatDate);
+src/App.tsx:224:    let groupsFiltered = (liveData || []).map(group => {
+src/App.tsx:225:        const filteredTarefas = (group.tarefas || []).map(task => {
+src/App.tsx:259:                .map(group => ({
+src/App.tsx:348:            liveData = (liveData || []).map((g: any) => {
+src/App.tsx:555:      await Promise.all(projectsInFolder.map(project => 
+src/App.tsx:574:      await Promise.all(projectsInFolder.map(project => 
+src/App.tsx:851:        const hydratedData = importedGroups.map(group => ({
+src/App.tsx:854:            tarefas: Array.isArray(group.tarefas) ? group.tarefas.map(tarefa => ({
+src/App.tsx:857:                activities: Array.isArray(tarefa.activities) ? tarefa.activities.map(activity => ({
+src/App.tsx:887:              const rows = text.split(/\r?\n/).filter(row => row.trim() !== '').map(row => row.split('\t'));
+src/App.tsx:985:    const beforeNames = dynamicCols.filter(c => c.position !== 'after').map(col => col.name);
+src/App.tsx:986:    const afterNames = dynamicCols.filter(c => c.position === 'after').map(col => col.name);
+src/App.tsx:992:    const beforeNames = dynamicCols.filter(c => c.position !== 'after').map(col => col.name);
+src/App.tsx:993:    const afterNames = dynamicCols.filter(c => c.position === 'after').map(col => col.name);
+src/App.tsx:1082:        ...fixedColumnWidths.map((w, i) => visibleColumns[scheduleHeaders[i]] === false ? 0 : w),
+src/App.tsx:1087:        ...comparisonFixedColumnWidths.map((w, i) => visibleColumns[comparisonHeaders[i]] === false ? 0 : w),
+src/App.tsx:1106:            dynamicColumns: (prev.dynamicColumns || []).map(c => c.id === colId ? { ...c, name } : c)
+src/App.tsx:1269:                const activityIdToRowIndex = new Map((renderableRows || []).map((r, i) => [r.activity.id, i]));
+src/App.tsx:1270:                const datesStr = (dates || []).map(d => formatDate(d));
+src/App.tsx:1271:                const dateToColIndex = new Map((datesStr || []).map((d, i) => [d, i]));
+src/ai/aiAgents.ts:17:        return (data || []).map(group => {
+src/ai/aiAgents.ts:25:        return (data || []).map(group => {
+src/ai/aiAgents.ts:27:            const newTarefas = (group.tarefas || []).map(task => {
+src/ai/aiAgents.ts:60:    const simplifiedData = (data || []).map((g, gIdx) => ({
+src/ai/aiAgents.ts:64:        tasks: (g.tarefas || []).map((t, tIdx) => ({
+src/ai/aiAgents.ts:68:            activities: (t.activities || []).map((a, aIdx) => ({
+src/ai/aiAgents.ts:76:    const itemsList = itemsToDelete.map(item => 
+src/ai/aiAgents.ts:470:    return (parsedJson as any[]).map((group: any) => ({
+src/ai/aiAgents.ts:477:      tarefas: Array.isArray(group.tarefas) ? group.tarefas.map((tarefa: any) => ({
+src/ai/aiAgents.ts:480:        activities: Array.isArray(tarefa.activities) ? tarefa.activities.map((activity: any) => {
+src/hooks/useScheduleInteraction.ts:27:    const activityIdToRowIndex = useMemo(() => new Map((renderableRows || []).map((r, i) => [r.activity.id, i])), [renderableRows]);
+src/hooks/useScheduleInteraction.ts:28:    const dateToColIndex = useMemo(() => new Map((dates || []).map((d, i) => [formatDate(d), i])), [dates]);
+src/hooks/useScheduleInteraction.ts:139:            const activityMap = new Map((newData || []).flatMap(g => (g.tarefas || []).flatMap(t => t.activities || [])).map(a => [a.id, a]));
+src/hooks/useScheduleInteraction.ts:266:                    const activityMap = new Map((newData || []).flatMap(g => (g.tarefas || []).flatMap(t => t.activities || [])).map(a => [a.id, a]));
+src/hooks/useScheduleInteraction.ts:394:            const activityMap = new Map((newData || []).flatMap((g: any) => (g.tarefas || []).flatMap((t: any) => t.activities || [])).map((a: any) => [a.id, a]));
+src/hooks/useScheduleInteraction.ts:451:                const activityMap = new Map((newData || []).flatMap((g: any) => (g.tarefas || []).flatMap((t: any) => t.activities || [])).map((a: any) => [a.id, a]));

@@ -39,7 +39,7 @@ export const ComparisonView: React.FC<{
     const flatLiveData = useMemo(() => flattenComparisonData(liveData), [liveData]);
 
     const headerNames = useMemo(() => {
-        return ['ID', ...dynamicColumns.map(c => c.name), 'TAREFA PRINCIPAL', 'ATIVIDADE', 'PLANO'];
+        return ['ID', ...(dynamicColumns || []).map(c => c.name), 'TAREFA PRINCIPAL', 'ATIVIDADE', 'PLANO'];
     }, [dynamicColumns]);
 
     const weekSpans = useMemo(() => {
@@ -109,7 +109,7 @@ export const ComparisonView: React.FC<{
                                 <React.Fragment key={liveRow.activity.id}>
                                 <tr className="planned-row">
                                     <td className="col-sticky col-sticky-1" style={{ width: columnWidths[0], left: stickyColumnPositions[0] }}>{liveRow.wbsId}</td>
-                                    {dynamicColumns.map((col, idx) => (
+                                    {(dynamicColumns || []).map((col, idx) => (
                                         <td key={col.id} className={`col-sticky col-sticky-${idx + 2}`} style={{ width: columnWidths[idx + 1], left: stickyColumnPositions[idx + 1] }}>
                                             {liveRow.group.customValues?.[col.id] || ''}
                                         </td>

@@ -1604,3 +1604,40 @@ tr.add-group-row.drop-target-end > .add-group-cell {
     cursor: pointer;
     pointer-events: auto;
 }
+
+/* --- Print Styles --- */
+@media print {
+    body {
+        margin: 0;
+        background-color: white;
+    }
+    .sidebar, .header-controls, .header-nav, .zoom-control, .app-header {
+        display: none !important;
+    }
+    .no-print {
+        display: none !important;
+    }
+    .print-only {
+        display: block !important;
+    }
+    .print-area {
+        width: 100% !important;
+        padding: 0 !important;
+        margin: 0 !important;
+        height: auto !important;
+        overflow: visible !important;
+    }
+    main.app-main {
+        overflow: visible !important;
+        padding: 0 !important;
+    }
+    .daily-summary-view {
+        background-color: white !important;
+        overflow: visible !important;
+        height: auto !important;
+    }
+    .daily-summary-view > div {
+        box-shadow: none !important;
+        border: 1px solid #e2e8f0;
+    }
+}

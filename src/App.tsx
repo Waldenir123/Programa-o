@@ -48,7 +48,7 @@ testConnection();
 // State and Types
 import { scheduleReducer } from './state/scheduleReducer';
 import { 
-    Project, UserProjects, Page, SelectedItem, ScheduleData, ToastMessage, RenderableRow, Status,
+    Project, UserProjects, Page, SelectedItem, ScheduleData, ToastMessage, RenderableRow, Status, Atividade,
     PREDEFINED_MANPOWER_ROLES, STATUS_LABELS, STATUS_COLOR_MAP, DynamicColumn 
 } from './state/types';
 
@@ -118,10 +118,22 @@ export const App = () => {
   });
   const { liveData, history, historyIndex } = scheduleState;
   
+  const [summaryState, dispatchSummary] = useReducer(scheduleReducer, {
+      liveData: [],
+      history: [[]],
+      historyIndex: 0,
+  });
+  const summaryData = summaryState.liveData;
+  
   const [activeFilters, setActiveFilters] = useState<Record<string, Set<string>>>({});
   const [openFilter, setOpenFilter] = useState<{ column: string; rect: DOMRect } | null>(null);
+  const [showHiddenActivities, setShowHiddenActivities] = useState(false);
   
   const [isImportModalOpen, setImportModalOpen] = useState(false);
+
+  const handleToggleHideActivity = useCallback((id: string) => {
+      dispatch({ type: 'TOGGLE_HIDE_ACTIVITY', payload: id });
+  }, []);
   const [isLoadModalOpen, setLoadModalOpen] = useState(false);
   const [isSaveModalOpen, setisSaveModalOpen] = useState(false);
   const [isDeletionModalOpen, setDeletionModalOpen] = useState(false);
@@ -168,6 +180,7 @@ export const App = () => {
       manpowerDashboard: 90,
       machines: 100,
       dailyMachineAllocation: 90,
+      dailySummary: 100,
   });
   const [resizingInfo, setResizingInfo] = useState({ isResizing: false, columnIndex: null as number | null, startX: 0, startWidth: 0 });
   const [visibleColumns, setVisibleColumns] = useState<Record<string, boolean>>({
@@ -203,32 +216,61 @@ export const App = () => {
     const filters = activeFilters as Record<string, Set<string>>;
     const hasActiveFilters = Object.values(filters).some(s => s && s.size > 0);
 
-    if (!liveData || !hasActiveFilters) {
-        return liveData || [];
+    if (!liveData) {
+        return [];
     }
 
-    const groupsFiltered = liveData.filter(group => {
-        for (const [colId, selections] of Object.entries(filters)) {
-            if (selections && selections.size > 0) {
-                if (colId === 'tarefaPrincipal' || colId === 'atividade') continue;
-                const value = group.customValues?.[colId] || '';
-                if (!selections.has(value)) return false;
-            }
-        }
-        return true;
+    // Apply showHiddenActivities and hasActiveFilters
+    let groupsFiltered = (liveData || []).map(group => {
+        const filteredTarefas = (group.tarefas || []).map(task => {
+            const actSelections = filters['atividade'];
+            const isAtividadeFilterActive = actSelections && actSelections.size > 0;
+            
+            const filteredActivities = (task.activities || []).filter(act => {
+                if (isAtividadeFilterActive) {
+                    // If filter is active and name is selected, ALWAYS show it. Otherwise hide it.
+                    return actSelections.has(act.name);
+                }
+                
+                // If no filter on atividade, behave normally regarding hidden
+                if (act.isHidden && !showHiddenActivities) return false;
+                
+                return true;
+            });
+            return { ...task, activities: filteredActivities };
+        });
+        return { ...group, tarefas: filteredTarefas };
     });
 
-    if (activeFilters.tarefaPrincipal?.size) {
-        return groupsFiltered
-            .map(group => ({
-                ...group,
-                tarefas: group.tarefas.filter(task => activeFilters.tarefaPrincipal.has(task.title)),
-            }))
-            .filter(group => group.tarefas.length > 0);
+    if (hasActiveFilters) {
+        // Group-level structural filters
+        groupsFiltered = groupsFiltered.filter(group => {
+            for (const [colId, selections] of Object.entries(filters)) {
+                if (selections && selections.size > 0) {
+                    if (colId === 'tarefaPrincipal' || colId === 'atividade') continue;
+                    const value = group.customValues?.[colId] || '';
+                    if (!selections.has(value)) return false;
+                }
+            }
+            return true;
+        });
+
+        // Tarefa Principal filter
+        if (filters['tarefaPrincipal']?.size) {
+            groupsFiltered = (groupsFiltered || [])
+                .map(group => ({
+                    ...group,
+                    tarefas: (group.tarefas || []).filter(task => filters.tarefaPrincipal.has(task.title)),
+                }))
+        }
     }
 
+    // Cleanup empty groups if not showing them. We keep groups if they have at least one valid tarefa.
+    // If showHiddenActivities is false, we might want to hide tasks with 0 activities unless task itself matches filter? 
+    // Usually it's okay to just show tasks that have 0 activities if it's structural.
+    
     return groupsFiltered;
-  }, [liveData, activeFilters]);
+  }, [liveData, activeFilters, showHiddenActivities]);
 
   const renderableRows = useMemo(() => flattenData(filteredData), [filteredData]);
 
@@ -244,11 +286,11 @@ export const App = () => {
   } = useScheduleInteraction(liveData, dispatch, renderableRows, dates, addToast);
 
   const ai = useMemo(() => {
-    if (!process.env.API_KEY) {
+    if (!process.env.GEMINI_API_KEY) {
         console.error("A chave de API para o Gemini não está configurada.");
         return null;
     }
-    return new GoogleGenAI({ apiKey: process.env.API_KEY });
+    return new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
   }, []);
 
   useEffect(() => {
@@ -305,7 +347,7 @@ export const App = () => {
             );
 
             // Migrate Grupo structure if needed
-            liveData = liveData.map((g: any) => {
+            liveData = (liveData || []).map((g: any) => {
                 if (!g.customValues) {
                     const customValues: Record<string, string> = {};
                     if (g.fa) customValues['fa'] = g.fa;
@@ -319,6 +361,7 @@ export const App = () => {
                liveData: liveData,
                dynamicColumns: dynamicColumns,
                savedPlan: safeJsonParse(data.savedPlan, null),
+               summaryData: safeJsonParse(data.summaryData, null),
                manpowerAllocation: safeJsonParse(data.manpowerAllocation, { roles: PREDEFINED_MANPOWER_ROLES, hasSecondShift: false, data: { adm: {}, shift2: {} } }),
                dailyManpowerAllocation: safeJsonParse(data.dailyManpowerAllocation, {}),
                machines: safeJsonParse(data.machines, []),
@@ -358,6 +401,7 @@ export const App = () => {
         ...project,
         liveData: JSON.stringify(project.liveData),
         savedPlan: project.savedPlan ? JSON.stringify(project.savedPlan) : '',
+        summaryData: project.summaryData ? JSON.stringify(project.summaryData) : '',
         manpowerAllocation: JSON.stringify(project.manpowerAllocation),
         dailyManpowerAllocation: JSON.stringify(project.dailyManpowerAllocation),
         machines: JSON.stringify(project.machines || []),
@@ -381,6 +425,7 @@ export const App = () => {
     
     setActiveProject(newProject);
     dispatch({ type: 'LOAD_DATA', payload: newProject.liveData });
+    dispatchSummary({ type: 'LOAD_DATA', payload: newProject.liveData });
     localStorage.setItem(`pcp-lastActive-${currentUser.uid}`, newProject.id);
     setisSaveModalOpen(false);
     
@@ -415,10 +460,10 @@ export const App = () => {
     if (!currentUser) return;
     const projectToLoad = projects[projectId];
     if (projectToLoad) {
-        if (projectToLoad.manpowerAllocation && !(projectToLoad.manpowerAllocation.data as any).adm) {
+        if (projectToLoad.manpowerAllocation && !(projectToLoad.manpowerAllocation.data as any)?.adm) {
             const oldData = projectToLoad.manpowerAllocation.data as unknown as any;
             projectToLoad.manpowerAllocation.data = {
-                adm: oldData,
+                adm: oldData || {},
                 shift2: {}
             };
             projectToLoad.manpowerAllocation.hasSecondShift = false;
@@ -432,6 +477,7 @@ export const App = () => {
             setCurrentStartDate(new Date(projectToLoad.startDate + 'T00:00:00Z'));
         }
         dispatch({ type: 'LOAD_DATA', payload: projectToLoad.liveData });
+        dispatchSummary({ type: 'LOAD_DATA', payload: projectToLoad.summaryData || projectToLoad.liveData });
         localStorage.setItem(`pcp-lastActive-${currentUser.uid}`, projectId);
         setLoadModalOpen(false);
 
@@ -559,11 +605,23 @@ export const App = () => {
     dispatch({ type: 'UPDATE_TEXT', payload: { id, field: field as any, value } });
   }, [activeProject]);
 
+  const handleSummaryTextUpdate = useCallback((id: string, field: string, value: string) => {
+    dispatchSummary({ type: 'UPDATE_TEXT', payload: { id, field: field as any, value } });
+  }, []);
+
+  const handleSummaryAddItem = useCallback((type: 'group' | 'task' | 'activity', parentId?: string) => {
+    dispatchSummary({ type: 'ADD_ITEM', payload: { type, parentId } });
+  }, []);
+
+  const handleSummaryDeleteItem = useCallback((id: string, type: 'group' | 'task' | 'activity') => {
+    dispatchSummary({ type: 'BATCH_DELETE_ITEMS', payload: [{ id, type }] });
+  }, []);
+
   useEffect(() => {
-    if (activeProject && activeProject.liveData !== liveData) {
-        setActiveProject(prev => prev ? { ...prev, liveData, lastModified: Date.now() } : null);
+    if (activeProject && (activeProject.liveData !== liveData || activeProject.summaryData !== summaryData)) {
+        setActiveProject(prev => prev ? { ...prev, liveData, summaryData, lastModified: Date.now() } : null);
     }
-  }, [liveData]);
+  }, [liveData, summaryData]);
   
   const handleSavePlan = useCallback(async () => {
     if (!activeProject || !currentUser) return;
@@ -864,7 +922,7 @@ export const App = () => {
   }, []);
   
   const filterOptions = useMemo(() => {
-    const options: Record<string, string[]> = { tarefaPrincipal: [] };
+    const options: Record<string, string[]> = { tarefaPrincipal: [], atividade: [] };
     if (!activeProject) return options;
     
     activeProject.dynamicColumns.forEach(col => {
@@ -879,9 +937,14 @@ export const App = () => {
             }
         });
         group.tarefas.forEach(task => {
-            if (!options.tarefaPrincipal.includes(task.title)) {
+            if (task.title && !options.tarefaPrincipal.includes(task.title)) {
                 options.tarefaPrincipal.push(task.title);
             }
+            task.activities.forEach(act => {
+                if (act.name && !options.atividade.includes(act.name)) {
+                    options.atividade.push(act.name);
+                }
+            });
         });
     });
 
@@ -925,14 +988,16 @@ export const App = () => {
   };
   
   const scheduleHeaders = useMemo(() => {
-    const beforeNames = activeProject?.dynamicColumns.filter(c => c.position !== 'after').map(col => col.name) || [];
-    const afterNames = activeProject?.dynamicColumns.filter(c => c.position === 'after').map(col => col.name) || [];
+    const dynamicCols = activeProject?.dynamicColumns || [];
+    const beforeNames = dynamicCols.filter(c => c.position !== 'after').map(col => col.name);
+    const afterNames = dynamicCols.filter(c => c.position === 'after').map(col => col.name);
     return ['ID', ...beforeNames, 'TAREFA PRINCIPAL', ...afterNames, 'ATIVIDADE'];
   }, [activeProject?.dynamicColumns]);
 
   const comparisonHeaders = useMemo(() => {
-    const beforeNames = activeProject?.dynamicColumns.filter(c => c.position !== 'after').map(col => col.name) || [];
-    const afterNames = activeProject?.dynamicColumns.filter(c => c.position === 'after').map(col => col.name) || [];
+    const dynamicCols = activeProject?.dynamicColumns || [];
+    const beforeNames = dynamicCols.filter(c => c.position !== 'after').map(col => col.name);
+    const afterNames = dynamicCols.filter(c => c.position === 'after').map(col => col.name);
     return ['ID', ...beforeNames, 'TAREFA PRINCIPAL', ...afterNames, 'ATIVIDADE', 'PLANO'];
   }, [activeProject?.dynamicColumns]);
   const headers = currentPage === 'comparison' ? comparisonHeaders : scheduleHeaders;
@@ -1045,7 +1110,7 @@ export const App = () => {
         if (!prev) return null;
         return {
             ...prev,
-            dynamicColumns: prev.dynamicColumns.map(c => c.id === colId ? { ...c, name } : c)
+            dynamicColumns: (prev.dynamicColumns || []).map(c => c.id === colId ? { ...c, name } : c)
         }
     });
   }, []);
@@ -1208,9 +1273,13 @@ export const App = () => {
 
             if (status !== undefined) {
                 e.preventDefault();
-                const activityIdToRowIndex = new Map(renderableRows.map((r, i) => [r.activity.id, i]));
-                const datesStr = dates.map(d => formatDate(d));
-                const dateToColIndex = new Map(datesStr.map((d, i) => [d, i]));
+                const activityIdToRowIndex = new Map(
+                    (renderableRows || [])
+                        .filter(r => r.activity)
+                        .map((r, i) => [r.activity!.id, renderableRows.indexOf(r)])
+                );
+                const datesStr = (dates || []).map(d => formatDate(d));
+                const dateToColIndex = new Map((datesStr || []).map((d, i) => [d, i]));
 
                 const anchorRow = activityIdToRowIndex.get(selectionBlock.anchor.activityId);
                 const anchorCol = dateToColIndex.get(selectionBlock.anchor.date);
@@ -1240,8 +1309,23 @@ export const App = () => {
                     }
                 }
             }
+        } else if (e.key === 'Backspace' && !e.shiftKey && selectedItems.length > 0) {
+            // Limpar o texto dos itens selecionados
+            if ((e.target as HTMLElement).isContentEditable || ['INPUT', 'TEXTAREA'].includes((e.target as HTMLElement).tagName)) return;
+            e.preventDefault();
+            selectedItems.forEach(item => {
+                if (item.type === 'activity') {
+                    dispatch({ type: 'UPDATE_TEXT', payload: { id: item.id, field: 'atividade', value: '' } });
+                } else if (item.type === 'task') {
+                    dispatch({ type: 'UPDATE_TEXT', payload: { id: item.id, field: 'tarefa', value: '' } });
+                } else if (item.type === 'group') {
+                    dispatch({ type: 'UPDATE_TEXT', payload: { id: item.id, field: 'grupo', value: '' } });
+                }
+            });
+            addToast(`${selectedItems.length} textos apagados.`, 'success');
         } else if ((e.key === 'Delete' || (e.shiftKey && e.key === 'Backspace')) && selectedItems.length > 0) {
             // Excluir itens selecionados se não houver bloco de seleção de células
+            if ((e.target as HTMLElement).isContentEditable || ['INPUT', 'TEXTAREA'].includes((e.target as HTMLElement).tagName)) return;
             e.preventDefault();
             handleDeleteSelectedItems();
         }
@@ -1333,12 +1417,12 @@ export const App = () => {
                         min="25" 
                         max="200" 
                         step="5"
-                        value={zoomLevels[currentPage]} 
+                        value={zoomLevels[currentPage] || 100} 
                         onChange={e => setZoomLevels(prev => ({...prev, [currentPage]: Number(e.target.value)}))}
                         aria-label="Zoom do cronograma"
                     />
                     <span className="material-icons">zoom_in</span>
-                    <span className="zoom-percentage">{zoomLevels[currentPage]}%</span>
+                    <span className="zoom-percentage">{zoomLevels[currentPage] || 100}%</span>
                 </div>
                 <div className="header-item-editable">
                     <span className="label">Responsável:</span>
@@ -1395,6 +1479,17 @@ export const App = () => {
                             <label style={{ display: 'block', fontSize: '0.75rem', color: '#64748b', fontWeight: '600', textTransform: 'uppercase', marginBottom: '4px' }}>Última Atualização</label>
                             <div style={{ color: '#64748b' }}>{new Date(activeProject.lastModified).toLocaleString('pt-BR')}</div>
                         </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <button
+                                onClick={() => setShowHiddenActivities(prev => !prev)}
+                                className="control-button"
+                                style={{ display: 'flex', alignItems: 'center', gap: '4px', backgroundColor: showHiddenActivities ? '#e0e7ff' : '#f1f5f9', color: showHiddenActivities ? '#4338ca' : '#475569', border: '1px solid', borderColor: showHiddenActivities ? '#818cf8' : '#cbd5e1', height: 'fit-content' }}
+                                title={showHiddenActivities ? "Ocultar atividades invisíveis" : "Mostrar atividades ocultas"}
+                            >
+                                <span className="material-icons" style={{ fontSize: '18px' }}>{showHiddenActivities ? 'visibility' : 'visibility_off'}</span>
+                                {showHiddenActivities ? "Esconder Ocultos" : "Mostrar Ocultos"}
+                            </button>
+                        </div>
                       </div>
                       <table className="schedule-table" style={{ width: scheduleTableColumnWidths.reduce((a, b) => a + b, 0) }}>
                           <ScheduleHeader 
@@ -1443,11 +1538,12 @@ export const App = () => {
                               onDropTargetChange={setDropTargetId}
                               dropTargetId={dropTargetId}
                               visibleColumns={visibleColumns}
+                              onToggleHideActivity={handleToggleHideActivity}
                           />
                       </table>
                     </div>
                   )}
-                  {currentPage === 'dailySummary' && <DailySummaryView data={liveData} dates={dates} />}
+                  {currentPage === 'dailySummary' && <DailySummaryView data={summaryData} dates={dates} onTextUpdate={handleSummaryTextUpdate} onAddItem={handleSummaryAddItem} onDeleteItem={(id, type) => handleSummaryDeleteItem(id, type)} onSyncWithSchedule={() => dispatchSummary({ type: 'LOAD_DATA', payload: liveData })} />}
                   {currentPage === 'dashboard' && <DashboardView data={liveData} title={title} programmerName={activeProject.programmerName} dynamicColumns={activeProject.dynamicColumns}/>}
                   {currentPage === 'comparison' && <ComparisonView savedPlan={savedPlan} liveData={liveData} dates={dates} columnWidths={comparisonTableColumnWidths} onResizeStart={handleResizeStart} stickyColumnPositions={stickyColumnPositions} title={title} dynamicColumns={activeProject.dynamicColumns}/>}
                   {currentPage === 'manpower' && <ManpowerAllocationView project={activeProject} setProject={setActiveProject} dates={dates} title={title} zoomLevel={zoomLevels.manpower} />}

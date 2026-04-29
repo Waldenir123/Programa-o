@@ -35,6 +35,8 @@ export interface Atividade {
   id: string;
   name: string;
   schedule: Record<string, Status>;
+  sector?: string;
+  isHidden?: boolean;
 }
 export interface TarefaPrincipal {
   id: string;
@@ -88,6 +90,7 @@ export interface Project {
   programmerName: string;
   liveData: ScheduleData;
   savedPlan: ScheduleData | null;
+  summaryData?: ScheduleData;
   manpowerAllocation: ManpowerAllocation;
   dailyManpowerAllocation: DailyManpowerAllocation;
   machines: Machine[];

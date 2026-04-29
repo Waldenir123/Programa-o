@@ -10,24 +10,24 @@ export const aiDeletionAgent = (
     const targetId = String(idToDelete).trim();
 
     if (type === 'group') {
-        return data.filter(g => String(g.id).trim() !== targetId);
+        return (data || []).filter(g => String(g.id).trim() !== targetId);
     } 
     
     if (type === 'task') {
-        return data.map(group => {
-            const newTarefas = group.tarefas.filter(t => String(t.id).trim() !== targetId);
-            if (newTarefas.length === group.tarefas.length) return group;
+        return (data || []).map(group => {
+            const newTarefas = (group.tarefas || []).filter(t => String(t.id).trim() !== targetId);
+            if (newTarefas.length === (group.tarefas || []).length) return group;
             return { ...group, tarefas: newTarefas };
-        }).filter(g => g.tarefas.length > 0);
+        }).filter(g => (g.tarefas || []).length > 0);
     } 
     
     if (type === 'activity') {
-        return data.map(group => {
+        return (data || []).map(group => {
             let groupUpdated = false;
-            const newTarefas = group.tarefas.map(task => {
+            const newTarefas = (group.tarefas || []).map(task => {
                 if (!task.activities) return task;
-                const newActivities = task.activities.filter(a => String(a.id).trim() !== targetId);
-                if (newActivities.length === task.activities.length) return task;
+                const newActivities = (task.activities || []).filter(a => String(a.id).trim() !== targetId);
+                if (newActivities.length === (task.activities || []).length) return task;
                 groupUpdated = true;
                 return { ...task, activities: newActivities };
             });
@@ -57,15 +57,15 @@ export const analyzeDeletionImpactWithAI = async (
         required: ['analysis'],
     };
 
-    const simplifiedData = data.map((g, gIdx) => ({
+    const simplifiedData = (data || []).map((g, gIdx) => ({
         wbs: `${gIdx + 1}`,
         id: g.id,
         name: Object.values(g.customValues || {}).join(' / ') || 'Linha sem nome',
-        tasks: g.tarefas.map((t, tIdx) => ({
+        tasks: (g.tarefas || []).map((t, tIdx) => ({
             wbs: `${gIdx + 1}.${tIdx + 1}`,
             id: t.id,
             name: t.title,
-            activities: t.activities.map((a, aIdx) => ({
+            activities: (t.activities || []).map((a, aIdx) => ({
                 wbs: `${gIdx + 1}.${tIdx + 1}.${aIdx + 1}`,
                 id: a.id,
                 name: a.name
@@ -395,6 +395,17 @@ Sua primeira tarefa é identificar qual dos três layouts de cronograma a seguir
         *   **Formato de Data:** Converta as datas de \`DD/MM/AA\` para \`YYYY-MM-DD\`. Anos como '25' e '26' devem ser convertidos para 2025 e 2026.
         *   **Saída:** Popule os campos \`startDate\` e \`endDate\` no JSON de saída. **NÃO GERE o array \`schedule\` para o Layout 3; deixe-o como um array vazio \`[]\`**.
 
+---
+
+### **Layout 4: Tabela Simplificada ou Texto de Copiar/Colar**
+
+*   **Como Identificar:** A tabela terá poucas colunas descritivas (ex: apenas uma coluna \`SETOR\` ou Grupo aglutinando várias linhas, seguida diretamente pela atividade e as datas). O texto colado frequentemente terá linhas onde o nome do grupo vem antes, ou logo na primeira coluna de uma linha (ex: \`GRUPO 37 - FABRICAÇÃO DAS QPS [264]\`), e as atividades desse grupo nas linhas seguintes.
+*   **Regras de Extração (Layout 4):** 
+    1.  O nome aglutinador (ex: \`GRUPO 37 - FABRICAÇÃO...\`) deve ser mapeado para o campo \`fa\`.
+    2.  Como não há uma Tarefa Principal definida separadamente, crie apenas UMA única Tarefa Principal dentro deste grupo, usando um \`title\` neutro, como "Atividades Gerais", ou repita o nome do \`fa\`.
+    3.  As linhas seguintes que contêm nomes de atividades (ex: \`ENSAIO DE VT...\`, \`CORTE...\`) devem ser mapeadas como \`activities\` desta única Tarefa Principal.
+    4.  Extraia as datas e os status (\`Ok\`, \`X\`, etc.) como nos Layouts 1 e 2.
+    
 ---
 
 ### **Regras Comuns para Todos os Layouts**
