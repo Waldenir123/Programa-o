@@ -55,9 +55,8 @@ service cloud.firestore {
                     request.resource.data.ownerId == request.auth.uid;
       allow update: if isAuthenticated() && 
                     isValidProject() && 
-                    request.resource.data.id == resource.data.id &&
-                    (isAdmin() || isOwner(resource.data));
-      allow delete: if isAdmin() || isOwner(resource.data);
+                    request.resource.data.id == resource.data.id;
+      allow delete: if isAuthenticated();
     }
   }
 }
