@@ -89,7 +89,7 @@ interface ScheduleRowProps {
     onCellRightClick: (e: React.MouseEvent, activityId: string, date: string) => void;
     isCellInBlock: (activityId: string, date: string, block: any) => boolean;
     onMoveItem: (id: string, direction: 'up' | 'down') => void;
-    onToggleHideActivity: (id: string) => void;
+    onToggleHideItem: (id: string, type: 'group' | 'task' | 'activity') => void;
 }
 
 const ScheduleRow = memo((props: ScheduleRowProps) => {
@@ -100,7 +100,7 @@ const ScheduleRow = memo((props: ScheduleRowProps) => {
         onRowClick, onGroupDragStart, onActivityDragStart, onActivityDrop, onDragEnd, onDropTargetChange,
         onAddItem, onDeleteItem, onTextUpdate,
         onCellMouseDown, onCellMouseEnter, onCellRightClick, isCellInBlock,
-        onMoveItem, onToggleHideActivity
+        onMoveItem, onToggleHideItem
     } = props;
 
     const dynamicColumnsBefore = useMemo(() => (dynamicColumns || []).filter(c => c.position !== 'after'), [dynamicColumns]);
@@ -120,7 +120,7 @@ const ScheduleRow = memo((props: ScheduleRowProps) => {
     return (
         <tr
             className={`${isSelected ? 'selected-row' : ''} ${isLastInGroup ? 'group-divider' : ''} ${isLastInTask ? 'task-divider' : ''} ${isGroupBeingDragged || isActivityBeingDragged ? 'group-dragging' : ''} ${isDropTarget ? 'drop-target-top' : ''}`}
-            style={{ opacity: activity?.isHidden ? 0.5 : 1, transition: 'opacity 0.2s' }}
+            style={{ opacity: (group.isHidden || task.isHidden || activity?.isHidden) ? 0.5 : 1, transition: 'opacity 0.2s' }}
             onDragOver={(e) => { 
               e.preventDefault(); 
               if (draggedGroupInfo) onDropTargetChange(group.id);
@@ -148,11 +148,14 @@ const ScheduleRow = memo((props: ScheduleRowProps) => {
                         <span className="material-icons">drag_indicator</span>
                     </span>
                     {wbsId}
+                    <button onClick={(e) => { e.stopPropagation(); onToggleHideItem(group.id, 'group'); }} title={group.isHidden ? "Mostrar Grupo" : "Ocultar Grupo"} style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#e2e8f0', borderRadius: '4px', width: '20px', height: '20px', pointerEvents: 'auto', border: 'none', cursor: 'pointer' }}>
+                        <span className="material-icons" style={{ fontSize: '14px', color: group.isHidden ? '#94a3b8' : '#64748b' }}>{group.isHidden ? 'visibility_off' : 'visibility'}</span>
+                    </button>
                     <button 
                         className="group-delete-button"
                         onClick={(e) => { e.stopPropagation(); onDeleteItem(group.id, 'group'); }}
                         title="Excluir Grupo"
-                        style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#e2e8f0', borderRadius: '4px', width: '20px', height: '20px', pointerEvents: 'auto', border: 'none', cursor: 'pointer' }}
+                        style={{ marginLeft: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#e2e8f0', borderRadius: '4px', width: '20px', height: '20px', pointerEvents: 'auto', border: 'none', cursor: 'pointer' }}
                     >
                         <span className="material-icons" style={{ fontSize: '14px', color: '#ef4444' }}>remove</span>
                     </button>
@@ -183,12 +186,24 @@ const ScheduleRow = memo((props: ScheduleRowProps) => {
                         <div className="task-fa-input" contentEditable suppressContentEditableWarning onMouseDown={e => e.stopPropagation()} onMouseUp={e => e.stopPropagation()} onClick={e => e.stopPropagation()} onBlur={e => onTextUpdate(task.id, 'tarefa_fa', e.currentTarget.innerHTML || '')} style={{ fontSize: '0.75rem', color: '#64748b', fontStyle: 'italic', borderTop: '1px solid #e2e8f0', paddingTop: '2px' }} dangerouslySetInnerHTML={{ __html: task.fa || 'Nº FA' }} />
                     </div>
                     <div className="cell-actions" style={{ display: 'flex', gap: '4px', zIndex: 10 }}>
-                        <button onClick={(e) => { e.stopPropagation(); onAddItem('activity', task.id); }} title="Adicionar Atividade" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#e2e8f0', borderRadius: '4px', width: '24px', height: '24px', pointerEvents: 'auto' }}>
-                            <span className="material-icons" style={{ fontSize: '16px', color: '#10b981' }}>add</span>
-                        </button>
-                        <button onClick={(e) => { e.stopPropagation(); onDeleteItem(task.id, 'task'); }} title="Excluir Tarefa" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#e2e8f0', borderRadius: '4px', width: '24px', height: '24px', pointerEvents: 'auto' }}>
-                            <span className="material-icons" style={{ fontSize: '16px', color: '#ef4444' }}>remove</span>
-                        </button>
+                        {!task.id.includes('_placeholder_task') && (
+                            <>
+                                <button onClick={(e) => { e.stopPropagation(); onToggleHideItem(task.id, 'task'); }} title={task.isHidden ? "Mostrar Tarefa" : "Ocultar Tarefa"} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#e2e8f0', borderRadius: '4px', width: '24px', height: '24px', pointerEvents: 'auto' }}>
+                                    <span className="material-icons" style={{ fontSize: '16px', color: task.isHidden ? '#94a3b8' : '#64748b' }}>{task.isHidden ? 'visibility_off' : 'visibility'}</span>
+                                </button>
+                                <button onClick={(e) => { e.stopPropagation(); onAddItem('activity', task.id); }} title="Adicionar Atividade" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#e2e8f0', borderRadius: '4px', width: '24px', height: '24px', pointerEvents: 'auto' }}>
+                                    <span className="material-icons" style={{ fontSize: '16px', color: '#10b981' }}>add</span>
+                                </button>
+                                <button onClick={(e) => { e.stopPropagation(); onDeleteItem(task.id, 'task'); }} title="Excluir Tarefa" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#e2e8f0', borderRadius: '4px', width: '24px', height: '24px', pointerEvents: 'auto' }}>
+                                    <span className="material-icons" style={{ fontSize: '16px', color: '#ef4444' }}>remove</span>
+                                </button>
+                            </>
+                        )}
+                        {task.id.includes('_placeholder_task') && (
+                            <button onClick={(e) => { e.stopPropagation(); onAddItem('task', group.id); }} title="Adicionar Tarefa" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#e2e8f0', borderRadius: '4px', width: '24px', height: '24px', pointerEvents: 'auto' }}>
+                                <span className="material-icons" style={{ fontSize: '16px', color: '#10b981' }}>add</span>
+                            </button>
+                        )}
                     </div>
                 </td>
             )}
@@ -238,7 +253,7 @@ const ScheduleRow = memo((props: ScheduleRowProps) => {
                 <div className="cell-actions" style={{ display: 'flex', gap: '4px', zIndex: 10 }}>
                     {activity && (
                         <>
-                            <button onClick={(e) => { e.stopPropagation(); onToggleHideActivity(activity.id); }} title={activity.isHidden ? "Mostrar Atividade" : "Ocultar Atividade"} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#e2e8f0', borderRadius: '4px', width: '24px', height: '24px', pointerEvents: 'auto' }}>
+                            <button onClick={(e) => { e.stopPropagation(); onToggleHideItem(activity.id, 'activity'); }} title={activity.isHidden ? "Mostrar Atividade" : "Ocultar Atividade"} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#e2e8f0', borderRadius: '4px', width: '24px', height: '24px', pointerEvents: 'auto' }}>
                                 <span className="material-icons" style={{ fontSize: '16px', color: activity.isHidden ? '#94a3b8' : '#64748b' }}>{activity.isHidden ? 'visibility_off' : 'visibility'}</span>
                             </button>
                             <button onClick={(e) => { e.stopPropagation(); onMoveItem(activity.id, 'up'); }} title="Mover para Cima" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#e2e8f0', borderRadius: '4px', width: '24px', height: '24px', pointerEvents: 'auto' }}>
@@ -514,7 +529,7 @@ interface ScheduleBodyProps {
     onDropTargetChange: (id: string | null) => void;
     dropTargetId: string | null;
     visibleColumns?: Record<string, boolean>;
-    onToggleHideActivity: (id: string) => void;
+    onToggleHideItem: (id: string, type: 'group' | 'task' | 'activity') => void;
 }
 
 export const ScheduleBody: React.FC<ScheduleBodyProps> = (props) => {
@@ -526,7 +541,7 @@ export const ScheduleBody: React.FC<ScheduleBodyProps> = (props) => {
         draggedGroupInfo, draggedActivityInfo, onGroupDragStart, onGroupDrop, 
         onActivityDragStart, onActivityDrop,
         onDragEnd, onDropTargetChange, dropTargetId,
-        visibleColumns, onToggleHideActivity
+        visibleColumns, onToggleHideItem
     } = props;
 
     const activityIdToRowIndex = useMemo(() => {
@@ -594,7 +609,7 @@ export const ScheduleBody: React.FC<ScheduleBodyProps> = (props) => {
                     onCellMouseEnter={onCellMouseEnter}
                     onCellRightClick={onCellRightClick}
                     isCellInBlock={isCellInBlock}
-                    onToggleHideActivity={onToggleHideActivity}
+                    onToggleHideItem={onToggleHideItem}
                 />
             ))}
             <tr className="add-group-row" onDragOver={(e) => { e.preventDefault(); onDropTargetChange(null); }}>

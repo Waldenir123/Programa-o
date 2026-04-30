@@ -101,11 +101,12 @@ export const SaveModal = ({ onClose, onSave, currentName, currentObra }: { onClo
     );
 };
 
-export const LoadModal = ({ schedules, onLoad, onDelete, onRenameProject, onDuplicateProject, onRenameFolder, onDeleteFolder, onClose, isAdmin }: { 
+export const LoadModal = ({ schedules, onLoad, onDelete, onRenameProject, onMoveProject, onDuplicateProject, onRenameFolder, onDeleteFolder, onClose, isAdmin }: { 
     schedules: Project[], 
     onLoad: (id: string) => void, 
     onDelete: (id: string) => void, 
     onRenameProject: (id: string, newName: string) => void,
+    onMoveProject: (id: string, newFolder: string) => void,
     onDuplicateProject: (id: string) => void,
     onRenameFolder: (oldName: string, newName: string) => void,
     onDeleteFolder: (folderName: string) => void,
@@ -117,6 +118,9 @@ export const LoadModal = ({ schedules, onLoad, onDelete, onRenameProject, onDupl
     const [newFolderName, setNewFolderName] = useState('');
     const [editingProject, setEditingProject] = useState<string | null>(null);
     const [newProjectName, setNewProjectName] = useState('');
+    const [movingProject, setMovingProject] = useState<string | null>(null);
+    const [moveTargetFolder, setMoveTargetFolder] = useState('');
+    const [isNewFolderMode, setIsNewFolderMode] = useState(false);
 
     // Group schedules by obra
     const groupedSchedules = schedules.reduce((acc, schedule) => {
@@ -143,6 +147,7 @@ export const LoadModal = ({ schedules, onLoad, onDelete, onRenameProject, onDupl
         e.stopPropagation();
         setEditingProject(s.id);
         setNewProjectName(s.name);
+        setMovingProject(null);
     };
 
     const handleSaveProjectRename = (id: string) => {
@@ -150,6 +155,23 @@ export const LoadModal = ({ schedules, onLoad, onDelete, onRenameProject, onDupl
             onRenameProject(id, newProjectName.trim());
         }
         setEditingProject(null);
+    };
+
+    const handleStartMoveProject = (e: React.MouseEvent, s: Project) => {
+        e.stopPropagation();
+        setMovingProject(s.id);
+        setMoveTargetFolder(s.obra || 'Geral');
+        setIsNewFolderMode(false);
+        setEditingProject(null);
+    };
+
+    const handleSaveMoveProject = (id: string) => {
+        if (moveTargetFolder.trim()) {
+            onMoveProject(id, moveTargetFolder.trim());
+            // If they are currently viewing a folder, we don't automatically change the view, 
+            // but the item will disappear from this list. 
+        }
+        setMovingProject(null);
     };
 
     return (
@@ -231,7 +253,45 @@ export const LoadModal = ({ schedules, onLoad, onDelete, onRenameProject, onDupl
                             {groupedSchedules[selectedObra].length > 0 ? groupedSchedules[selectedObra].map(s => (
                                 <li key={s.id}>
                                     <div className="schedule-info">
-                                        {editingProject === s.id ? (
+                                        {movingProject === s.id ? (
+                                            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginBottom: '4px' }}>
+                                                {isNewFolderMode ? (
+                                                    <input
+                                                        autoFocus
+                                                        value={moveTargetFolder}
+                                                        onChange={e => setMoveTargetFolder(e.target.value)}
+                                                        onKeyDown={e => e.key === 'Enter' && handleSaveMoveProject(s.id)}
+                                                        className="inline-input"
+                                                        placeholder="Digite o nome da nova pasta..."
+                                                        style={{ width: '100%' }}
+                                                    />
+                                                ) : (
+                                                    <select
+                                                        autoFocus
+                                                        value={moveTargetFolder}
+                                                        onChange={e => {
+                                                            if (e.target.value === 'NEW_FOLDER_ACTION') {
+                                                                setIsNewFolderMode(true);
+                                                                setMoveTargetFolder('');
+                                                            } else {
+                                                                setMoveTargetFolder(e.target.value);
+                                                            }
+                                                        }}
+                                                        className="inline-input"
+                                                        style={{ width: '100%', padding: '4px' }}
+                                                    >
+                                                        {Object.keys(groupedSchedules).map(f => (
+                                                            <option key={f} value={f}>{f}</option>
+                                                        ))}
+                                                        <option value="NEW_FOLDER_ACTION">+ Criar Nova Pasta</option>
+                                                    </select>
+                                                )}
+                                                <div style={{ display: 'flex', gap: '4px' }}>
+                                                    <button className="submit-button" onClick={() => handleSaveMoveProject(s.id)} style={{ padding: '2px 8px', fontSize: '0.8rem', flex: 1 }}>Mover</button>
+                                                    <button className="cancel-button" onClick={() => setMovingProject(null)} style={{ padding: '2px 8px', fontSize: '0.8rem' }}>Cancelar</button>
+                                                </div>
+                                            </div>
+                                        ) : editingProject === s.id ? (
                                             <input 
                                                 autoFocus
                                                 value={newProjectName} 
@@ -248,6 +308,9 @@ export const LoadModal = ({ schedules, onLoad, onDelete, onRenameProject, onDupl
                                     </div>
                                     <div className="schedule-actions">
                                         <button className="submit-button" onClick={() => onLoad(s.id)}>Carregar</button>
+                                        <button className="control-button" title="Mover para outra pasta" onClick={(e) => handleStartMoveProject(e, s)}>
+                                            <span className="material-icons">drive_file_move</span>
+                                        </button>
                                         <button className="control-button" title="Duplicar" onClick={() => onDuplicateProject(s.id)}>
                                             <span className="material-icons">content_copy</span>
                                         </button>

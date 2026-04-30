@@ -8,6 +8,25 @@ import * as ExcelJS from 'exceljs';
 import { saveAs } from 'file-saver';
 // Removed 'import { utils, writeFile } from 'xlsx';' using grep later, simply replacing the function here
 
+const stripHtmlTags = (str: string | undefined | null) => {
+    if (!str) return '';
+    
+    let html = str;
+    // Replace typical block-level transitions and line breaks with newline characters
+    html = html.replace(/<br\s*\/?>/gi, '\n');
+    html = html.replace(/<\/div>\s*<div[^>]*>/gi, '\n');
+    html = html.replace(/<\/p>\s*<p[^>]*>/gi, '\n');
+    html = html.replace(/<\/div>/gi, '\n');
+    html = html.replace(/<\/p>/gi, '\n');
+
+    const temp = document.createElement('div');
+    temp.innerHTML = html;
+    let text = temp.textContent || temp.innerText || '';
+    
+    // Sanitize trailing/leading newlines and excess whitespace
+    return text.replace(/\n\s*\n/g, '\n').trim();
+};
+
 export const exportToExcelAgent = async (
     filteredData: ScheduleData, 
     dates: Date[], 
@@ -107,11 +126,11 @@ export const exportToExcelAgent = async (
                 }
                 
                 visibleDynamicColsMapping.forEach(col => {
-                    rowData.push(group.customValues?.[col.id] || '');
+                    rowData.push(stripHtmlTags(group.customValues?.[col.id]));
                 });
                 
-                if (showTask) rowData.push(task.title);
-                if (showActivity) rowData.push(activity.name);
+                if (showTask) rowData.push(stripHtmlTags(task.title));
+                if (showActivity) rowData.push(stripHtmlTags(activity.name));
                 
                 dates.forEach(date => {
                     const status = activity.schedule[formatDate(date)];
@@ -318,18 +337,18 @@ export const exportToPdfAgent = (
             activities.forEach((activity) => {
                 const row: any = {
                     id: `${wbsGroup}.${wbsTask}.${wbsActivity}`,
-                    activity: activity.name
+                    activity: stripHtmlTags(activity.name)
                 };
 
                 // Add grouping fields only on the first row of span
                 if (isFirstRowOfGroup) {
                     visibleDynamicCols.forEach(col => {
-                        row[`col_${col.id}`] = { content: group.customValues?.[col.id] || '', rowSpan: groupTotalRows };
+                        row[`col_${col.id}`] = { content: stripHtmlTags(group.customValues?.[col.id]), rowSpan: groupTotalRows };
                     });
                 }
                 
                 if (isFirstRowOfTask) {
-                    row.task = { content: task.title, rowSpan: taskTotalRows };
+                    row.task = { content: stripHtmlTags(task.title), rowSpan: taskTotalRows };
                 }
 
                 // Status for each date
@@ -546,7 +565,7 @@ export const exportDailyAllocationToPdfAgent = (
             let activityCounter = 1;
             task.activities.forEach(activity => {
                 const wbs = `${groupCounter}.${taskCounter}.${activityCounter}`;
-                const row: any[] = [{ content: wbs }, { content: task.title }, { content: activity.name }];
+                const row: any[] = [{ content: wbs }, { content: stripHtmlTags(task.title) }, { content: stripHtmlTags(activity.name) }];
                 dates.forEach(date => {
                     const dateStr = formatDate(date);
                     const allocations = project.dailyManpowerAllocation[activity.id]?.[dateStr];

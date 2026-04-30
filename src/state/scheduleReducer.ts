@@ -26,6 +26,7 @@ export type ScheduleAction =
     | { type: 'MOVE_ACTIVITY'; payload: { id: string, direction: 'up' | 'down' } }
     | { type: 'MOVE_ACTIVITY_DND'; payload: { draggedId: string, targetId: string | null, taskId: string } }
     | { type: 'TOGGLE_HIDE_ACTIVITY'; payload: string }
+    | { type: 'TOGGLE_HIDE_ITEM'; payload: { id: string; type: 'group' | 'task' | 'activity' } }
     | { type: 'CLEAR_ALL' };
 
 // The reducer function that handles state transitions
@@ -57,6 +58,31 @@ export const scheduleReducer = (state: ScheduleState, action: ScheduleAction): S
 
         case 'CLEAR_ALL':
             return createNewStateWithHistory([]);
+
+        case 'TOGGLE_HIDE_ITEM': {
+            const { id, type } = action.payload;
+            return createNewStateWithHistory(
+                (state.liveData || []).map(group => {
+                    if (type === 'group' && group.id === id) {
+                        return { ...group, isHidden: !group.isHidden };
+                    }
+                    return {
+                        ...group,
+                        tarefas: (group.tarefas || []).map(task => {
+                            if (type === 'task' && task.id === id) {
+                                return { ...task, isHidden: !task.isHidden };
+                            }
+                            return {
+                                ...task,
+                                activities: (task.activities || []).map(act => 
+                                    (type === 'activity' && act.id === id) ? { ...act, isHidden: !act.isHidden } : act
+                                )
+                            };
+                        })
+                    };
+                })
+            );
+        }
 
         case 'TOGGLE_HIDE_ACTIVITY': {
             const targetId = action.payload;

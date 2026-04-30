@@ -43,11 +43,13 @@ export interface TarefaPrincipal {
   title: string;
   fa?: string;
   activities: Atividade[];
+  isHidden?: boolean;
 }
 export interface Grupo {
   id: string;
   tarefas: TarefaPrincipal[];
   customValues: Record<string, string>;
+  isHidden?: boolean;
 }
 export type ScheduleData = Grupo[];
 

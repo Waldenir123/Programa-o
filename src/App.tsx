@@ -112,6 +112,7 @@ export const App = () => {
   const [isAuthReady, setIsAuthReady] = useState(false);
   const [activeProject, setActiveProject] = useState<Project | null>(null);
   const [lastSavedTime, setLastSavedTime] = useState<number | null>(null);
+  const [isAutoSaveEnabled, setIsAutoSaveEnabled] = useState(true);
 
   const [scheduleState, dispatch] = useReducer(scheduleReducer, {
       liveData: [],
@@ -133,8 +134,8 @@ export const App = () => {
   
   const [isImportModalOpen, setImportModalOpen] = useState(false);
 
-  const handleToggleHideActivity = useCallback((id: string) => {
-      dispatch({ type: 'TOGGLE_HIDE_ACTIVITY', payload: id });
+  const handleToggleHideItem = useCallback((id: string, type: 'group' | 'task' | 'activity') => {
+      dispatch({ type: 'TOGGLE_HIDE_ITEM', payload: { id, type } });
   }, []);
   const [isLoadModalOpen, setLoadModalOpen] = useState(false);
   const [isSaveModalOpen, setisSaveModalOpen] = useState(false);
@@ -284,26 +285,30 @@ export const App = () => {
     }
 
     // Apply showHiddenActivities and hasActiveFilters
-    let groupsFiltered = (liveData || []).map(group => {
-        const filteredTarefas = (group.tarefas || []).map(task => {
-            const actSelections = filters['atividade'];
-            const isAtividadeFilterActive = actSelections && actSelections.size > 0;
-            
-            const filteredActivities = (task.activities || []).filter(act => {
-                if (isAtividadeFilterActive) {
-                    // If filter is active and name is selected, ALWAYS show it. Otherwise hide it.
-                    return actSelections.has(act.name);
-                }
-                
-                // If no filter on atividade, behave normally regarding hidden
-                if (act.isHidden && !showHiddenActivities) return false;
-                
-                return true;
-            });
-            return { ...task, activities: filteredActivities };
+    let groupsFiltered = (liveData || [])
+        .filter(group => showHiddenActivities || !group.isHidden)
+        .map(group => {
+            const filteredTarefas = (group.tarefas || [])
+                .filter(task => showHiddenActivities || !task.isHidden)
+                .map(task => {
+                    const actSelections = filters['atividade'];
+                    const isAtividadeFilterActive = actSelections && actSelections.size > 0;
+                    
+                    const filteredActivities = (task.activities || []).filter(act => {
+                        if (isAtividadeFilterActive) {
+                            // If filter is active and name is selected, ALWAYS show it. Otherwise hide it.
+                            return actSelections.has(act.name);
+                        }
+                        
+                        // If no filter on atividade, behave normally regarding hidden
+                        if (act.isHidden && !showHiddenActivities) return false;
+                        
+                        return true;
+                    });
+                    return { ...task, activities: filteredActivities };
+                });
+            return { ...group, tarefas: filteredTarefas };
         });
-        return { ...group, tarefas: filteredTarefas };
-    });
 
     if (hasActiveFilters) {
         // Group-level structural filters
@@ -328,11 +333,24 @@ export const App = () => {
         }
     }
 
-    // Cleanup empty groups if not showing them. We keep groups if they have at least one valid tarefa.
-    // If showHiddenActivities is false, we might want to hide tasks with 0 activities unless task itself matches filter? 
-    // Usually it's okay to just show tasks that have 0 activities if it's structural.
+    let finalGroups = groupsFiltered.map(group => {
+        const _tarefas = group.tarefas.filter(task => {
+            const originalTask = liveData.find(g => g.id === group.id)?.tarefas.find(t => t.id === task.id);
+            if (originalTask && originalTask.activities.length > 0 && task.activities.length === 0) {
+                return false; // Hide task if all its activities were filtered out
+            }
+            return true;
+        });
+        return { ...group, tarefas: _tarefas };
+    }).filter(group => {
+        const originalGroup = liveData.find(g => g.id === group.id);
+        if (originalGroup && originalGroup.tarefas.length > 0 && group.tarefas.length === 0) {
+            return false; // Hide group if all its tasks were filtered out
+        }
+        return true;
+    });
     
-    return groupsFiltered;
+    return finalGroups;
   }, [liveData, activeFilters, showHiddenActivities]);
 
   const renderableRows = useMemo(() => flattenData(filteredData), [filteredData]);
@@ -524,13 +542,15 @@ export const App = () => {
   }, [currentUser, activeProject, liveData, addToast, visibleColumns, activeFilters]);
 
   useEffect(() => {
+    if (!isAutoSaveEnabled) return;
     const intervalId = setInterval(() => {
       if (activeProject) {
         handleSaveProject(true);
+        addToast('Salvamento automático concluído', 'success');
       }
-    }, 180000); // 3 minutes
+    }, 120000); // 2 minutes
     return () => clearInterval(intervalId);
-  }, [handleSaveProject, activeProject]);
+  }, [handleSaveProject, activeProject, isAutoSaveEnabled, addToast]);
 
   const handleLoadProject = useCallback((projectId: string) => {
     if (!currentUser) return;
@@ -596,6 +616,19 @@ export const App = () => {
     }
   };
   
+  const handleMoveProject = async (id: string, newObra: string) => {
+    if (!currentUser) return;
+    try {
+      await setDoc(doc(db, 'projects', id), { obra: newObra, lastModified: Date.now() }, { merge: true });
+      addToast(`Projeto movido para pasta '${newObra}'`, 'success');
+      if (activeProject && activeProject.id === id) {
+          setActiveProject(prev => prev ? { ...prev, obra: newObra } : prev);
+      }
+    } catch (error) {
+      handleFirestoreError(error, OperationType.UPDATE, 'projects/' + id);
+    }
+  };
+
   const handleRenameProject = async (id: string, newName: string) => {
     if (!currentUser) return;
     try {
@@ -1452,6 +1485,7 @@ export const App = () => {
             onLoad={handleLoadProject} 
             onDelete={handleDeleteProject}
             onRenameProject={handleRenameProject}
+            onMoveProject={handleMoveProject}
             onDuplicateProject={handleDuplicateProject}
             onRenameFolder={handleRenameFolder}
             onDeleteFolder={handleDeleteFolder}
@@ -1581,6 +1615,19 @@ export const App = () => {
                         </div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                             <button
+                                onClick={() => {
+                                    const newState = !isAutoSaveEnabled;
+                                    setIsAutoSaveEnabled(newState);
+                                    addToast(newState ? 'Salvamento Automático Ativado' : 'Salvamento Automático Desativado', newState ? 'success' : 'error');
+                                }}
+                                className="control-button"
+                                style={{ display: 'flex', alignItems: 'center', gap: '4px', backgroundColor: isAutoSaveEnabled ? '#e0e7ff' : '#fee2e2', color: isAutoSaveEnabled ? '#4338ca' : '#b91c1c', border: '1px solid', borderColor: isAutoSaveEnabled ? '#818cf8' : '#fca5a5', height: 'fit-content' }}
+                                title={isAutoSaveEnabled ? "Desativar salvamento automático" : "Ativar salvamento automático"}
+                            >
+                                <span className="material-icons" style={{ fontSize: '18px' }}>{isAutoSaveEnabled ? 'autorenew' : 'sync_disabled'}</span>
+                                {isAutoSaveEnabled ? 'Auto-Save: ON' : 'Auto-Save: OFF'}
+                            </button>
+                            <button
                                 onClick={() => setShowHiddenActivities(prev => !prev)}
                                 className="control-button"
                                 style={{ display: 'flex', alignItems: 'center', gap: '4px', backgroundColor: showHiddenActivities ? '#e0e7ff' : '#f1f5f9', color: showHiddenActivities ? '#4338ca' : '#475569', border: '1px solid', borderColor: showHiddenActivities ? '#818cf8' : '#cbd5e1', height: 'fit-content' }}
@@ -1638,7 +1685,7 @@ export const App = () => {
                               onDropTargetChange={setDropTargetId}
                               dropTargetId={dropTargetId}
                               visibleColumns={visibleColumns}
-                              onToggleHideActivity={handleToggleHideActivity}
+                              onToggleHideItem={handleToggleHideItem}
                           />
                       </table>
                     </div>
