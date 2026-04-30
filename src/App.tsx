@@ -59,6 +59,7 @@ import { useScheduleInteraction } from './hooks/useScheduleInteraction';
 import { formatDate, getWeek, generateId, deepClone, flattenData, safeJsonParse } from './utils/dataUtils';
 import { parseTabularData } from './utils/parsers';
 import { exportToExcelAgent, exportToPdfAgent } from './utils/exportAgents';
+import { APP_VERSION } from './version';
 
 // AI Agents
 import { parseScheduleWithAI, parseFADetailWithAI, analyzeDeletionImpactWithAI, aiDeletionAgent } from './ai/aiAgents';
@@ -1502,6 +1503,7 @@ export const App = () => {
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100vh', width: '100%', backgroundColor: '#f8fafc' }}>
                <span className="material-icons" style={{ fontSize: '64px', color: '#94a3b8', marginBottom: '16px' }}>inventory_2</span>
                <h1 style={{ color: '#334155', marginBottom: '8px' }}>Nenhum projeto selecionado</h1>
+               <div style={{ fontSize: '0.9rem', color: '#64748b', marginBottom: '16px', fontWeight: 500 }}>Versão: {APP_VERSION}</div>
                <p style={{ color: '#64748b', marginBottom: '24px' }}>Crie um novo planejamento ou abra um projeto existente para começar.</p>
                <div style={{ display: 'flex', gap: '16px' }}>
                     <button className="submit-button" onClick={() => setisSaveModalOpen(true)} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '12px 24px', fontSize: '1rem' }}>
@@ -1705,7 +1707,7 @@ export const App = () => {
       </div>
       )}
       <footer className="app-footer" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0 24px' }}>
-          <span>Plataforma de Programação Avançada-V6</span>
+          <span>Plataforma de Programação Avançada-V6 <span style={{ fontSize: '0.8rem', opacity: 0.7, marginLeft: '8px' }}>{APP_VERSION}</span></span>
           <span style={{ fontSize: '0.8rem', opacity: 0.8 }}>Criado por: <strong>Waldenir Oliveira</strong></span>
       </footer>
       <TutorialModal isOpen={isTutorialModalOpen} onClose={() => setTutorialModalOpen(false)} />

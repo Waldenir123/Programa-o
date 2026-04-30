@@ -129,7 +129,12 @@ export const exportToExcelAgent = async (
                     rowData.push(stripHtmlTags(group.customValues?.[col.id]));
                 });
                 
-                if (showTask) rowData.push(stripHtmlTags(task.title));
+                if (showTask) {
+                    const cleanTitle = stripHtmlTags(task.title);
+                    const cleanFa = stripHtmlTags(task.fa || '');
+                    const taskText = cleanFa && cleanFa !== 'Nº FA' ? `${cleanTitle}\n${cleanFa}` : cleanTitle;
+                    rowData.push(taskText);
+                }
                 if (showActivity) rowData.push(stripHtmlTags(activity.name));
                 
                 dates.forEach(date => {
@@ -348,7 +353,10 @@ export const exportToPdfAgent = (
                 }
                 
                 if (isFirstRowOfTask) {
-                    row.task = { content: stripHtmlTags(task.title), rowSpan: taskTotalRows };
+                    const cleanTitle = stripHtmlTags(task.title);
+                    const cleanFa = stripHtmlTags(task.fa || '');
+                    const taskText = cleanFa && cleanFa !== 'Nº FA' ? `${cleanTitle}\n${cleanFa}` : cleanTitle;
+                    row.task = { content: taskText, rowSpan: taskTotalRows };
                 }
 
                 // Status for each date
@@ -565,7 +573,10 @@ export const exportDailyAllocationToPdfAgent = (
             let activityCounter = 1;
             task.activities.forEach(activity => {
                 const wbs = `${groupCounter}.${taskCounter}.${activityCounter}`;
-                const row: any[] = [{ content: wbs }, { content: stripHtmlTags(task.title) }, { content: stripHtmlTags(activity.name) }];
+                const cleanTitle = stripHtmlTags(task.title);
+                const cleanFa = stripHtmlTags(task.fa || '');
+                const taskText = cleanFa && cleanFa !== 'Nº FA' ? `${cleanTitle}\n${cleanFa}` : cleanTitle;
+                const row: any[] = [{ content: wbs }, { content: taskText }, { content: stripHtmlTags(activity.name) }];
                 dates.forEach(date => {
                     const dateStr = formatDate(date);
                     const allocations = project.dailyManpowerAllocation[activity.id]?.[dateStr];

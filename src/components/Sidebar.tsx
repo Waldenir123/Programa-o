@@ -1,6 +1,7 @@
 import React from 'react';
 import { SelectedItem, STATUS_LABELS, STATUS_COLOR_MAP, Status } from '../state/types';
 import { formatDate } from '../utils/dataUtils';
+import { APP_VERSION } from '../version';
 
 interface SidebarProps {
     handleUndo: () => void;
@@ -55,6 +56,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 <button className="control-button" onClick={onCloseMobile}>
                     <span className="material-icons">close</span>
                 </button>
+            </div>
+            <div style={{ padding: '0 0 16px 0', borderBottom: '1px solid #e2e8f0', marginBottom: '16px', fontSize: '0.8rem', color: '#64748b' }}>
+                <strong>Versão:</strong> {APP_VERSION}
             </div>
             <div className="control-section">
                 <h3>Ações Rápidas</h3>
