@@ -207,9 +207,15 @@ export const useScheduleInteraction = (
             setActiveCell(newSelectionBlock.end);
         }
         
-        setIsMovingBlock(false);
-        setDragStartCell(null);
-        setGhostBlockCells(new Set());
+        if (isMovingBlock) {
+            setIsMovingBlock(false);
+        }
+        if (dragStartCell !== null) {
+            setDragStartCell(null);
+        }
+        if (ghostBlockCells.size > 0) {
+            setGhostBlockCells(new Set());
+        }
         document.body.classList.remove('dragging');
     }, [isSelecting, isMovingBlock, dragStartCell, selectionBlock, ghostBlockCells, liveData, dispatch, getBlockIndices, activityIdToRowIndex, dateToColIndex, renderableRows, dates]);
 
@@ -220,7 +226,7 @@ export const useScheduleInteraction = (
 
     const handleKeyDown = useCallback((event: KeyboardEvent) => {
         const target = event.target as HTMLElement;
-        if (target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName)) return;
+        if (target.closest?.('[contenteditable="true"]') || target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName)) return;
         
         if (event.ctrlKey || event.metaKey) {
             switch (event.key.toLowerCase()) {
@@ -249,7 +255,6 @@ export const useScheduleInteraction = (
                     const textToCopy = copiedStatuses.map(row => row.map(s => s || '').join('\t')).join('\n');
                     navigator.clipboard.writeText(textToCopy).catch(console.error);
                     
-                    addToast("Copiado!", 'success');
                     return;
                 case 'x':
                     event.preventDefault();
@@ -276,7 +281,6 @@ export const useScheduleInteraction = (
                     const textToCut = cutStatuses.map(row => row.map(s => s || '').join('\t')).join('\n');
                     navigator.clipboard.writeText(textToCut).catch(console.error);
                     
-                    addToast("Recortado!", 'success');
                     return;
             }
         }
@@ -306,8 +310,44 @@ export const useScheduleInteraction = (
             if (updates.length > 0) {
                 dispatch({ type: 'BATCH_UPDATE_STATUS', payload: updates });
             }
+            return;
         }
         
+        // Handle letter keys for status
+        if (!event.ctrlKey && !event.metaKey && !event.altKey && event.key.length === 1) {
+            const keyLower = event.key.toLowerCase();
+            let matchedStatus: Status | null = null;
+            if (keyLower === 'c') matchedStatus = Status.Cancelado;
+            else if (keyLower === 'x' || keyLower === 'p') matchedStatus = Status.Programado;
+            else if (keyLower === 'n') matchedStatus = Status.NaoRealizado;
+            else if (keyLower === 'o' || keyLower === 'k' || keyLower === 'r') matchedStatus = Status.Realizado;
+            
+            if (matchedStatus) {
+                event.preventDefault();
+                const updates: { activityId: string; date: string; status: Status | null }[] = [];
+                if (selectionBlock) {
+                    const indices = getBlockIndices(selectionBlock);
+                    if (indices) {
+                        for (let r = indices.minRow; r <= indices.maxRow; r++) {
+                            const activityId = renderableRows[r]?.activity?.id;
+                            if (activityId) {
+                                for (let c = indices.minCol; c <= indices.maxCol; c++) {
+                                    updates.push({ activityId, date: formatDate(dates[c]), status: matchedStatus });
+                                }
+                            }
+                        }
+                    }
+                } else if (activeCell) {
+                    updates.push({ activityId: activeCell.activityId, date: activeCell.date, status: matchedStatus });
+                }
+
+                if (updates.length > 0) {
+                    dispatch({ type: 'BATCH_UPDATE_STATUS', payload: updates });
+                }
+                return;
+            }
+        }
+
         if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(event.key)) {
             event.preventDefault();
             if (!activeCell || renderableRows.length === 0 || dates.length === 0) return;
@@ -421,7 +461,6 @@ export const useScheduleInteraction = (
             }
 
             dispatch({ type: 'UPDATE_SCHEDULE', payload: newData });
-            addToast("Dados colados no cronograma!", 'success');
             return;
         }
 
@@ -453,7 +492,6 @@ export const useScheduleInteraction = (
 
                 dispatch({ type: 'UPDATE_SCHEDULE', payload: newData });
                 activeElement.blur();
-                addToast("Atividades coladas!", 'success');
                 return;
             }
         }

@@ -6,7 +6,7 @@ interface DailySummaryViewProps {
     data: ScheduleData;
     dates: Date[];
     onTextUpdate: (id: string, field: string, value: string) => void;
-    onAddItem: (type: 'group' | 'task' | 'activity', parentId?: string) => void;
+    onAddItem: (type: 'group' | 'task' | 'activity', parentId?: string, date?: string) => void;
     onDeleteItem: (id: string, type: 'group' | 'task' | 'activity') => void;
     onSyncWithSchedule: () => void;
 }
@@ -16,6 +16,12 @@ export const DailySummaryView: React.FC<DailySummaryViewProps> = ({ data, dates,
     const todayStr = formatDate(new Date());
     const initialDate = dates.find(d => formatDate(d) === todayStr) ? todayStr : (dates.length > 0 ? formatDate(dates[0]) : todayStr);
     const [selectedDateStr, setSelectedDateStr] = useState<string>(initialDate);
+    
+    useEffect(() => {
+        if (!dates.some(d => formatDate(d) === selectedDateStr)) {
+            setSelectedDateStr(dates.find(d => formatDate(d) === todayStr) ? todayStr : (dates.length > 0 ? formatDate(dates[0]) : todayStr));
+        }
+    }, [dates, selectedDateStr, todayStr]);
     
     // Weekly state
     const [selectedWeekStart, setSelectedWeekStart] = useState<string>('');
@@ -247,23 +253,14 @@ export const DailySummaryView: React.FC<DailySummaryViewProps> = ({ data, dates,
                 
                 <div style={{ display: 'flex', gap: '16px', alignItems: 'center', flexWrap: 'wrap' }}>
                     <button 
-                        onClick={() => {
-                            if (window.confirm("Isso irá substituir o resumo diário atual com os dados da programação. Deseja continuar?")) {
-                                onSyncWithSchedule();
-                            }
-                        }}
-                        style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '8px 16px', backgroundColor: '#10b981', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}
-                        className="no-print"
-                        title="Atualizar com a programação"
-                    >
-                        <span className="material-icons" style={{ fontSize: '18px' }}>sync</span> Atualizar com Programação
-                    </button>
-                    <button 
-                        onClick={() => onAddItem('group')}
+                        onClick={() => onAddItem('group', undefined, viewMode === 'daily' ? selectedDateStr : undefined)}
                         style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '8px 16px', backgroundColor: '#3b82f6', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}
                         className="no-print"
                     >
                         <span className="material-icons" style={{ fontSize: '18px' }}>add</span> Adicionar Grupo
+                    </button>
+                    <button onClick={() => window.print()} style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '8px 16px', backgroundColor: '#10b981', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }} className="no-print">
+                        <span className="material-icons" style={{ fontSize: '18px' }}>print</span> Imprimir
                     </button>
                     {viewMode === 'daily' ? (
                         <div>
@@ -406,7 +403,7 @@ export const DailySummaryView: React.FC<DailySummaryViewProps> = ({ data, dates,
                                                     ))}
                                                 </ul>
                                                 <button
-                                                    onClick={() => onAddItem('activity', item.taskId)}
+                                                    onClick={() => onAddItem('activity', item.taskId, selectedDateStr)}
                                                     className="no-print"
                                                     style={{ width: '100%', marginTop: '12px', padding: '6px', background: 'transparent', border: '1px dashed #cbd5e1', borderRadius: '4px', cursor: 'pointer', color: '#64748b', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                                                 >
@@ -520,7 +517,7 @@ export const DailySummaryView: React.FC<DailySummaryViewProps> = ({ data, dates,
                                                                 ))}
                                                             </ul>
                                                             <button
-                                                                onClick={() => onAddItem('activity', item.taskId)}
+                                                                onClick={() => onAddItem('activity', item.taskId, daySummary.dateStr)}
                                                                 className="no-print"
                                                                 style={{ width: '100%', marginTop: '12px', padding: '6px', background: 'transparent', border: '1px dashed #cbd5e1', borderRadius: '4px', cursor: 'pointer', color: '#64748b', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                                                             >

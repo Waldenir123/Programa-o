@@ -171,9 +171,7 @@ const ScheduleRow = memo((props: ScheduleRowProps) => {
                         style={{ width: columnWidths[absIdx], left: stickyColumnPositions[absIdx], display: isVisible ? 'table-cell' : 'none' }} 
                         onClick={(e) => onRowClick(e, { id: group.id, name: value, type: 'group', wbsId: wbsId.split('.')[0] })}
                     >
-                        <div contentEditable suppressContentEditableWarning onBlur={e => onTextUpdate(group.id, col.id, e.currentTarget.textContent || '')}>
-                            {value}
-                        </div>
+                        <div contentEditable suppressContentEditableWarning onMouseDown={e => e.stopPropagation()} onMouseUp={e => e.stopPropagation()} onClick={e => e.stopPropagation()} onBlur={e => onTextUpdate(group.id, col.id, e.currentTarget.innerHTML || '')} dangerouslySetInnerHTML={{ __html: value }} />
                     </td>
                 );
             })}
@@ -181,12 +179,8 @@ const ScheduleRow = memo((props: ScheduleRowProps) => {
             {renderTask && (
                 <td className={`col-sticky col-sticky-${dynamicColumnsBefore.length + 2}`} rowSpan={taskRowSpan} style={{ width: columnWidths[dynamicColumnsBefore.length + 1], left: stickyColumnPositions[dynamicColumnsBefore.length + 1], display: visibleColumns && visibleColumns['TAREFA PRINCIPAL'] === false ? 'none' : 'table-cell' }} onClick={(e) => onRowClick(e, { id: task.id, name: task.title, type: 'task', wbsId: wbsId.split('.').slice(0, 2).join('.') })}>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                        <div className="task-title-input" contentEditable suppressContentEditableWarning onBlur={e => onTextUpdate(task.id, 'tarefa', e.currentTarget.textContent || '')} style={{ fontWeight: '500' }}>
-                            {task.title}
-                        </div>
-                        <div className="task-fa-input" contentEditable suppressContentEditableWarning onBlur={e => onTextUpdate(task.id, 'tarefa_fa', e.currentTarget.textContent || '')} style={{ fontSize: '0.75rem', color: '#64748b', fontStyle: 'italic', borderTop: '1px solid #e2e8f0', paddingTop: '2px' }}>
-                            {task.fa || 'Nº FA'}
-                        </div>
+                        <div className="task-title-input" contentEditable suppressContentEditableWarning onMouseDown={e => e.stopPropagation()} onMouseUp={e => e.stopPropagation()} onClick={e => e.stopPropagation()} onBlur={e => onTextUpdate(task.id, 'tarefa', e.currentTarget.innerHTML || '')} style={{ fontWeight: '500' }} dangerouslySetInnerHTML={{ __html: task.title }} />
+                        <div className="task-fa-input" contentEditable suppressContentEditableWarning onMouseDown={e => e.stopPropagation()} onMouseUp={e => e.stopPropagation()} onClick={e => e.stopPropagation()} onBlur={e => onTextUpdate(task.id, 'tarefa_fa', e.currentTarget.innerHTML || '')} style={{ fontSize: '0.75rem', color: '#64748b', fontStyle: 'italic', borderTop: '1px solid #e2e8f0', paddingTop: '2px' }} dangerouslySetInnerHTML={{ __html: task.fa || 'Nº FA' }} />
                     </div>
                     <div className="cell-actions" style={{ display: 'flex', gap: '4px', zIndex: 10 }}>
                         <button onClick={(e) => { e.stopPropagation(); onAddItem('activity', task.id); }} title="Adicionar Atividade" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#e2e8f0', borderRadius: '4px', width: '24px', height: '24px', pointerEvents: 'auto' }}>
@@ -211,9 +205,7 @@ const ScheduleRow = memo((props: ScheduleRowProps) => {
                         style={{ width: columnWidths[absIdx], left: stickyColumnPositions[absIdx], display: isVisible ? 'table-cell' : 'none' }} 
                         onClick={(e) => onRowClick(e, { id: group.id, name: value, type: 'group', wbsId: wbsId.split('.')[0] })}
                     >
-                        <div contentEditable suppressContentEditableWarning onBlur={e => onTextUpdate(group.id, col.id, e.currentTarget.textContent || '')}>
-                            {value}
-                        </div>
+                        <div contentEditable suppressContentEditableWarning onMouseDown={e => e.stopPropagation()} onMouseUp={e => e.stopPropagation()} onClick={e => e.stopPropagation()} onBlur={e => onTextUpdate(group.id, col.id, e.currentTarget.innerHTML || '')} dangerouslySetInnerHTML={{ __html: value }} />
                     </td>
                 );
             })}
@@ -235,9 +227,13 @@ const ScheduleRow = memo((props: ScheduleRowProps) => {
                              drag_indicator
                          </span>
                      )}
-                     <div data-activity-id={activity?.id} data-column-type="atividade" contentEditable={!!activity} suppressContentEditableWarning onBlur={e => activity && onTextUpdate(activity.id, 'atividade', e.currentTarget.textContent || '')} style={{ flexGrow: 1 }}>
-                        {activity ? activity.name : <span style={{ color: '#94a3b8', fontStyle: 'italic' }}>(Sem atividades)</span>}
-                     </div>
+                     {activity ? (
+                         <div data-activity-id={activity.id} data-column-type="atividade" contentEditable={true} suppressContentEditableWarning onMouseDown={e => e.stopPropagation()} onMouseUp={e => e.stopPropagation()} onClick={e => e.stopPropagation()} onBlur={e => onTextUpdate(activity.id, 'atividade', e.currentTarget.innerHTML || '')} style={{ flexGrow: 1, minHeight: '1.2em' }} dangerouslySetInnerHTML={{ __html: activity.name }} />
+                     ) : (
+                         <div data-column-type="atividade" style={{ flexGrow: 1, minHeight: '1.2em' }}>
+                             <span style={{ color: '#94a3b8', fontStyle: 'italic' }}>(Sem atividades)</span>
+                         </div>
+                     )}
                  </div>
                 <div className="cell-actions" style={{ display: 'flex', gap: '4px', zIndex: 10 }}>
                     {activity && (

@@ -16,7 +16,7 @@ export type ScheduleAction =
     | { type: 'APPEND_DATA'; payload: ScheduleData }
     | { type: 'UNDO' }
     | { type: 'REDO' }
-    | { type: 'ADD_ITEM'; payload: { type: 'group' | 'task' | 'activity'; parentId?: string } }
+    | { type: 'ADD_ITEM'; payload: { type: 'group' | 'task' | 'activity'; parentId?: string; date?: string; status?: Status } }
     | { type: 'BATCH_DELETE_ITEMS'; payload: { id: string; type: 'group' | 'task' | 'activity' }[] }
     | { type: 'UPDATE_TEXT'; payload: { id: string; field: string; value: string } }
     | { type: 'UPDATE_STATUS'; payload: { activityId: string; date: string; status: Status | null } }
@@ -72,8 +72,9 @@ export const scheduleReducer = (state: ScheduleState, action: ScheduleAction): S
         }
 
         case 'ADD_ITEM': {
-            const { type, parentId } = action.payload;
-            const newActivity = { id: generateId(), name: 'Nova Atividade', schedule: {} };
+            const { type, parentId, date, status } = action.payload;
+            const initialSchedule = date && status ? { [date]: status } : {};
+            const newActivity = { id: generateId(), name: 'Nova Atividade', schedule: initialSchedule };
             const newTask = { id: generateId(), title: 'Nova Tarefa Principal', activities: [newActivity] };
             const newGroup = { id: generateId(), tarefas: [newTask], customValues: {} };
 

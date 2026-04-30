@@ -14,6 +14,8 @@ interface SidebarProps {
     handleSaveProject: () => void;
     handleExportExcel: () => void;
     onExportPdfClick: () => void;
+    handleExportTxt: () => void;
+    onImportTxtClick: () => void;
     handleOpenTutorial: () => void;
     handleDateChange: (date: string) => void;
     startDate: Date;
@@ -34,7 +36,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     handleUndo, handleRedo, historyIndex, historyLength,
     handleSavePlan,
     setImportModalOpen, setSaveModalOpen, setLoadModalOpen, handleSaveProject,
-    handleExportExcel, onExportPdfClick, handleOpenTutorial,
+    handleExportExcel, onExportPdfClick, handleExportTxt, onImportTxtClick, handleOpenTutorial,
     handleDateChange, startDate,
     goToWeekInput, setGoToWeekInput, handleGoToWeek,
     selectedItems, handleDeleteSelectedItems, handleClearAll,
@@ -58,6 +60,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 <h3>Ações Rápidas</h3>
                 <button className="control-button" onClick={handleUndo} disabled={historyIndex <= 0}><span className="material-icons" aria-hidden="true">undo</span> Desfazer</button>
                 <button className="control-button" onClick={handleRedo} disabled={historyIndex >= historyLength - 1}><span className="material-icons" aria-hidden="true">redo</span> Refazer</button>
+                <button className="control-button" onClick={onImportTxtClick}><span className="material-icons" aria-hidden="true">data_object</span>Importar TXT (Perfeito)</button>
                 <button className="control-button" onClick={onImportExcelClick}><span className="material-icons" aria-hidden="true">grid_on</span>Importar Excel</button>
                 <button className="control-button" onClick={handleQuickImportClick}><span className="material-icons" aria-hidden="true">file_upload</span>Importar PDF/Imagem (IA)</button>
                 <button className="control-button" onClick={() => setImportModalOpen(true)}><span className="material-icons" aria-hidden="true">input</span>Importação Avançada (IA)</button>
@@ -117,6 +120,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
             <div className="control-section">
                 <h3>Exportar</h3>
+                <button className="control-button" onClick={handleExportTxt}><span className="material-icons" aria-hidden="true">data_object</span> Exportar TXT (Perfeito)</button>
                 <button className="control-button" onClick={handleExportExcel}><span className="material-icons" aria-hidden="true">download</span> Exportar para Excel</button>
                 <button className="control-button" onClick={onExportPdfClick}><span className="material-icons" aria-hidden="true">picture_as_pdf</span> Exportar para PDF</button>
             </div>

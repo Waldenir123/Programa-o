@@ -56,10 +56,10 @@ export const ImportModal = ({ isOpen, onClose, onImportSchedule, onImportFA }: {
                     disabled={isProcessing}
                 ></textarea>
                 <div style={{ margin: '16px 0' }}>
-                    <input type="file" ref={fileInputRef} onChange={handleFileChange} style={{ display: 'none' }} disabled={isProcessing} accept="image/*,application/pdf" />
+                    <input type="file" ref={fileInputRef} onChange={handleFileChange} style={{ display: 'none' }} disabled={isProcessing} accept="image/*,application/pdf,.xlsx,.xls,.csv" />
                     <button onClick={triggerFileSelect} className="control-button" disabled={isProcessing}>
                         <span className="material-icons" aria-hidden="true">upload_file</span>
-                        {file ? `Arquivo: ${file.name}` : 'Selecionar Arquivo (Imagem ou PDF)'}
+                        {file ? `Arquivo: ${file.name}` : 'Selecionar Arquivo (Imagem, PDF, Excel)'}
                     </button>
                 </div>
                 <div className="modal-actions">

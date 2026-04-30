@@ -79,6 +79,7 @@ import { ManpowerDashboardView } from './components/ManpowerDashboardView';
 import { DailySummaryView } from './components/DailySummaryView';
 import { MachineListView } from './components/MachineListView';
 import { DailyMachineAllocationView } from './components/DailyMachineAllocationView';
+import { RichTextToolbar } from './components/RichTextToolbar';
 
   const createNewProject = (name: string, obra: string): Project => ({
   id: generateId(),
@@ -110,6 +111,7 @@ export const App = () => {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [isAuthReady, setIsAuthReady] = useState(false);
   const [activeProject, setActiveProject] = useState<Project | null>(null);
+  const [lastSavedTime, setLastSavedTime] = useState<number | null>(null);
 
   const [scheduleState, dispatch] = useReducer(scheduleReducer, {
       liveData: [],
@@ -194,16 +196,6 @@ export const App = () => {
 
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
   const nextToastId = useRef(0);
-  
-  const quickImportInputRef = useRef<HTMLInputElement>(null);
-  const excelImportInputRef = useRef<HTMLInputElement>(null);
-
-  // --- DERIVED STATE FROM activeProject ---
-  const savedPlan = useMemo(() => activeProject?.savedPlan || null, [activeProject]);
-  const title = useMemo(() => activeProject?.title || '', [activeProject]);
-  const [currentStartDate, setCurrentStartDate] = useState(() => activeProject?.startDate ? new Date(activeProject.startDate + 'T00:00:00Z') : new Date('2026-04-13T00:00:00Z'));
-  const [goToWeekInput, setGoToWeekInput] = useState(() => getWeek(currentStartDate));
-  const dates = useMemo(() => Array.from({length: 28}, (_, i) => { const d = new Date(currentStartDate); d.setUTCDate(currentStartDate.getUTCDate() + i); return d; }), [currentStartDate]);
 
   const addToast = useCallback((message: string, type: 'success' | 'error') => {
       setToasts(currentToasts => [
@@ -211,6 +203,77 @@ export const App = () => {
           { id: nextToastId.current++, message, type }
       ]);
   }, []);
+  
+  const quickImportInputRef = useRef<HTMLInputElement>(null);
+  const handleExportTxt = () => {
+    if (!activeProject) return;
+    const projectData = {
+        name: activeProject.name,
+        obra: activeProject.obra,
+        data: summaryState.liveData,
+        startDate: activeProject.startDate,
+    };
+    const jsonString = JSON.stringify(projectData, null, 2);
+    const blob = new Blob([jsonString], { type: "text/plain" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `cronograma_${activeProject.name}.txt`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
+  const handleImportTxtClick = () => {
+      txtImportInputRef.current?.click();
+  };
+
+  const handleImportTxtFile = useCallback(async (event: React.ChangeEvent<HTMLInputElement>) => {
+      const file = event.target.files?.[0];
+      if (!file) return;
+      
+      try {
+          const text = await file.text();
+          const parsed = JSON.parse(text);
+          if (parsed && Array.isArray(parsed.data)) {
+               dispatch({ type: 'SET_DATA', payload: parsed.data });
+               if (parsed.startDate) {
+                   setCurrentStartDate(new Date(parsed.startDate + 'T00:00:00Z'));
+               }
+               addToast("Cronograma TXT importado com sucesso!", "success");
+          } else {
+               addToast("O arquivo TXT não possui um formato estruturado válido.", "error");
+          }
+      } catch(e) {
+          addToast("Falha ao ler o arquivo TXT estruturado.", "error");
+      } finally {
+          if (event.target) event.target.value = '';
+      }
+  }, [addToast, dispatch]);
+
+  const excelImportInputRef = useRef<HTMLInputElement>(null);
+  const txtImportInputRef = useRef<HTMLInputElement>(null);
+
+  // --- DERIVED STATE FROM activeProject ---
+  const savedPlan = useMemo(() => activeProject?.savedPlan || null, [activeProject]);
+  const title = useMemo(() => activeProject?.title || '', [activeProject]);
+  const [currentStartDate, setCurrentStartDate] = useState(() => activeProject?.startDate ? new Date(activeProject.startDate + 'T00:00:00Z') : new Date('2026-04-13T00:00:00Z'));
+  const [goToWeekInput, setGoToWeekInput] = useState(() => getWeek(currentStartDate));
+  const dates = useMemo(() => {
+    const currentZoom = zoomLevels[currentPage] || 100;
+    let numWeeks = 4; // Default 4 weeks at 100% zoom
+    if (currentZoom <= 85) numWeeks = 6;
+    if (currentZoom <= 65) numWeeks = 8;
+    if (currentZoom <= 45) numWeeks = 12;
+    if (currentZoom <= 30) numWeeks = 16;
+    
+    return Array.from({length: numWeeks * 7}, (_, i) => {
+        const d = new Date(currentStartDate);
+        d.setUTCDate(currentStartDate.getUTCDate() + i);
+        return d;
+    });
+  }, [currentStartDate, zoomLevels, currentPage]);
   
   const filteredData = useMemo(() => {
     const filters = activeFilters as Record<string, Set<string>>;
@@ -378,6 +441,7 @@ export const App = () => {
             const lastActiveId = localStorage.getItem(`pcp-lastActive-${currentUser.uid}`);
             const projectToLoad = newProjects[lastActiveId!];
             if (projectToLoad) {
+                setLastSavedTime(projectToLoad.lastModified);
                 setActiveProject(projectToLoad);
                 dispatch({ type: 'LOAD_DATA', payload: projectToLoad.liveData });
             } else if (Object.keys(newProjects).length > 0) {
@@ -409,6 +473,7 @@ export const App = () => {
         displaySettings: project.displaySettings ? JSON.stringify(project.displaySettings) : ''
       };
       await setDoc(doc(db, 'projects', project.id), dbProject);
+      setLastSavedTime(Date.now());
     } catch (error) {
       handleFirestoreError(error, OperationType.WRITE, 'projects/' + project.id);
     }
@@ -433,7 +498,7 @@ export const App = () => {
     addToast(`Projeto '${name}' criado com sucesso!`, 'success');
   };
   
-  const handleSaveProject = useCallback(async () => {
+  const handleSaveProject = useCallback(async (silent: boolean | React.MouseEvent = false) => {
     if (!currentUser || !activeProject) return;
     
     // Convert Set filters to array for serialization
@@ -453,8 +518,19 @@ export const App = () => {
     };
     setActiveProject(projectToSave); 
     await persistProjectToFirebase(projectToSave);
-    addToast(`Projeto '${projectToSave.name}' salvo!`, 'success');
+    if (silent !== true) {
+      addToast(`Projeto '${projectToSave.name}' salvo!`, 'success');
+    }
   }, [currentUser, activeProject, liveData, addToast, visibleColumns, activeFilters]);
+
+  useEffect(() => {
+    const intervalId = setInterval(() => {
+      if (activeProject) {
+        handleSaveProject(true);
+      }
+    }, 180000); // 3 minutes
+    return () => clearInterval(intervalId);
+  }, [handleSaveProject, activeProject]);
 
   const handleLoadProject = useCallback((projectId: string) => {
     if (!currentUser) return;
@@ -472,6 +548,7 @@ export const App = () => {
         if (!projectToLoad.dailyManpowerAllocation) {
             projectToLoad.dailyManpowerAllocation = {};
         }
+        setLastSavedTime(projectToLoad.lastModified);
         setActiveProject(projectToLoad);
         if (projectToLoad.startDate) {
             setCurrentStartDate(new Date(projectToLoad.startDate + 'T00:00:00Z'));
@@ -606,15 +683,15 @@ export const App = () => {
   }, [activeProject]);
 
   const handleSummaryTextUpdate = useCallback((id: string, field: string, value: string) => {
-    dispatchSummary({ type: 'UPDATE_TEXT', payload: { id, field: field as any, value } });
+    dispatch({ type: 'UPDATE_TEXT', payload: { id, field: field as any, value } });
   }, []);
 
-  const handleSummaryAddItem = useCallback((type: 'group' | 'task' | 'activity', parentId?: string) => {
-    dispatchSummary({ type: 'ADD_ITEM', payload: { type, parentId } });
+  const handleSummaryAddItem = useCallback((type: 'group' | 'task' | 'activity', parentId?: string, date?: string) => {
+    dispatch({ type: 'ADD_ITEM', payload: { type, parentId, date, status: Status.Programado } });
   }, []);
 
   const handleSummaryDeleteItem = useCallback((id: string, type: 'group' | 'task' | 'activity') => {
-    dispatchSummary({ type: 'BATCH_DELETE_ITEMS', payload: [{ id, type }] });
+    dispatch({ type: 'BATCH_DELETE_ITEMS', payload: [{ id, type }] });
   }, []);
 
   useEffect(() => {
@@ -697,10 +774,6 @@ export const App = () => {
     setActiveProject(updatedProject);
     await persistProjectToFirebase(updatedProject);
 
-    const message = itemsToDelete.length > 1
-        ? `${itemsToDelete.length} itens excluídos.`
-        : `Item excluído.`;
-    addToast(message, 'success');
     setSelectedItems([]);
   }, [activeProject, liveData, dispatch, persistProjectToFirebase, addToast]);
 
@@ -738,19 +811,31 @@ export const App = () => {
     }
     try {
         let fileData: { mimeType: string, data: string } | null = null;
+        let finalContent = text;
+        
         if (file) {
-            fileData = await new Promise((resolve, reject) => {
-                const reader = new FileReader();
-                reader.onload = (event) => {
-                    const result = event.target?.result as string;
-                    if (!result) return reject(new Error("Não foi possível ler o arquivo."));
-                    resolve({ mimeType: file.type, data: result.split(',')[1] });
-                };
-                reader.onerror = (error) => reject(error);
-                reader.readAsDataURL(file);
-            });
+            const isExcel = file.name.match(/\.(xlsx|xls|csv)$/i);
+            if (isExcel) {
+                const data = await file.arrayBuffer();
+                const { read, utils } = await import("xlsx");
+                const workbook = read(data, { cellDates: true });
+                const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+                const csvData = utils.sheet_to_csv(worksheet);
+                finalContent = (finalContent ? finalContent + "\n\n" : "") + csvData;
+            } else {
+                fileData = await new Promise((resolve, reject) => {
+                    const reader = new FileReader();
+                    reader.onload = (event) => {
+                        const result = event.target?.result as string;
+                        if (!result) return reject(new Error("Não foi possível ler o arquivo."));
+                        resolve({ mimeType: file.type, data: result.split(',')[1] });
+                    };
+                    reader.onerror = (error) => reject(error);
+                    reader.readAsDataURL(file);
+                });
+            }
         }
-        const importedData = await parseScheduleWithAI(ai, text, fileData);
+        const importedData = await parseScheduleWithAI(ai, finalContent, fileData);
         dispatch({ type: 'SET_DATA', payload: importedData });
         setImportModalOpen(false);
         addToast("Cronograma importado com sucesso!", "success");
@@ -771,18 +856,30 @@ export const App = () => {
     addToast(`Processando o arquivo '${file.name}' com a IA...`, 'success');
 
     try {
-        const fileData = await new Promise<{ mimeType: string, data: string }>((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onload = (e) => {
-                const result = e.target?.result as string;
-                if (!result) return reject(new Error("Não foi possível ler o arquivo."));
-                resolve({ mimeType: file.type, data: result.split(',')[1] });
-            };
-            reader.onerror = (error) => reject(error);
-            reader.readAsDataURL(file);
-        });
+        let fileData: { mimeType: string, data: string } | null = null;
+        let finalContent = '';
 
-        const importedData = await parseScheduleWithAI(ai, '', fileData); // Pass empty text
+        const isExcel = file.name.match(/\.(xlsx|xls|csv)$/i);
+        if (isExcel) {
+            const data = await file.arrayBuffer();
+            const { read, utils } = await import("xlsx");
+            const workbook = read(data, { cellDates: true });
+            const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+            finalContent = utils.sheet_to_csv(worksheet);
+        } else {
+            fileData = await new Promise<{ mimeType: string, data: string }>((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    const result = e.target?.result as string;
+                    if (!result) return reject(new Error("Não foi possível ler o arquivo."));
+                    resolve({ mimeType: file.type, data: result.split(',')[1] });
+                };
+                reader.onerror = (error) => reject(error);
+                reader.readAsDataURL(file);
+            });
+        }
+
+        const importedData = await parseScheduleWithAI(ai, finalContent, fileData); // Pass empty text if no finalContent
         dispatch({ type: 'SET_DATA', payload: importedData });
         addToast("Cronograma importado com sucesso!", "success");
     } catch (error) {
@@ -1345,8 +1442,9 @@ export const App = () => {
   return (
     <div className={`app-wrapper ${isSidebarCollapsed ? 'sidebar-collapsed' : ''}`}>
       <ToastContainer toasts={toasts} setToasts={setToasts} />
-      <input type="file" ref={quickImportInputRef} onChange={handleQuickImport} style={{ display: 'none' }} accept="image/*,application/pdf" />
+      <input type="file" ref={quickImportInputRef} onChange={handleQuickImport} style={{ display: 'none' }} accept="image/*,application/pdf,.xlsx,.csv" />
       <input type="file" ref={excelImportInputRef} onChange={handleImportExcelFile} style={{ display: 'none' }} accept=".xlsx, .xls" />
+      <input type="file" ref={txtImportInputRef} onChange={handleImportTxtFile} style={{ display: 'none' }} accept=".txt" />
       {isImportModalOpen && <ImportModal isOpen={isImportModalOpen} onClose={() => setImportModalOpen(false)} onImportSchedule={handleImportSchedule} onImportFA={handleImportFA} />}
       {isLoadModalOpen && (
           <LoadModal 
@@ -1444,6 +1542,7 @@ export const App = () => {
                 setImportModalOpen={setImportModalOpen} setSaveModalOpen={setisSaveModalOpen} setLoadModalOpen={setLoadModalOpen}
                 handleSaveProject={handleSaveProject}
                 handleExportExcel={handleExportExcel} onExportPdfClick={() => setPrintModalOpen(true)}
+                handleExportTxt={handleExportTxt} onImportTxtClick={handleImportTxtClick}
                 handleOpenTutorial={() => setTutorialModalOpen(true)}
                 handleDateChange={handleDateChange} startDate={currentStartDate}
                 goToWeekInput={goToWeekInput} setGoToWeekInput={setGoToWeekInput} handleGoToWeek={handleGoToWeek}
@@ -1466,8 +1565,8 @@ export const App = () => {
                 <>
                   {currentPage === 'schedule' && (
                     <div className="table-wrapper">
-                      <div className="project-detail-header" style={{ display: 'flex', gap: '24px', padding: '16px', backgroundColor: '#fff', borderBottom: '1px solid #e2e8f0', marginBottom: '8px', borderRadius: '8px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
-                        <div style={{ flex: 1 }}>
+                      <div className="project-detail-header" style={{ display: 'flex', gap: '24px', padding: '16px', backgroundColor: '#fff', borderBottom: '1px solid #e2e8f0', marginBottom: '8px', borderRadius: '8px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)', flexWrap: 'wrap', alignItems: 'center' }}>
+                        <div style={{ flex: 1, minWidth: '200px' }}>
                             <label style={{ display: 'block', fontSize: '0.75rem', color: '#64748b', fontWeight: '600', textTransform: 'uppercase', marginBottom: '4px' }}>Obra / Projeto</label>
                             <div contentEditable suppressContentEditableWarning onBlur={e => handleTextUpdate('', 'name', e.currentTarget.textContent || '')} style={{ fontSize: '1.25rem', fontWeight: 'bold', color: '#1e293b', borderBottom: '1px dashed #cbd5e1', paddingBottom: '2px' }}>{activeProject.name}</div>
                         </div>
@@ -1475,9 +1574,10 @@ export const App = () => {
                             <label style={{ display: 'block', fontSize: '0.75rem', color: '#64748b', fontWeight: '600', textTransform: 'uppercase', marginBottom: '4px' }}>Programador</label>
                             <div contentEditable suppressContentEditableWarning onBlur={e => handleTextUpdate('', 'programmerName', e.currentTarget.textContent || '')} style={{ fontWeight: '500', color: '#334155', borderBottom: '1px dashed #cbd5e1' }}>{activeProject.programmerName || 'Não definido'}</div>
                         </div>
-                        <div style={{ width: '200px' }}>
-                            <label style={{ display: 'block', fontSize: '0.75rem', color: '#64748b', fontWeight: '600', textTransform: 'uppercase', marginBottom: '4px' }}>Última Atualização</label>
-                            <div style={{ color: '#64748b' }}>{new Date(activeProject.lastModified).toLocaleString('pt-BR')}</div>
+                        <RichTextToolbar />
+                        <div style={{ width: '200px', textAlign: 'right' }}>
+                            <label style={{ display: 'block', fontSize: '0.75rem', color: '#64748b', fontWeight: '600', textTransform: 'uppercase', marginBottom: '4px' }}>Último Salvamento</label>
+                            <div style={{ color: '#64748b' }}>{lastSavedTime ? new Date(lastSavedTime).toLocaleString('pt-BR') : 'Aguardando...'}</div>
                         </div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                             <button
@@ -1543,7 +1643,7 @@ export const App = () => {
                       </table>
                     </div>
                   )}
-                  {currentPage === 'dailySummary' && <DailySummaryView data={summaryData} dates={dates} onTextUpdate={handleSummaryTextUpdate} onAddItem={handleSummaryAddItem} onDeleteItem={(id, type) => handleSummaryDeleteItem(id, type)} onSyncWithSchedule={() => dispatchSummary({ type: 'LOAD_DATA', payload: liveData })} />}
+                  {currentPage === 'dailySummary' && <DailySummaryView data={liveData} dates={dates} onTextUpdate={handleSummaryTextUpdate} onAddItem={handleSummaryAddItem} onDeleteItem={(id, type) => handleSummaryDeleteItem(id, type)} onSyncWithSchedule={() => {}} />}
                   {currentPage === 'dashboard' && <DashboardView data={liveData} title={title} programmerName={activeProject.programmerName} dynamicColumns={activeProject.dynamicColumns}/>}
                   {currentPage === 'comparison' && <ComparisonView savedPlan={savedPlan} liveData={liveData} dates={dates} columnWidths={comparisonTableColumnWidths} onResizeStart={handleResizeStart} stickyColumnPositions={stickyColumnPositions} title={title} dynamicColumns={activeProject.dynamicColumns}/>}
                   {currentPage === 'manpower' && <ManpowerAllocationView project={activeProject} setProject={setActiveProject} dates={dates} title={title} zoomLevel={zoomLevels.manpower} />}
