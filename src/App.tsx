@@ -751,8 +751,8 @@ export const App = () => {
       dispatch({ type: 'ADD_ITEM', payload: { type, parentId } });
   }, []);
 
-  const handleMoveItem = useCallback((id: string, direction: 'up' | 'down') => {
-      dispatch({ type: 'MOVE_ACTIVITY', payload: { id, direction } });
+  const handleMoveItem = useCallback((id: string, type: 'task' | 'activity', direction: 'up' | 'down') => {
+      dispatch({ type: 'MOVE_ITEM', payload: { id, type, direction } });
   }, []);
 
   const handleConfirmDeletion = useCallback(async (itemsToDelete: { id: string, type: 'group' | 'task' | 'activity' }[]) => {

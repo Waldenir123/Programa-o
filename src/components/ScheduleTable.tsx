@@ -88,7 +88,7 @@ interface ScheduleRowProps {
     onCellMouseEnter: (activityId: string, date: string) => void;
     onCellRightClick: (e: React.MouseEvent, activityId: string, date: string) => void;
     isCellInBlock: (activityId: string, date: string, block: any) => boolean;
-    onMoveItem: (id: string, direction: 'up' | 'down') => void;
+    onMoveItem: (id: string, type: 'task' | 'activity', direction: 'up' | 'down') => void;
     onToggleHideItem: (id: string, type: 'group' | 'task' | 'activity') => void;
 }
 
@@ -191,6 +191,12 @@ const ScheduleRow = memo((props: ScheduleRowProps) => {
                                 <button onClick={(e) => { e.stopPropagation(); onToggleHideItem(task.id, 'task'); }} title={task.isHidden ? "Mostrar Tarefa" : "Ocultar Tarefa"} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#e2e8f0', borderRadius: '4px', width: '24px', height: '24px', pointerEvents: 'auto' }}>
                                     <span className="material-icons" style={{ fontSize: '16px', color: task.isHidden ? '#94a3b8' : '#64748b' }}>{task.isHidden ? 'visibility_off' : 'visibility'}</span>
                                 </button>
+                                <button onClick={(e) => { e.stopPropagation(); onMoveItem(task.id, 'task', 'up'); }} title="Mover para Cima" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#e2e8f0', borderRadius: '4px', width: '24px', height: '24px', pointerEvents: 'auto' }}>
+                                    <span className="material-icons" style={{ fontSize: '16px', color: '#64748b' }}>arrow_upward</span>
+                                </button>
+                                <button onClick={(e) => { e.stopPropagation(); onMoveItem(task.id, 'task', 'down'); }} title="Mover para Baixo" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#e2e8f0', borderRadius: '4px', width: '24px', height: '24px', pointerEvents: 'auto' }}>
+                                    <span className="material-icons" style={{ fontSize: '16px', color: '#64748b' }}>arrow_downward</span>
+                                </button>
                                 <button onClick={(e) => { e.stopPropagation(); onAddItem('activity', task.id); }} title="Adicionar Atividade" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#e2e8f0', borderRadius: '4px', width: '24px', height: '24px', pointerEvents: 'auto' }}>
                                     <span className="material-icons" style={{ fontSize: '16px', color: '#10b981' }}>add</span>
                                 </button>
@@ -256,10 +262,10 @@ const ScheduleRow = memo((props: ScheduleRowProps) => {
                             <button onClick={(e) => { e.stopPropagation(); onToggleHideItem(activity.id, 'activity'); }} title={activity.isHidden ? "Mostrar Atividade" : "Ocultar Atividade"} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#e2e8f0', borderRadius: '4px', width: '24px', height: '24px', pointerEvents: 'auto' }}>
                                 <span className="material-icons" style={{ fontSize: '16px', color: activity.isHidden ? '#94a3b8' : '#64748b' }}>{activity.isHidden ? 'visibility_off' : 'visibility'}</span>
                             </button>
-                            <button onClick={(e) => { e.stopPropagation(); onMoveItem(activity.id, 'up'); }} title="Mover para Cima" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#e2e8f0', borderRadius: '4px', width: '24px', height: '24px', pointerEvents: 'auto' }}>
+                            <button onClick={(e) => { e.stopPropagation(); onMoveItem(activity.id, 'activity', 'up'); }} title="Mover para Cima" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#e2e8f0', borderRadius: '4px', width: '24px', height: '24px', pointerEvents: 'auto' }}>
                                 <span className="material-icons" style={{ fontSize: '16px', color: '#64748b' }}>arrow_upward</span>
                             </button>
-                            <button onClick={(e) => { e.stopPropagation(); onMoveItem(activity.id, 'down'); }} title="Mover para Baixo" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#e2e8f0', borderRadius: '4px', width: '24px', height: '24px', pointerEvents: 'auto' }}>
+                            <button onClick={(e) => { e.stopPropagation(); onMoveItem(activity.id, 'activity', 'down'); }} title="Mover para Baixo" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#e2e8f0', borderRadius: '4px', width: '24px', height: '24px', pointerEvents: 'auto' }}>
                                 <span className="material-icons" style={{ fontSize: '16px', color: '#64748b' }}>arrow_downward</span>
                             </button>
                         </>
@@ -518,7 +524,7 @@ interface ScheduleBodyProps {
     onTextUpdate: (id: string, field: string, value: string) => void;
     onAddItem: (type: 'group' | 'task' | 'activity', parentId?: string) => void;
     onDeleteItem: (id: string, type: 'group' | 'task' | 'activity') => void;
-    onMoveItem: (id: string, direction: 'up' | 'down') => void;
+    onMoveItem: (id: string, type: 'task' | 'activity', direction: 'up' | 'down') => void;
     draggedGroupInfo: { group: Grupo, index: number } | null;
     draggedActivityInfo: { activity: Atividade, taskId: string } | null;
     onGroupDragStart: (group: Grupo, index: number) => void;

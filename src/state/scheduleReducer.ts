@@ -1,5 +1,5 @@
 import { ScheduleData, Status } from './types';
-import { generateId } from '../utils/dataUtils';
+import { generateId, deepClone } from '../utils/dataUtils';
 import { aiDeletionAgent } from '../ai/aiAgents';
 
 // Define the shape of the state managed by the reducer
@@ -23,7 +23,7 @@ export type ScheduleAction =
     | { type: 'BATCH_UPDATE_STATUS'; payload: { activityId: string; date: string; status: Status | null }[] }
     | { type: 'UPDATE_SCHEDULE'; payload: ScheduleData }
     | { type: 'MOVE_GROUP'; payload: { fromId: string, toId: string | null } }
-    | { type: 'MOVE_ACTIVITY'; payload: { id: string, direction: 'up' | 'down' } }
+    | { type: 'MOVE_ITEM'; payload: { id: string; type: 'task' | 'activity'; direction: 'up' | 'down' } }
     | { type: 'MOVE_ACTIVITY_DND'; payload: { draggedId: string, targetId: string | null, taskId: string } }
     | { type: 'TOGGLE_HIDE_ACTIVITY'; payload: string }
     | { type: 'TOGGLE_HIDE_ITEM'; payload: { id: string; type: 'group' | 'task' | 'activity' } }
@@ -259,37 +259,130 @@ export const scheduleReducer = (state: ScheduleState, action: ScheduleAction): S
             return createNewStateWithHistory(data);
         }
 
-        case 'MOVE_ACTIVITY': {
-            const { id, direction } = action.payload;
-            
-            let hasChanged = false;
-            const newData = (state.liveData || []).map(group => {
-                let groupChanged = false;
-                const newTarefas = (group.tarefas || []).map(task => {
-                    const activityIndex = task.activities.findIndex(a => a.id === id);
-                    if (activityIndex === -1) return task;
-                    
-                    if (direction === 'up' && activityIndex > 0) {
-                        const newActivities = [...task.activities];
-                        [newActivities[activityIndex - 1], newActivities[activityIndex]] = [newActivities[activityIndex], newActivities[activityIndex - 1]];
-                        groupChanged = true;
-                        hasChanged = true;
-                        return { ...task, activities: newActivities };
+        case 'MOVE_ITEM': {
+            const { id, type, direction } = action.payload;
+            const newData = deepClone(state.liveData || []);
+
+            if (type === 'task') {
+                let foundGroupIdx = -1;
+                let foundTaskIdx = -1;
+
+                for (let gIdx = 0; gIdx < newData.length; gIdx++) {
+                    const tIdx = newData[gIdx].tarefas.findIndex((t: any) => t.id === id);
+                    if (tIdx !== -1) {
+                        foundGroupIdx = gIdx;
+                        foundTaskIdx = tIdx;
+                        break;
                     }
-                    if (direction === 'down' && activityIndex < task.activities.length - 1) {
-                        const newActivities = [...task.activities];
-                        [newActivities[activityIndex], newActivities[activityIndex + 1]] = [newActivities[activityIndex + 1], newActivities[activityIndex]];
-                        groupChanged = true;
-                        hasChanged = true;
-                        return { ...task, activities: newActivities };
+                }
+
+                if (foundGroupIdx === -1) return state;
+
+                if (direction === 'up') {
+                    if (foundTaskIdx > 0) {
+                        // Swap within the same group
+                        const temp = newData[foundGroupIdx].tarefas[foundTaskIdx - 1];
+                        newData[foundGroupIdx].tarefas[foundTaskIdx - 1] = newData[foundGroupIdx].tarefas[foundTaskIdx];
+                        newData[foundGroupIdx].tarefas[foundTaskIdx] = temp;
+                    } else if (foundGroupIdx > 0) {
+                        // Move to previous group
+                        const [movedTask] = newData[foundGroupIdx].tarefas.splice(foundTaskIdx, 1);
+                        newData[foundGroupIdx - 1].tarefas.push(movedTask);
+                    } else {
+                        return state; // Already at top
                     }
-                    return task;
-                });
-                return groupChanged ? { ...group, tarefas: newTarefas } : group;
-            });
-            
-            if (!hasChanged) return state;
-            return createNewStateWithHistory(newData);
+                } else {
+                    if (foundTaskIdx < newData[foundGroupIdx].tarefas.length - 1) {
+                        // Swap within the same group
+                        const temp = newData[foundGroupIdx].tarefas[foundTaskIdx + 1];
+                        newData[foundGroupIdx].tarefas[foundTaskIdx + 1] = newData[foundGroupIdx].tarefas[foundTaskIdx];
+                        newData[foundGroupIdx].tarefas[foundTaskIdx] = temp;
+                    } else if (foundGroupIdx < newData.length - 1) {
+                        // Move to next group
+                        const [movedTask] = newData[foundGroupIdx].tarefas.splice(foundTaskIdx, 1);
+                        newData[foundGroupIdx + 1].tarefas.unshift(movedTask);
+                    } else {
+                        return state; // Already at bottom
+                    }
+                }
+                
+                return createNewStateWithHistory(newData);
+
+            } else if (type === 'activity') {
+                let foundGroupIdx = -1;
+                let foundTaskIdx = -1;
+                let foundActIdx = -1;
+
+                for (let gIdx = 0; gIdx < newData.length; gIdx++) {
+                    for (let tIdx = 0; tIdx < newData[gIdx].tarefas.length; tIdx++) {
+                        const aIdx = newData[gIdx].tarefas[tIdx].activities.findIndex((a: any) => a.id === id);
+                        if (aIdx !== -1) {
+                            foundGroupIdx = gIdx;
+                            foundTaskIdx = tIdx;
+                            foundActIdx = aIdx;
+                            break;
+                        }
+                    }
+                    if (foundGroupIdx !== -1) break;
+                }
+
+                if (foundGroupIdx === -1) return state;
+
+                if (direction === 'up') {
+                    if (foundActIdx > 0) {
+                        // Swap within same task
+                        const temp = newData[foundGroupIdx].tarefas[foundTaskIdx].activities[foundActIdx - 1];
+                        newData[foundGroupIdx].tarefas[foundTaskIdx].activities[foundActIdx - 1] = newData[foundGroupIdx].tarefas[foundTaskIdx].activities[foundActIdx];
+                        newData[foundGroupIdx].tarefas[foundTaskIdx].activities[foundActIdx] = temp;
+                    } else {
+                        // Move to previous task globally
+                        let prevTIdx = foundTaskIdx - 1;
+                        let prevGIdx = foundGroupIdx;
+                        
+                        if (prevTIdx < 0) {
+                            prevGIdx--;
+                            if (prevGIdx >= 0) {
+                                prevTIdx = newData[prevGIdx].tarefas.length - 1;
+                            }
+                        }
+
+                        if (prevGIdx >= 0 && prevTIdx >= 0) {
+                            const [movedAct] = newData[foundGroupIdx].tarefas[foundTaskIdx].activities.splice(foundActIdx, 1);
+                            newData[prevGIdx].tarefas[prevTIdx].activities.push(movedAct);
+                        } else {
+                            return state; // Already at top of everything
+                        }
+                    }
+                } else {
+                    if (foundActIdx < newData[foundGroupIdx].tarefas[foundTaskIdx].activities.length - 1) {
+                        // Swap within same task
+                        const temp = newData[foundGroupIdx].tarefas[foundTaskIdx].activities[foundActIdx + 1];
+                        newData[foundGroupIdx].tarefas[foundTaskIdx].activities[foundActIdx + 1] = newData[foundGroupIdx].tarefas[foundTaskIdx].activities[foundActIdx];
+                        newData[foundGroupIdx].tarefas[foundTaskIdx].activities[foundActIdx] = temp;
+                    } else {
+                        // Move to next task globally
+                        let nextTIdx = foundTaskIdx + 1;
+                        let nextGIdx = foundGroupIdx;
+                        
+                        if (nextTIdx >= newData[foundGroupIdx].tarefas.length) {
+                            nextGIdx++;
+                            if (nextGIdx < newData.length) {
+                                nextTIdx = 0;
+                            }
+                        }
+
+                        if (nextGIdx < newData.length && nextTIdx < newData[nextGIdx].tarefas.length) {
+                            const [movedAct] = newData[foundGroupIdx].tarefas[foundTaskIdx].activities.splice(foundActIdx, 1);
+                            newData[nextGIdx].tarefas[nextTIdx].activities.unshift(movedAct);
+                        } else {
+                            return state; // Already at bottom of everything
+                        }
+                    }
+                }
+
+                return createNewStateWithHistory(newData);
+            }
+            return state;
         }
 
         case 'MOVE_ACTIVITY_DND': {
