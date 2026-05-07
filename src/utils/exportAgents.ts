@@ -846,3 +846,130 @@ export const exportManpowerDashboardToPdfAgent = (chartImage: string | null, tit
     
     doc.save(`Dashboard_MO_${title.replace(/ /g, '_')}.pdf`);
 };
+
+export const exportDailySummaryToWordAgent = async (
+    viewMode: 'daily' | 'weekly',
+    startDate: string,
+    endDate: string,
+    searchQuery: string,
+    data: any
+) => {
+    const { Document, Packer, Paragraph, TextRun, HeadingLevel } = await import('docx');
+    const { saveAs } = await import('file-saver');
+
+    const children: any[] = [];
+    
+    if (viewMode === 'daily') {
+        children.push(
+            new Paragraph({
+                text: `Resumo Diário - ${new Date(startDate + 'T00:00:00Z').toLocaleDateString('pt-BR', { timeZone: 'UTC' })}`,
+                heading: HeadingLevel.HEADING_1,
+                spacing: { after: 200 }
+            })
+        );
+        data.forEach(({ category, tasks }: any) => {
+            children.push(new Paragraph({ text: category, heading: HeadingLevel.HEADING_2, spacing: { before: 200, after: 100 } }));
+            tasks.forEach((item: any) => {
+                children.push(new Paragraph({
+                    children: [
+                        new TextRun({ text: item.groupTitle, color: '64748b', size: 16 }),
+                    ],
+                }));
+                children.push(new Paragraph({
+                    children: [
+                        new TextRun({ text: `${item.taskTitle} `, bold: true, size: 24 }),
+                        item.taskFa ? new TextRun({ text: `(FA: ${item.taskFa})`, italics: true, color: '94a3b8', size: 20 }) : new TextRun({text: ''}),
+                    ],
+                    spacing: { after: 50 }
+                }));
+
+                item.activities.forEach((act: any) => {
+                    const statusLabel = {
+                        'completed': 'Concluído',
+                        'in_progress': 'Em Andamento',
+                        'not_started': 'Não Iniciado',
+                        'delayed': 'Atrasado',
+                        'canceled': 'Cancelado',
+                        'not_performed': 'Não Realizado',
+                    }[act.status] || act.status;
+                    
+                    children.push(new Paragraph({
+                        children: [
+                            new TextRun({ text: `  • ${act.name} `, size: 20 }),
+                            new TextRun({ text: `[${statusLabel}]`, bold: true, size: 16 }),
+                        ]
+                    }));
+                });
+                children.push(new Paragraph({ text: "" }));
+            });
+        });
+    } else {
+         children.push(
+            new Paragraph({
+                text: `Resumo Semanal/Período${searchQuery.trim() ? ` - Filtro: "${searchQuery}"` : ''}`,
+                heading: HeadingLevel.HEADING_1,
+                spacing: { after: 100 }
+            })
+        );
+        const startStr = new Date(startDate + 'T00:00:00Z').toLocaleDateString('pt-BR', { timeZone: 'UTC' });
+        const endStr = new Date(endDate + 'T00:00:00Z').toLocaleDateString('pt-BR', { timeZone: 'UTC' });
+        children.push(
+            new Paragraph({
+                text: `${startStr} até ${endStr}`,
+                spacing: { after: 200 }
+            })
+        );
+
+        data.forEach((daySummary: any) => {
+            if (daySummary.categories.length === 0) return;
+            const dStr = daySummary.dateObj.toLocaleDateString('pt-BR', { weekday: 'long', timeZone: 'UTC', day: '2-digit', month: '2-digit' }).replace(/^\w/, (c: string) => c.toUpperCase());
+            children.push(new Paragraph({ text: dStr, heading: HeadingLevel.HEADING_2, spacing: { before: 200, after: 100 } }));
+
+            daySummary.categories.forEach(({category, tasks}: any) => {
+                children.push(new Paragraph({ text: category, heading: HeadingLevel.HEADING_3, spacing: { before: 100, after: 50 } }));
+                tasks.forEach((item: any) => {
+                    children.push(new Paragraph({
+                        children: [
+                            new TextRun({ text: item.groupTitle, color: '64748b', size: 16 }),
+                        ],
+                    }));
+                    children.push(new Paragraph({
+                        children: [
+                            new TextRun({ text: `${item.taskTitle} `, bold: true, size: 20 }),
+                            item.taskFa ? new TextRun({ text: `(FA: ${item.taskFa})`, italics: true, color: '94a3b8', size: 16 }) : new TextRun({text: ''}),
+                        ]
+                    }));
+
+                    item.activities.forEach((act: any) => {
+                        const statusLabel = {
+                            'completed': 'Concluído',
+                            'in_progress': 'Em Andamento',
+                            'not_started': 'Não Iniciado',
+                            'delayed': 'Atrasado',
+                            'canceled': 'Cancelado',
+                            'not_performed': 'Não Realizado',
+                        }[act.status] || act.status;
+
+                        children.push(new Paragraph({
+                            children: [
+                                new TextRun({ text: `  • ${act.name} `, size: 20 }),
+                                new TextRun({ text: `[${statusLabel}]`, bold: true, size: 16 }),
+                            ]
+                        }));
+                    });
+                    children.push(new Paragraph({ text: "" }));
+                });
+            });
+        });
+    }
+
+    const doc = new Document({
+        sections: [{
+            children: children
+        }]
+    });
+
+    Packer.toBlob(doc).then(blob => {
+        saveAs(blob, `resumo_${viewMode}.docx`);
+    });
+};

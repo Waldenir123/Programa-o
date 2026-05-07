@@ -1627,6 +1627,12 @@ tr.add-group-row.drop-target-end > .add-group-cell {
         height: auto !important;
         overflow: visible !important;
     }
+    .app-wrapper, .app-container, .main-content {
+        overflow: visible !important;
+        height: auto !important;
+        display: block !important;
+        position: static !important;
+    }
     main.app-main {
         overflow: visible !important;
         padding: 0 !important;

@@ -15,11 +15,12 @@ interface ScheduleCellProps {
     onMouseDown: (e: React.MouseEvent, activityId: string, date: string) => void;
     onMouseEnter: (activityId: string, date: string) => void;
     onRightClick: (e: React.MouseEvent, activityId: string, date: string) => void;
+    className?: string;
 }
 
 const ScheduleCell = memo(({ 
     date, activity, isActive, isSelected, isCut, isMoving, isGhost, 
-    onMouseDown, onMouseEnter, onRightClick 
+    onMouseDown, onMouseEnter, onRightClick, className 
 }: ScheduleCellProps) => {
     const dateStr = formatDate(date);
     const status = activity ? activity.schedule[dateStr] : undefined;
@@ -35,6 +36,7 @@ const ScheduleCell = memo(({
         isCut ? 'cut-cell' : '',
         isMoving ? 'moving-cell' : '',
         isGhost ? 'ghost-cell' : '',
+        className || ''
     ].filter(Boolean).join(' ');
 
     return (
@@ -59,6 +61,7 @@ const ScheduleCell = memo(({
 ScheduleCell.displayName = 'ScheduleCell';
 
 interface ScheduleRowProps {
+    printNumWeeks?: number;
     row: RenderableRow;
     index: number;
     dates: Date[];
@@ -94,7 +97,7 @@ interface ScheduleRowProps {
 
 const ScheduleRow = memo((props: ScheduleRowProps) => {
     const { 
-        row, index, dates, dynamicColumns, columnWidths, stickyColumnPositions, visibleColumns,
+        printNumWeeks, row, index, dates, dynamicColumns, columnWidths, stickyColumnPositions, visibleColumns,
         selectedItems, draggedGroupInfo, draggedActivityInfo, dropTargetId, activeCell,
         selectionBlock, cutSelectionBlock, isMovingBlock, ghostBlockCells,
         onRowClick, onGroupDragStart, onActivityDragStart, onActivityDrop, onDragEnd, onDropTargetChange,
@@ -280,7 +283,8 @@ const ScheduleRow = memo((props: ScheduleRowProps) => {
                     )}
                 </div>
             </td>
-            {(dates || []).map(date => {
+            {(dates || []).map((date, dateIndex) => {
+                const isPrintable = printNumWeeks === undefined || dateIndex < printNumWeeks * 7;
                 const dateStr = formatDate(date);
                 const isSelectedInBlock = activity ? isCellInBlock(activity.id, dateStr, selectionBlock) : false;
                 return (
@@ -296,6 +300,7 @@ const ScheduleRow = memo((props: ScheduleRowProps) => {
                         onMouseDown={onCellMouseDown}
                         onMouseEnter={onCellMouseEnter}
                         onRightClick={onCellRightClick}
+                        className={isPrintable ? '' : 'no-print'}
                     />
                 );
             })}
@@ -307,6 +312,7 @@ ScheduleRow.displayName = 'ScheduleRow';
 
 // --- Schedule Header Component ---
 interface ScheduleHeaderProps {
+    printNumWeeks?: number;
     dates: Date[];
     dynamicColumns: DynamicColumn[];
     columnWidths: number[];
@@ -322,7 +328,7 @@ interface ScheduleHeaderProps {
 }
 
 export const ScheduleHeader: React.FC<ScheduleHeaderProps> = ({ 
-    dates, dynamicColumns, columnWidths, onResizeStart, stickyColumnPositions, 
+    printNumWeeks, dates, dynamicColumns, columnWidths, onResizeStart, stickyColumnPositions, 
     onOpenFilter, activeFilters, visibleColumns,
     onColumnNameUpdate, onAddColumn, onRemoveColumn, onMoveColumn
 }) => {
@@ -478,26 +484,31 @@ export const ScheduleHeader: React.FC<ScheduleHeaderProps> = ({
                     <div className="resize-handle" onMouseDown={(e) => onResizeStart(dynamicColumns.length + 2, e)}></div>
                 </th>
 
-                {weekSpans.map(span => (
-                    <th key={`week-${span.week}`} colSpan={span.count} className="week-header">
-                        Semana {span.week}
-                    </th>
-                ))}
-            </tr>
-            <tr>
-                {dates.map(date => {
-                    const dayAbbr = getDayAbbr(date);
-                    const isWeekend = dayAbbr === 'SÁB' || dayAbbr === 'DOM';
-                    const weekendClass = isWeekend ? 'saturday-col' : '';
-                    return <th key={`day-${formatDate(date)}`} className={weekendClass}>{dayAbbr}</th>
+                {weekSpans.map((span, index) => {
+                    const isPrintable = printNumWeeks === undefined || index < printNumWeeks;
+                    return (
+                        <th key={`week-${span.week}`} colSpan={span.count} className={`week-header ${isPrintable ? '' : 'no-print'}`}>
+                            Semana {span.week}
+                        </th>
+                    );
                 })}
             </tr>
             <tr>
-                {dates.map(date => {
+                {dates.map((date, index) => {
+                    const isPrintable = printNumWeeks === undefined || index < printNumWeeks * 7;
                     const dayAbbr = getDayAbbr(date);
                     const isWeekend = dayAbbr === 'SÁB' || dayAbbr === 'DOM';
                     const weekendClass = isWeekend ? 'saturday-col' : '';
-                    return <th key={`date-${formatDate(date)}`} className={weekendClass}>{date.getUTCDate()}</th>
+                    return <th key={`day-${formatDate(date)}`} className={`${weekendClass} ${isPrintable ? '' : 'no-print'}`}>{dayAbbr}</th>
+                })}
+            </tr>
+            <tr>
+                {dates.map((date, index) => {
+                    const isPrintable = printNumWeeks === undefined || index < printNumWeeks * 7;
+                    const dayAbbr = getDayAbbr(date);
+                    const isWeekend = dayAbbr === 'SÁB' || dayAbbr === 'DOM';
+                    const weekendClass = isWeekend ? 'saturday-col' : '';
+                    return <th key={`date-${formatDate(date)}`} className={`${weekendClass} ${isPrintable ? '' : 'no-print'}`}>{date.getUTCDate()}</th>
                 })}
             </tr>
         </thead>
@@ -506,6 +517,7 @@ export const ScheduleHeader: React.FC<ScheduleHeaderProps> = ({
 
 // --- Schedule Body Component ---
 interface ScheduleBodyProps {
+    printNumWeeks?: number;
     renderableRows: RenderableRow[];
     dates: Date[];
     dynamicColumns: DynamicColumn[];
@@ -540,7 +552,7 @@ interface ScheduleBodyProps {
 
 export const ScheduleBody: React.FC<ScheduleBodyProps> = (props) => {
     const { 
-        renderableRows, dates, dynamicColumns, columnWidths, stickyColumnPositions, 
+        printNumWeeks, renderableRows, dates, dynamicColumns, columnWidths, stickyColumnPositions, 
         selectedItems, onRowClick, activeCell, onCellMouseDown, onCellMouseEnter, onCellRightClick,
         selectionBlock, cutSelectionBlock, isMovingBlock, ghostBlockCells,
         onTextUpdate, onAddItem, onDeleteItem, onMoveItem,
@@ -585,6 +597,7 @@ export const ScheduleBody: React.FC<ScheduleBodyProps> = (props) => {
              {(renderableRows || []).map((row, index) => (
                 <ScheduleRow
                     key={row.activity?.id || `empty-${row.task.id}-${index}`}
+                    printNumWeeks={printNumWeeks}
                     index={index}
                     row={row}
                     dates={dates}

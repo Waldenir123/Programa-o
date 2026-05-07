@@ -262,20 +262,23 @@ export const App = () => {
   const title = useMemo(() => activeProject?.title || '', [activeProject]);
   const [currentStartDate, setCurrentStartDate] = useState(() => activeProject?.startDate ? new Date(activeProject.startDate + 'T00:00:00Z') : new Date('2026-04-13T00:00:00Z'));
   const [goToWeekInput, setGoToWeekInput] = useState(() => getWeek(currentStartDate));
-  const dates = useMemo(() => {
+  const printNumWeeks = useMemo(() => {
     const currentZoom = zoomLevels[currentPage] || 100;
     let numWeeks = 4; // Default 4 weeks at 100% zoom
     if (currentZoom <= 85) numWeeks = 6;
     if (currentZoom <= 65) numWeeks = 8;
     if (currentZoom <= 45) numWeeks = 12;
     if (currentZoom <= 30) numWeeks = 16;
-    
-    return Array.from({length: numWeeks * 7}, (_, i) => {
+    return numWeeks;
+  }, [zoomLevels, currentPage]);
+
+  const dates = useMemo(() => {
+    return Array.from({length: 26 * 7}, (_, i) => { // 26 Weeks for view
         const d = new Date(currentStartDate);
         d.setUTCDate(currentStartDate.getUTCDate() + i);
         return d;
     });
-  }, [currentStartDate, zoomLevels, currentPage]);
+  }, [currentStartDate]);
   
   const filteredData = useMemo(() => {
     const filters = activeFilters as Record<string, Set<string>>;
@@ -1642,6 +1645,7 @@ export const App = () => {
                       </div>
                       <table className="schedule-table" style={{ width: scheduleTableColumnWidths.reduce((a, b) => a + b, 0) }}>
                           <ScheduleHeader 
+                              printNumWeeks={printNumWeeks}
                               dates={dates} 
                               dynamicColumns={activeProject.dynamicColumns}
                               columnWidths={scheduleTableColumnWidths} 
@@ -1656,6 +1660,7 @@ export const App = () => {
                               onMoveColumn={handleMoveColumn}
                           />
                           <ScheduleBody
+                              printNumWeeks={printNumWeeks}
                               renderableRows={renderableRows}
                               dates={dates}
                               dynamicColumns={activeProject.dynamicColumns}

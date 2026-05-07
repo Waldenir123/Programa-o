@@ -23,34 +23,18 @@ export const DailySummaryView: React.FC<DailySummaryViewProps> = ({ data, dates,
         }
     }, [dates, selectedDateStr, todayStr]);
     
-    // Weekly state
-    const [selectedWeekStart, setSelectedWeekStart] = useState<string>('');
+    // Weekly/Period state
+    const [customStart, setCustomStart] = useState<string>('');
+    const [customEnd, setCustomEnd] = useState<string>('');
     const [searchQuery, setSearchQuery] = useState('');
-
-    const weeksOptions = useMemo(() => {
-        const options: { value: string, label: string, datesStr: string[] }[] = [];
-        if (dates.length === 0) return options;
-        
-        for (let i = 0; i < dates.length; i += 7) {
-            const weekDates = dates.slice(i, i + 7);
-            const start = weekDates[0];
-            const end = weekDates[weekDates.length - 1];
-            const value = formatDate(start);
-            const formatStr = (d: Date) => `${d.getUTCDate().toString().padStart(2, '0')}/${(d.getUTCMonth() + 1).toString().padStart(2, '0')}`;
-            options.push({ 
-                value, 
-                label: `${formatStr(start)} até ${formatStr(end)}`,
-                datesStr: weekDates.map(formatDate)
-            });
-        }
-        return options;
-    }, [dates]);
+    const [selectedCategory, setSelectedCategory] = useState<string>('');
 
     useEffect(() => {
-        if (weeksOptions.length > 0 && !selectedWeekStart) {
-            setSelectedWeekStart(weeksOptions[0].value);
+        if (dates.length > 0) {
+            if (!customStart) setCustomStart(formatDate(dates[0]));
+            if (!customEnd) setCustomEnd(formatDate(dates[Math.min(dates.length - 1, 6)]));
         }
-    }, [weeksOptions, selectedWeekStart]);
+    }, [dates, customStart, customEnd]);
 
     const categorizeActivity = (name: string): string => {
         const lowerName = name.toLowerCase();
@@ -82,13 +66,19 @@ export const DailySummaryView: React.FC<DailySummaryViewProps> = ({ data, dates,
             "Outras Atividades": []
         };
 
+        const term = searchQuery.trim().toLowerCase();
+
         (data || []).forEach(group => {
             const groupTitle = group.customValues?.['grupo'] || 'Grupo Sem Nome'; 
             (group.tarefas || []).forEach(task => {
                 (task.activities || []).forEach(a => {
                     const status = a.schedule[selectedDateStr];
                     if (status !== null && status !== undefined) {
+                        if (term && !a.name.toLowerCase().includes(term) && !groupTitle.toLowerCase().includes(term) && !task.title.toLowerCase().includes(term)) {
+                            return;
+                        }
                         const catKey = a.sector || categorizeActivity(a.name);
+
                         if (!categories[catKey]) {
                             categories[catKey] = [];
                         }
@@ -118,8 +108,9 @@ export const DailySummaryView: React.FC<DailySummaryViewProps> = ({ data, dates,
 
         return Object.entries(categories)
             .filter(([_, tasks]) => tasks.length > 0)
+            .filter(([category, _]) => selectedCategory ? category === selectedCategory : true)
             .map(([category, tasks]) => ({ category, tasks }));
-    }, [data, selectedDateStr]);
+    }, [data, selectedDateStr, selectedCategory, searchQuery]);
 
     const handleDragStart = (e: React.DragEvent, activityId: string) => {
         e.dataTransfer.setData('application/x-activity-id', activityId);
@@ -138,14 +129,24 @@ export const DailySummaryView: React.FC<DailySummaryViewProps> = ({ data, dates,
     };
 
     const weeklySummaryByDay = useMemo(() => {
-        const selectedWeek = weeksOptions.find(w => w.value === selectedWeekStart);
-        if (!selectedWeek) return [];
-        const weekDates = selectedWeek.datesStr;
-        const result: { dateStr: string; dateObj: Date; categories: any[] }[] = [];
+        if (!customStart || !customEnd) return [];
         
+        const dStartIndex = dates.findIndex(d => formatDate(d) === customStart);
+        const dEndIndex = dates.findIndex(d => formatDate(d) === customEnd);
+        
+        const periodDates: string[] = [];
+        if (dStartIndex !== -1 && dEndIndex !== -1) {
+            const start = Math.min(dStartIndex, dEndIndex);
+            const end = Math.max(dStartIndex, dEndIndex);
+            for (let i = start; i <= end; i++) {
+                periodDates.push(formatDate(dates[i]));
+            }
+        }
+
+        const result: { dateStr: string; dateObj: Date; categories: any[] }[] = [];
         const term = searchQuery.trim().toLowerCase();
 
-        weekDates.forEach(dateStr => {
+        periodDates.forEach(dateStr => {
             const categories: Record<string, any[]> = {
                 "Setor de Traçagem e Corte": [],
                 "Inspeções (VT, LP, DT, UT, e RX e ensaios)": [],
@@ -194,9 +195,10 @@ export const DailySummaryView: React.FC<DailySummaryViewProps> = ({ data, dates,
 
             const dayCategories = Object.entries(categories)
                 .filter(([_, tasks]) => tasks.length > 0)
+                .filter(([category, _]) => selectedCategory ? category === selectedCategory : true)
                 .map(([category, tasks]) => ({ category, tasks }));
 
-            if (dayCategories.length > 0 || !searchQuery) {
+            if (dayCategories.length > 0 || (!searchQuery && !selectedCategory)) {
                 result.push({
                     dateStr,
                     dateObj: new Date(dateStr + 'T00:00:00Z'),
@@ -206,7 +208,7 @@ export const DailySummaryView: React.FC<DailySummaryViewProps> = ({ data, dates,
         });
 
         return result;
-    }, [data, selectedWeekStart, searchQuery, weeksOptions]);
+    }, [data, customStart, customEnd, searchQuery, dates, selectedCategory]);
 
     const handlePrint = () => {
         window.print();
@@ -262,6 +264,35 @@ export const DailySummaryView: React.FC<DailySummaryViewProps> = ({ data, dates,
                     <button onClick={() => window.print()} style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '8px 16px', backgroundColor: '#10b981', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }} className="no-print">
                         <span className="material-icons" style={{ fontSize: '18px' }}>print</span> Imprimir
                     </button>
+                    
+                    <div>
+                        <label style={{ marginRight: '8px', fontWeight: 'bold', color: '#475569' }}>Setor:</label>
+                        <select 
+                            value={selectedCategory} 
+                            onChange={(e) => setSelectedCategory(e.target.value)}
+                            style={{ padding: '8px', borderRadius: '4px', border: '1px solid #cbd5e1', outline: 'none' }}
+                        >
+                            <option value="">Todos</option>
+                            <option value="Setor de Traçagem e Corte">Setor de Traçagem e Corte</option>
+                            <option value="Inspeções (VT, LP, DT, UT, e RX e ensaios)">Inspeções</option>
+                            <option value="Soldagem e Tratamento Térmico">Soldagem e Tratamento Térmico</option>
+                            <option value="Montagem e Caldeiraria">Montagem e Caldeiraria</option>
+                            <option value="Usinagem/Ferramentaria">Usinagem/Ferramentaria</option>
+                            <option value="Outras Atividades">Outras Atividades</option>
+                        </select>
+                    </div>
+
+                    <div style={{ position: 'relative' }}>
+                        <span className="material-icons" style={{ position: 'absolute', left: '8px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8', fontSize: '18px' }}>search</span>
+                        <input 
+                            type="text" 
+                            placeholder="Buscar atividade..." 
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            style={{ padding: '8px 8px 8px 32px', borderRadius: '4px', border: '1px solid #cbd5e1', outline: 'none', width: '200px' }}
+                        />
+                    </div>
+
                     {viewMode === 'daily' ? (
                         <div>
                             <label style={{ marginRight: '8px', fontWeight: 'bold', color: '#475569' }}>Data:</label>
@@ -278,33 +309,56 @@ export const DailySummaryView: React.FC<DailySummaryViewProps> = ({ data, dates,
                             </select>
                         </div>
                     ) : (
-                        <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
+                        <div style={{ display: 'flex', gap: '16px', alignItems: 'center', flexWrap: 'wrap' }}>
                             <div>
-                                <label style={{ marginRight: '8px', fontWeight: 'bold', color: '#475569' }}>Semana:</label>
+                                <label style={{ marginRight: '8px', fontWeight: 'bold', color: '#475569' }}>De:</label>
                                 <select 
-                                    value={selectedWeekStart} 
-                                    onChange={(e) => setSelectedWeekStart(e.target.value)}
+                                    value={customStart} 
+                                    onChange={(e) => setCustomStart(e.target.value)}
                                     style={{ padding: '8px', borderRadius: '4px', border: '1px solid #cbd5e1', outline: 'none' }}
                                 >
-                                    {weeksOptions.map(w => (
-                                        <option key={w.value} value={w.value}>{w.label}</option>
+                                    {dates.map(d => (
+                                        <option key={formatDate(d)} value={formatDate(d)}>
+                                            {d.toLocaleDateString('pt-BR', { timeZone: 'UTC' })}
+                                        </option>
                                     ))}
                                 </select>
                             </div>
-                            <div style={{ position: 'relative' }}>
-                                <span className="material-icons" style={{ position: 'absolute', left: '8px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8', fontSize: '18px' }}>search</span>
-                                <input 
-                                    type="text" 
-                                    placeholder="Buscar atividade..." 
-                                    value={searchQuery}
-                                    onChange={(e) => setSearchQuery(e.target.value)}
-                                    style={{ padding: '8px 8px 8px 32px', borderRadius: '4px', border: '1px solid #cbd5e1', outline: 'none', width: '200px' }}
-                                />
+                            <div>
+                                <label style={{ marginRight: '8px', fontWeight: 'bold', color: '#475569' }}>Até:</label>
+                                <select 
+                                    value={customEnd} 
+                                    onChange={(e) => setCustomEnd(e.target.value)}
+                                    style={{ padding: '8px', borderRadius: '4px', border: '1px solid #cbd5e1', outline: 'none' }}
+                                >
+                                    {dates.map(d => (
+                                        <option key={formatDate(d)} value={formatDate(d)}>
+                                            {d.toLocaleDateString('pt-BR', { timeZone: 'UTC' })}
+                                        </option>
+                                    ))}
+                                </select>
                             </div>
                         </div>
                     )}
                     <button onClick={handlePrint} className="control-button" style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '8px 16px', backgroundColor: '#fbbf24', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}>
                         <span className="material-icons" style={{ fontSize: '18px' }}>print</span> Imprimir
+                    </button>
+                    <button 
+                        onClick={() => {
+                            import('../utils/exportAgents').then(module => {
+                                module.exportDailySummaryToWordAgent(
+                                    viewMode,
+                                    viewMode === 'daily' ? selectedDateStr : customStart,
+                                    customEnd,
+                                    searchQuery,
+                                    viewMode === 'daily' ? dailySummary : weeklySummaryByDay
+                                );
+                            });
+                        }} 
+                        style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '8px 16px', backgroundColor: '#3b82f6', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }} 
+                        className="no-print"
+                    >
+                        <span className="material-icons" style={{ fontSize: '18px' }}>description</span> Exportar Word
                     </button>
                 </div>
             </div>
@@ -435,7 +489,7 @@ export const DailySummaryView: React.FC<DailySummaryViewProps> = ({ data, dates,
                                      {searchQuery.trim() ? ` - Filtro: "${searchQuery}"` : ''}
                                  </h1>
                                  <p style={{ textAlign: 'center', color: '#64748b' }}>
-                                     {weeksOptions.find(w => w.value === selectedWeekStart)?.label}
+                                     {new Date(customStart + 'T00:00:00Z').toLocaleDateString('pt-BR', { timeZone: 'UTC' })} até {new Date(customEnd + 'T00:00:00Z').toLocaleDateString('pt-BR', { timeZone: 'UTC' })}
                                  </p>
                             </div>
                             {weeklySummaryByDay.map((daySummary, dayIdx) => daySummary.categories.length > 0 && (
