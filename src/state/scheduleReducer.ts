@@ -27,6 +27,7 @@ export type ScheduleAction =
     | { type: 'MOVE_ACTIVITY_DND'; payload: { draggedId: string, targetId: string | null, taskId: string } }
     | { type: 'TOGGLE_HIDE_ACTIVITY'; payload: string }
     | { type: 'TOGGLE_HIDE_ITEM'; payload: { id: string; type: 'group' | 'task' | 'activity' } }
+    | { type: 'DUPLICATE_TASK'; payload: { taskId: string } }
     | { type: 'CLEAR_ALL' };
 
 // The reducer function that handles state transitions
@@ -95,6 +96,29 @@ export const scheduleReducer = (state: ScheduleState, action: ScheduleAction): S
                     }))
                 }))
             );
+        }
+
+        case 'DUPLICATE_TASK': {
+            const { taskId } = action.payload;
+            const newData = (state.liveData || []).map(group => {
+                const taskIndex = group.tarefas.findIndex(t => t.id === taskId);
+                if (taskIndex !== -1) {
+                    const originalTask = group.tarefas[taskIndex];
+                    const duplicatedTask = {
+                        ...deepClone(originalTask),
+                        id: generateId(),
+                        activities: originalTask.activities.map(act => ({
+                            ...deepClone(act),
+                            id: generateId()
+                        }))
+                    };
+                    const newTarefas = [...group.tarefas];
+                    newTarefas.splice(taskIndex + 1, 0, duplicatedTask);
+                    return { ...group, tarefas: newTarefas };
+                }
+                return group;
+            });
+            return createNewStateWithHistory(newData);
         }
 
         case 'ADD_ITEM': {

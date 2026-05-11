@@ -715,9 +715,41 @@ export const App = () => {
         setActiveProject(p => p ? { ...p, name: value, lastModified: Date.now() } : null);
         return;
     }
+
+    let oldValue: string | undefined;
+    let filterKey: string | undefined;
+
+    if (liveData) {
+        if (field === 'tarefa') {
+            liveData.forEach(g => g.tarefas.forEach(t => { if (t.id === id) oldValue = t.title; }));
+            filterKey = 'tarefaPrincipal';
+        } else if (field === 'atividade') {
+            liveData.forEach(g => g.tarefas.forEach(t => t.activities.forEach(a => { if (a.id === id) oldValue = a.name; })));
+            filterKey = 'atividade';
+        } else if (!['tarefa_fa', 'sector'].includes(field)) {
+            liveData.forEach(g => { if (g.id === id) oldValue = g.customValues?.[field]; });
+            filterKey = field;
+        }
+    }
+
+    if (oldValue !== undefined && filterKey && oldValue !== value) {
+        const currentOldValue = oldValue; // capture for closure
+        setActiveFilters(prev => {
+            if (!prev[filterKey!]) return prev;
+            if (prev[filterKey!].has(currentOldValue)) {
+                const newFilters = { ...prev };
+                const updatedSet = new Set(newFilters[filterKey!]);
+                updatedSet.delete(currentOldValue);
+                updatedSet.add(value);
+                newFilters[filterKey!] = updatedSet;
+                return newFilters;
+            }
+            return prev;
+        });
+    }
     
     dispatch({ type: 'UPDATE_TEXT', payload: { id, field: field as any, value } });
-  }, [activeProject]);
+  }, [activeProject, liveData]);
 
   const handleSummaryTextUpdate = useCallback((id: string, field: string, value: string) => {
     dispatch({ type: 'UPDATE_TEXT', payload: { id, field: field as any, value } });
@@ -753,6 +785,10 @@ export const App = () => {
 
   const handleAddItem = useCallback((type: 'group' | 'task' | 'activity', parentId?: string) => {
       dispatch({ type: 'ADD_ITEM', payload: { type, parentId } });
+  }, []);
+
+  const handleDuplicateTask = useCallback((taskId: string) => {
+      dispatch({ type: 'DUPLICATE_TASK', payload: { taskId } });
   }, []);
 
   const handleMoveItem = useCallback((id: string, type: 'task' | 'activity', direction: 'up' | 'down') => {
@@ -1682,6 +1718,7 @@ export const App = () => {
                                   handleConfirmDeletion([{ id, type }]);
                               }}
                               onMoveItem={handleMoveItem}
+                              onDuplicateTask={handleDuplicateTask}
                               draggedGroupInfo={draggedGroupInfo}
                               draggedActivityInfo={draggedActivityInfo}
                               onGroupDragStart={handleGroupDragStart}

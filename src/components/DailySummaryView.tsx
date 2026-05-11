@@ -400,26 +400,23 @@ export const DailySummaryView: React.FC<DailySummaryViewProps> = ({ data, dates,
                                                         suppressContentEditableWarning
                                                         onBlur={e => onTextUpdate(item.groupId, 'grupo', e.currentTarget.textContent || '')}
                                                         style={{ fontSize: '0.85rem', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', outline: 'none' }}
-                                                    >
-                                                        {item.groupTitle}
-                                                    </div>
+                                                        dangerouslySetInnerHTML={{ __html: item.groupTitle }}
+                                                    />
                                                     <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px' }}>
                                                         <div 
                                                             contentEditable
                                                             suppressContentEditableWarning
                                                             onBlur={e => onTextUpdate(item.taskId, 'tarefa', e.currentTarget.textContent || '')}
                                                             style={{ fontSize: '1.1rem', fontWeight: 'bold', color: '#0f172a', outline: 'none' }}
-                                                        >
-                                                            {item.taskTitle}
-                                                        </div>
+                                                            dangerouslySetInnerHTML={{ __html: item.taskTitle }}
+                                                        />
                                                         <div 
                                                             contentEditable
                                                             suppressContentEditableWarning
                                                             onBlur={e => onTextUpdate(item.taskId, 'tarefa_fa', e.currentTarget.textContent || '')}
                                                             style={{ fontSize: '0.9rem', color: '#94a3b8', fontStyle: 'italic', outline: 'none' }}
-                                                        >
-                                                            {item.taskFa ? `${item.taskFa}` : '(FA)'}
-                                                        </div>
+                                                            dangerouslySetInnerHTML={{ __html: item.taskFa ? `${item.taskFa}` : '(FA)' }}
+                                                        />
                                                     </div>
                                                 </div>
                                                 <ul style={{ listStyleType: 'none', padding: 0, margin: 0 }}>
@@ -437,9 +434,8 @@ export const DailySummaryView: React.FC<DailySummaryViewProps> = ({ data, dates,
                                                                     suppressContentEditableWarning
                                                                     onBlur={e => onTextUpdate(act.id, 'atividade', e.currentTarget.textContent || '')}
                                                                     style={{ color: '#334155', flexGrow: 1, outline: 'none' }}
-                                                                >
-                                                                    {act.name}
-                                                                </div>
+                                                                    dangerouslySetInnerHTML={{ __html: act.name }}
+                                                                />
                                                             </div>
                                                             <span style={{ 
                                                                 padding: '4px 8px', 
@@ -519,26 +515,23 @@ export const DailySummaryView: React.FC<DailySummaryViewProps> = ({ data, dates,
                                                                     suppressContentEditableWarning
                                                                     onBlur={e => onTextUpdate(item.groupId, 'grupo', e.currentTarget.textContent || '')}
                                                                     style={{ fontSize: '0.8rem', color: '#64748b', textTransform: 'uppercase', outline: 'none' }}
-                                                                >
-                                                                    {item.groupTitle}
-                                                                </div>
+                                                                    dangerouslySetInnerHTML={{ __html: item.groupTitle }}
+                                                                />
                                                                 <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px' }}>
                                                                     <div 
                                                                         contentEditable
                                                                         suppressContentEditableWarning
                                                                         onBlur={e => onTextUpdate(item.taskId, 'tarefa', e.currentTarget.textContent || '')}
                                                                         style={{ fontSize: '1rem', fontWeight: 'bold', color: '#0f172a', outline: 'none' }}
-                                                                    >
-                                                                        {item.taskTitle}
-                                                                    </div>
+                                                                        dangerouslySetInnerHTML={{ __html: item.taskTitle }}
+                                                                    />
                                                                     <div 
                                                                         contentEditable
                                                                         suppressContentEditableWarning
                                                                         onBlur={e => onTextUpdate(item.taskId, 'tarefa_fa', e.currentTarget.textContent || '')}
                                                                         style={{ fontSize: '0.85rem', color: '#94a3b8', fontStyle: 'italic', outline: 'none' }}
-                                                                    >
-                                                                        {item.taskFa ? `${item.taskFa}` : '(FA)'}
-                                                                    </div>
+                                                                        dangerouslySetInnerHTML={{ __html: item.taskFa ? `${item.taskFa}` : '(FA)' }}
+                                                                    />
                                                                 </div>
                                                             </div>
                                                             <ul style={{ listStyleType: 'none', padding: 0, margin: 0 }}>
@@ -551,9 +544,8 @@ export const DailySummaryView: React.FC<DailySummaryViewProps> = ({ data, dates,
                                                                                 suppressContentEditableWarning
                                                                                 onBlur={e => onTextUpdate(act.id, 'atividade', e.currentTarget.textContent || '')}
                                                                                 style={{ color: '#334155', flexGrow: 1, outline: 'none', fontSize: '0.95rem' }}
-                                                                            >
-                                                                                {act.name}
-                                                                            </div>
+                                                                                dangerouslySetInnerHTML={{ __html: act.name }}
+                                                                            />
                                                                         </div>
                                                                         <span style={{ 
                                                                             padding: '2px 6px', 

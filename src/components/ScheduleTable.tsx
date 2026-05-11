@@ -87,6 +87,7 @@ interface ScheduleRowProps {
     onAddItem: (type: 'group' | 'task' | 'activity', parentId?: string) => void;
     onDeleteItem: (id: string, type: 'group' | 'task' | 'activity') => void;
     onTextUpdate: (id: string, field: string, value: string) => void;
+    onDuplicateTask: (taskId: string) => void;
     onCellMouseDown: (e: React.MouseEvent, activityId: string, date: string) => void;
     onCellMouseEnter: (activityId: string, date: string) => void;
     onCellRightClick: (e: React.MouseEvent, activityId: string, date: string) => void;
@@ -102,6 +103,7 @@ const ScheduleRow = memo((props: ScheduleRowProps) => {
         selectionBlock, cutSelectionBlock, isMovingBlock, ghostBlockCells,
         onRowClick, onGroupDragStart, onActivityDragStart, onActivityDrop, onDragEnd, onDropTargetChange,
         onAddItem, onDeleteItem, onTextUpdate,
+        onDuplicateTask,
         onCellMouseDown, onCellMouseEnter, onCellRightClick, isCellInBlock,
         onMoveItem, onToggleHideItem
     } = props;
@@ -119,6 +121,20 @@ const ScheduleRow = memo((props: ScheduleRowProps) => {
     const isGroupBeingDragged = draggedGroupInfo?.group.id === group.id;
     const isActivityBeingDragged = draggedActivityInfo?.activity.id === activity?.id;
     const isDropTarget = dropTargetId === group.id || (dropTargetId === activity?.id); // dropTargetId handles both group and activity drops by id
+
+    const handlePaste = (e: React.ClipboardEvent<HTMLDivElement>) => {
+        e.preventDefault();
+        const text = e.clipboardData.getData('text/plain');
+        // Insert plain text at the cursor position
+        document.execCommand('insertText', false, text);
+    };
+
+    const handleKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            e.currentTarget.blur();
+        }
+    };
 
     return (
         <tr
@@ -177,7 +193,7 @@ const ScheduleRow = memo((props: ScheduleRowProps) => {
                         style={{ width: columnWidths[absIdx], left: stickyColumnPositions[absIdx], display: isVisible ? 'table-cell' : 'none' }} 
                         onClick={(e) => onRowClick(e, { id: group.id, name: value, type: 'group', wbsId: wbsId.split('.')[0] })}
                     >
-                        <div contentEditable suppressContentEditableWarning onMouseDown={e => e.stopPropagation()} onMouseUp={e => e.stopPropagation()} onClick={e => e.stopPropagation()} onBlur={e => onTextUpdate(group.id, col.id, e.currentTarget.innerHTML || '')} dangerouslySetInnerHTML={{ __html: value }} />
+                        <div contentEditable suppressContentEditableWarning onMouseDown={e => e.stopPropagation()} onMouseUp={e => e.stopPropagation()} onClick={e => e.stopPropagation()} onBlur={e => onTextUpdate(group.id, col.id, e.currentTarget.textContent || '')} dangerouslySetInnerHTML={{ __html: value }} />
                     </td>
                 );
             })}
@@ -185,8 +201,8 @@ const ScheduleRow = memo((props: ScheduleRowProps) => {
             {renderTask && (
                 <td className={`col-sticky col-sticky-${dynamicColumnsBefore.length + 2}`} rowSpan={taskRowSpan} style={{ width: columnWidths[dynamicColumnsBefore.length + 1], left: stickyColumnPositions[dynamicColumnsBefore.length + 1], display: visibleColumns && visibleColumns['TAREFA PRINCIPAL'] === false ? 'none' : 'table-cell' }} onClick={(e) => onRowClick(e, { id: task.id, name: task.title, type: 'task', wbsId: wbsId.split('.').slice(0, 2).join('.') })}>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                        <div className="task-title-input" contentEditable suppressContentEditableWarning onMouseDown={e => e.stopPropagation()} onMouseUp={e => e.stopPropagation()} onClick={e => e.stopPropagation()} onBlur={e => onTextUpdate(task.id, 'tarefa', e.currentTarget.innerHTML || '')} style={{ fontWeight: '500' }} dangerouslySetInnerHTML={{ __html: task.title }} />
-                        <div className="task-fa-input" contentEditable suppressContentEditableWarning onMouseDown={e => e.stopPropagation()} onMouseUp={e => e.stopPropagation()} onClick={e => e.stopPropagation()} onBlur={e => onTextUpdate(task.id, 'tarefa_fa', e.currentTarget.innerHTML || '')} style={{ fontSize: '0.75rem', color: '#64748b', fontStyle: 'italic', borderTop: '1px solid #e2e8f0', paddingTop: '2px' }} dangerouslySetInnerHTML={{ __html: task.fa || 'Nº FA' }} />
+                        <div className="task-title-input" contentEditable suppressContentEditableWarning onPaste={handlePaste} onMouseDown={e => e.stopPropagation()} onMouseUp={e => e.stopPropagation()} onClick={e => e.stopPropagation()} onKeyDown={handleKeyDown} onBlur={e => onTextUpdate(task.id, 'tarefa', e.currentTarget.textContent || '')} style={{ fontWeight: '500' }} dangerouslySetInnerHTML={{ __html: task.title }} />
+                        <div className="task-fa-input" contentEditable suppressContentEditableWarning onPaste={handlePaste} onMouseDown={e => e.stopPropagation()} onMouseUp={e => e.stopPropagation()} onClick={e => e.stopPropagation()} onKeyDown={handleKeyDown} onBlur={e => onTextUpdate(task.id, 'tarefa_fa', e.currentTarget.textContent || '')} style={{ fontSize: '0.75rem', color: '#64748b', fontStyle: 'italic', borderTop: '1px solid #e2e8f0', paddingTop: '2px' }} dangerouslySetInnerHTML={{ __html: task.fa || 'Nº FA' }} />
                     </div>
                     <div className="cell-actions" style={{ display: 'flex', gap: '4px', zIndex: 10 }}>
                         {!task.id.includes('_placeholder_task') && (
@@ -199,6 +215,9 @@ const ScheduleRow = memo((props: ScheduleRowProps) => {
                                 </button>
                                 <button onClick={(e) => { e.stopPropagation(); onMoveItem(task.id, 'task', 'down'); }} title="Mover para Baixo" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#e2e8f0', borderRadius: '4px', width: '24px', height: '24px', pointerEvents: 'auto' }}>
                                     <span className="material-icons" style={{ fontSize: '16px', color: '#64748b' }}>arrow_downward</span>
+                                </button>
+                                <button onClick={(e) => { e.stopPropagation(); onDuplicateTask(task.id); }} title="Duplicar Tarefa Principal" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#e2e8f0', borderRadius: '4px', width: '24px', height: '24px', pointerEvents: 'auto' }}>
+                                    <span className="material-icons" style={{ fontSize: '16px', color: '#3b82f6' }}>content_copy</span>
                                 </button>
                                 <button onClick={(e) => { e.stopPropagation(); onAddItem('activity', task.id); }} title="Adicionar Atividade" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#e2e8f0', borderRadius: '4px', width: '24px', height: '24px', pointerEvents: 'auto' }}>
                                     <span className="material-icons" style={{ fontSize: '16px', color: '#10b981' }}>add</span>
@@ -229,7 +248,7 @@ const ScheduleRow = memo((props: ScheduleRowProps) => {
                         style={{ width: columnWidths[absIdx], left: stickyColumnPositions[absIdx], display: isVisible ? 'table-cell' : 'none' }} 
                         onClick={(e) => onRowClick(e, { id: group.id, name: value, type: 'group', wbsId: wbsId.split('.')[0] })}
                     >
-                        <div contentEditable suppressContentEditableWarning onMouseDown={e => e.stopPropagation()} onMouseUp={e => e.stopPropagation()} onClick={e => e.stopPropagation()} onBlur={e => onTextUpdate(group.id, col.id, e.currentTarget.innerHTML || '')} dangerouslySetInnerHTML={{ __html: value }} />
+                        <div contentEditable suppressContentEditableWarning onMouseDown={e => e.stopPropagation()} onMouseUp={e => e.stopPropagation()} onClick={e => e.stopPropagation()} onBlur={e => onTextUpdate(group.id, col.id, e.currentTarget.textContent || '')} dangerouslySetInnerHTML={{ __html: value }} />
                     </td>
                 );
             })}
@@ -252,7 +271,7 @@ const ScheduleRow = memo((props: ScheduleRowProps) => {
                          </span>
                      )}
                      {activity ? (
-                         <div data-activity-id={activity.id} data-column-type="atividade" contentEditable={true} suppressContentEditableWarning onMouseDown={e => e.stopPropagation()} onMouseUp={e => e.stopPropagation()} onClick={e => e.stopPropagation()} onBlur={e => onTextUpdate(activity.id, 'atividade', e.currentTarget.innerHTML || '')} style={{ flexGrow: 1, minHeight: '1.2em' }} dangerouslySetInnerHTML={{ __html: activity.name }} />
+                         <div data-activity-id={activity.id} data-column-type="atividade" contentEditable={true} suppressContentEditableWarning onPaste={handlePaste} onMouseDown={e => e.stopPropagation()} onMouseUp={e => e.stopPropagation()} onClick={e => e.stopPropagation()} onKeyDown={handleKeyDown} onBlur={e => onTextUpdate(activity.id, 'atividade', e.currentTarget.textContent || '')} style={{ flexGrow: 1, minHeight: '1.2em' }} dangerouslySetInnerHTML={{ __html: activity.name }} />
                      ) : (
                          <div data-column-type="atividade" style={{ flexGrow: 1, minHeight: '1.2em' }}>
                              <span style={{ color: '#94a3b8', fontStyle: 'italic' }}>(Sem atividades)</span>
@@ -535,6 +554,7 @@ interface ScheduleBodyProps {
     ghostBlockCells: Set<string>;
     onTextUpdate: (id: string, field: string, value: string) => void;
     onAddItem: (type: 'group' | 'task' | 'activity', parentId?: string) => void;
+    onDuplicateTask: (taskId: string) => void;
     onDeleteItem: (id: string, type: 'group' | 'task' | 'activity') => void;
     onMoveItem: (id: string, type: 'task' | 'activity', direction: 'up' | 'down') => void;
     draggedGroupInfo: { group: Grupo, index: number } | null;
@@ -555,7 +575,7 @@ export const ScheduleBody: React.FC<ScheduleBodyProps> = (props) => {
         printNumWeeks, renderableRows, dates, dynamicColumns, columnWidths, stickyColumnPositions, 
         selectedItems, onRowClick, activeCell, onCellMouseDown, onCellMouseEnter, onCellRightClick,
         selectionBlock, cutSelectionBlock, isMovingBlock, ghostBlockCells,
-        onTextUpdate, onAddItem, onDeleteItem, onMoveItem,
+        onTextUpdate, onAddItem, onDeleteItem, onMoveItem, onDuplicateTask,
         draggedGroupInfo, draggedActivityInfo, onGroupDragStart, onGroupDrop, 
         onActivityDragStart, onActivityDrop,
         onDragEnd, onDropTargetChange, dropTargetId,
@@ -621,6 +641,7 @@ export const ScheduleBody: React.FC<ScheduleBodyProps> = (props) => {
                     onDragEnd={onDragEnd}
                     onDropTargetChange={onDropTargetChange}
                     onAddItem={onAddItem}
+                    onDuplicateTask={onDuplicateTask}
                     onDeleteItem={onDeleteItem}
                     onMoveItem={onMoveItem}
                     onTextUpdate={onTextUpdate}
