@@ -1,6 +1,6 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import { ScheduleData, Status, STATUS_LABELS, STATUS_COLOR_MAP } from '../state/types';
-import { formatDate } from '../utils/dataUtils';
+import { formatDate, cleanText } from '../utils/dataUtils';
 
 interface DailySummaryViewProps {
     data: ScheduleData;
@@ -28,6 +28,7 @@ export const DailySummaryView: React.FC<DailySummaryViewProps> = ({ data, dates,
     const [customEnd, setCustomEnd] = useState<string>('');
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedCategory, setSelectedCategory] = useState<string>('');
+    const [selectedStatus, setSelectedStatus] = useState<string>('');
 
     useEffect(() => {
         if (dates.length > 0) {
@@ -38,14 +39,14 @@ export const DailySummaryView: React.FC<DailySummaryViewProps> = ({ data, dates,
 
     const categorizeActivity = (name: string): string => {
         const lowerName = name.toLowerCase();
+        if (/(usinagem|ferramentaria|corpo de prova|corpos de prova|fresagem|fresa|torno\b|mandrilhamento)/.test(lowerName)) {
+            return "Usinagem/Ferramentaria";
+        }
         if (/(inspeção|inspecao|vt\b|lp\b|dt\b|ut\b|rx\b|ensaio|ultrassom|radiografia|líquido penetrante|partícula magnética)/.test(lowerName)) {
             return "Inspeções (VT, LP, DT, UT, e RX e ensaios)";
         }
         if (/(solda|soldagem|tt\b|tratamento térmico|alívio de tensão|alivio)/.test(lowerName)) {
             return "Soldagem e Tratamento Térmico";
-        }
-        if (/(usinagem|ferramentaria|corpo de prova|fresagem|fresa|torno\b|mandrilhamento)/.test(lowerName)) {
-            return "Usinagem/Ferramentaria";
         }
         if (/(montagem|caldeiraria|acoplamento|ponteamento|ajuste)/.test(lowerName)) {
             return "Montagem e Caldeiraria";
@@ -74,6 +75,9 @@ export const DailySummaryView: React.FC<DailySummaryViewProps> = ({ data, dates,
                 (task.activities || []).forEach(a => {
                     const status = a.schedule[selectedDateStr];
                     if (status !== null && status !== undefined) {
+                        if (selectedStatus && status !== selectedStatus) {
+                            return;
+                        }
                         if (term && !a.name.toLowerCase().includes(term) && !groupTitle.toLowerCase().includes(term) && !task.title.toLowerCase().includes(term)) {
                             return;
                         }
@@ -110,7 +114,7 @@ export const DailySummaryView: React.FC<DailySummaryViewProps> = ({ data, dates,
             .filter(([_, tasks]) => tasks.length > 0)
             .filter(([category, _]) => selectedCategory ? category === selectedCategory : true)
             .map(([category, tasks]) => ({ category, tasks }));
-    }, [data, selectedDateStr, selectedCategory, searchQuery]);
+    }, [data, selectedDateStr, selectedCategory, selectedStatus, searchQuery]);
 
     const handleDragStart = (e: React.DragEvent, activityId: string) => {
         e.dataTransfer.setData('application/x-activity-id', activityId);
@@ -162,6 +166,9 @@ export const DailySummaryView: React.FC<DailySummaryViewProps> = ({ data, dates,
                     (task.activities || []).forEach(a => {
                         const status = a.schedule[dateStr];
                         if (status !== null && status !== undefined) {
+                            if (selectedStatus && status !== selectedStatus) {
+                                return;
+                            }
                             if (term && !a.name.toLowerCase().includes(term) && !groupTitle.toLowerCase().includes(term) && !task.title.toLowerCase().includes(term)) {
                                 return;
                             }
@@ -198,7 +205,7 @@ export const DailySummaryView: React.FC<DailySummaryViewProps> = ({ data, dates,
                 .filter(([category, _]) => selectedCategory ? category === selectedCategory : true)
                 .map(([category, tasks]) => ({ category, tasks }));
 
-            if (dayCategories.length > 0 || (!searchQuery && !selectedCategory)) {
+            if (dayCategories.length > 0 || (!searchQuery && !selectedCategory && !selectedStatus)) {
                 result.push({
                     dateStr,
                     dateObj: new Date(dateStr + 'T00:00:00Z'),
@@ -208,7 +215,7 @@ export const DailySummaryView: React.FC<DailySummaryViewProps> = ({ data, dates,
         });
 
         return result;
-    }, [data, customStart, customEnd, searchQuery, dates, selectedCategory]);
+    }, [data, customStart, customEnd, searchQuery, dates, selectedCategory, selectedStatus]);
 
     const handlePrint = () => {
         window.print();
@@ -279,6 +286,21 @@ export const DailySummaryView: React.FC<DailySummaryViewProps> = ({ data, dates,
                             <option value="Montagem e Caldeiraria">Montagem e Caldeiraria</option>
                             <option value="Usinagem/Ferramentaria">Usinagem/Ferramentaria</option>
                             <option value="Outras Atividades">Outras Atividades</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label style={{ marginRight: '8px', fontWeight: 'bold', color: '#475569' }}>Status:</label>
+                        <select 
+                            value={selectedStatus} 
+                            onChange={(e) => setSelectedStatus(e.target.value)}
+                            style={{ padding: '8px', borderRadius: '4px', border: '1px solid #cbd5e1', outline: 'none' }}
+                        >
+                            <option value="">Todos</option>
+                            {/* Assumes STATUS_LABELS is imported from types */}
+                            {Object.entries(STATUS_LABELS).map(([statusKey, label]) => (
+                                <option key={statusKey} value={statusKey}>{label}</option>
+                            ))}
                         </select>
                     </div>
 
@@ -378,14 +400,15 @@ export const DailySummaryView: React.FC<DailySummaryViewProps> = ({ data, dates,
                             {dailySummary.map(({ category, tasks }) => (
                                 <div 
                                     key={category} 
-                                    style={{ pageBreakInside: 'avoid', padding: '8px', borderRadius: '8px', transition: 'background-color 0.2s' }}
+                                    style={{ pageBreakInside: 'avoid' }}
+                                    className="p-2 rounded-lg transition-colors"
                                     onDragOver={handleDragOver}
                                     onDrop={(e) => handleDrop(e, category)}
                                 >
-                                    <h3 style={{ fontSize: '1.25rem', color: '#334155', borderBottom: '2px solid #e2e8f0', paddingBottom: '8px', marginBottom: '16px' }}>{category}</h3>
-                                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(350px, 1fr))', gap: '16px' }}>
+                                    <h3 className="text-xl font-bold text-slate-800 border-b-2 border-slate-200 pb-2 mb-4 tracking-tight">{category}</h3>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                                         {tasks.map((item, idx) => (
-                                            <div key={`${item.taskId}-${idx}`} style={{ backgroundColor: 'white', borderRadius: '8px', padding: '16px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)', position: 'relative' }}>
+                                            <div key={`${item.taskId}-${idx}`} className="bg-white rounded-xl p-5 shadow-sm border border-slate-200 hover:shadow-md transition-shadow relative group">
                                                 <button 
                                                     onClick={() => onDeleteItem(item.taskId, 'task')}
                                                     className="no-print"
@@ -400,7 +423,7 @@ export const DailySummaryView: React.FC<DailySummaryViewProps> = ({ data, dates,
                                                         suppressContentEditableWarning
                                                         onBlur={e => onTextUpdate(item.groupId, 'grupo', e.currentTarget.textContent || '')}
                                                         style={{ fontSize: '0.85rem', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', outline: 'none' }}
-                                                        dangerouslySetInnerHTML={{ __html: item.groupTitle }}
+                                                        dangerouslySetInnerHTML={{ __html: cleanText(item.groupTitle) }}
                                                     />
                                                     <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px' }}>
                                                         <div 
@@ -408,14 +431,14 @@ export const DailySummaryView: React.FC<DailySummaryViewProps> = ({ data, dates,
                                                             suppressContentEditableWarning
                                                             onBlur={e => onTextUpdate(item.taskId, 'tarefa', e.currentTarget.textContent || '')}
                                                             style={{ fontSize: '1.1rem', fontWeight: 'bold', color: '#0f172a', outline: 'none' }}
-                                                            dangerouslySetInnerHTML={{ __html: item.taskTitle }}
+                                                            dangerouslySetInnerHTML={{ __html: cleanText(item.taskTitle) }}
                                                         />
                                                         <div 
                                                             contentEditable
                                                             suppressContentEditableWarning
                                                             onBlur={e => onTextUpdate(item.taskId, 'tarefa_fa', e.currentTarget.textContent || '')}
                                                             style={{ fontSize: '0.9rem', color: '#94a3b8', fontStyle: 'italic', outline: 'none' }}
-                                                            dangerouslySetInnerHTML={{ __html: item.taskFa ? `${item.taskFa}` : '(FA)' }}
+                                                            dangerouslySetInnerHTML={{ __html: cleanText(item.taskFa ? `${item.taskFa}` : '(FA)') }}
                                                         />
                                                     </div>
                                                 </div>
@@ -434,7 +457,7 @@ export const DailySummaryView: React.FC<DailySummaryViewProps> = ({ data, dates,
                                                                     suppressContentEditableWarning
                                                                     onBlur={e => onTextUpdate(act.id, 'atividade', e.currentTarget.textContent || '')}
                                                                     style={{ color: '#334155', flexGrow: 1, outline: 'none' }}
-                                                                    dangerouslySetInnerHTML={{ __html: act.name }}
+                                                                    dangerouslySetInnerHTML={{ __html: cleanText(act.name) }}
                                                                 />
                                                             </div>
                                                             <span style={{ 
@@ -494,13 +517,13 @@ export const DailySummaryView: React.FC<DailySummaryViewProps> = ({ data, dates,
                                         {daySummary.dateObj.toLocaleDateString('pt-BR', { weekday: 'long', timeZone: 'UTC', day: '2-digit', month: '2-digit' }).replace(/^\w/, c => c.toUpperCase())}
                                     </h2>
                                     
-                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+                                    <div className="flex flex-col gap-6">
                                         {daySummary.categories.map(({ category, tasks }) => (
                                             <div key={category}>
-                                                <h3 style={{ fontSize: '1.1rem', color: '#475569', marginBottom: '12px', fontWeight: 'bold' }}>{category}</h3>
-                                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(350px, 1fr))', gap: '16px' }}>
+                                                <h3 className="text-lg font-bold text-slate-700 mb-3 tracking-tight">{category}</h3>
+                                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                                                     {tasks.map((item: any, idx: number) => (
-                                                        <div key={`${item.taskId}-${idx}`} style={{ backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '12px', position: 'relative' }}>
+                                                        <div key={`${item.taskId}-${idx}`} className="bg-slate-50 border border-slate-200 rounded-xl p-4 shadow-sm hover:shadow-md transition-shadow relative group">
                                                             <button 
                                                                 onClick={() => onDeleteItem(item.taskId, 'task')}
                                                                 className="no-print"
@@ -515,7 +538,7 @@ export const DailySummaryView: React.FC<DailySummaryViewProps> = ({ data, dates,
                                                                     suppressContentEditableWarning
                                                                     onBlur={e => onTextUpdate(item.groupId, 'grupo', e.currentTarget.textContent || '')}
                                                                     style={{ fontSize: '0.8rem', color: '#64748b', textTransform: 'uppercase', outline: 'none' }}
-                                                                    dangerouslySetInnerHTML={{ __html: item.groupTitle }}
+                                                                    dangerouslySetInnerHTML={{ __html: cleanText(item.groupTitle) }}
                                                                 />
                                                                 <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px' }}>
                                                                     <div 
@@ -523,14 +546,14 @@ export const DailySummaryView: React.FC<DailySummaryViewProps> = ({ data, dates,
                                                                         suppressContentEditableWarning
                                                                         onBlur={e => onTextUpdate(item.taskId, 'tarefa', e.currentTarget.textContent || '')}
                                                                         style={{ fontSize: '1rem', fontWeight: 'bold', color: '#0f172a', outline: 'none' }}
-                                                                        dangerouslySetInnerHTML={{ __html: item.taskTitle }}
+                                                                        dangerouslySetInnerHTML={{ __html: cleanText(item.taskTitle) }}
                                                                     />
                                                                     <div 
                                                                         contentEditable
                                                                         suppressContentEditableWarning
                                                                         onBlur={e => onTextUpdate(item.taskId, 'tarefa_fa', e.currentTarget.textContent || '')}
                                                                         style={{ fontSize: '0.85rem', color: '#94a3b8', fontStyle: 'italic', outline: 'none' }}
-                                                                        dangerouslySetInnerHTML={{ __html: item.taskFa ? `${item.taskFa}` : '(FA)' }}
+                                                                        dangerouslySetInnerHTML={{ __html: cleanText(item.taskFa ? `${item.taskFa}` : '(FA)') }}
                                                                     />
                                                                 </div>
                                                             </div>
@@ -544,7 +567,7 @@ export const DailySummaryView: React.FC<DailySummaryViewProps> = ({ data, dates,
                                                                                 suppressContentEditableWarning
                                                                                 onBlur={e => onTextUpdate(act.id, 'atividade', e.currentTarget.textContent || '')}
                                                                                 style={{ color: '#334155', flexGrow: 1, outline: 'none', fontSize: '0.95rem' }}
-                                                                                dangerouslySetInnerHTML={{ __html: act.name }}
+                                                                                dangerouslySetInnerHTML={{ __html: cleanText(act.name) }}
                                                                             />
                                                                         </div>
                                                                         <span style={{ 

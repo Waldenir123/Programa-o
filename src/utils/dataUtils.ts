@@ -3,6 +3,19 @@ import { Status, Atividade, ScheduleData, RenderableRow } from '../state/types';
 // --- UTILITY FUNCTIONS ---
 export const generateId = () => `id_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 export const formatDate = (date: Date): string => date.toISOString().split('T')[0];
+
+export const cleanText = (val: string) => {
+    if (!val) return '';
+    let parsed = val;
+    try {
+        const doc = new DOMParser().parseFromString(parsed, 'text/html');
+        parsed = doc.body.textContent || "";
+        const doc2 = new DOMParser().parseFromString(parsed, 'text/html');
+        parsed = doc2.body.textContent || "";
+    } catch(e) {}
+    return parsed.replace(/<[^>]*>?/gm, '').replace(/&nbsp;/g, ' ').trim();
+};
+
 export const getDayAbbr = (date: Date) => ['DOM', 'SEG', 'TER', 'QUA', 'QUI', 'SEX', 'SÁB'][date.getUTCDay()];
 export const getWeek = (date: Date) => {
     const d = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
