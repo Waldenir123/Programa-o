@@ -17,6 +17,15 @@ export const cleanText = (val: string) => {
 };
 
 export const getDayAbbr = (date: Date) => ['DOM', 'SEG', 'TER', 'QUA', 'QUI', 'SEX', 'SÁB'][date.getUTCDay()];
+export const getWeekRangeStr = (date: Date): string => {
+    const d = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
+    const day = d.getUTCDay();
+    const start = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate() - day));
+    const end = new Date(Date.UTC(start.getUTCFullYear(), start.getUTCMonth(), start.getUTCDate() + 6));
+    
+    return `${start.toLocaleDateString('pt-BR', {timeZone: 'UTC'})} - ${end.toLocaleDateString('pt-BR', {timeZone: 'UTC'})}`;
+};
+
 export const getWeek = (date: Date) => {
     const d = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
     d.setUTCDate(d.getUTCDate() + 4 - (d.getUTCDay() || 7));

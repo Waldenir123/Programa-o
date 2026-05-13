@@ -752,15 +752,15 @@ export const App = () => {
   }, [activeProject, liveData]);
 
   const handleSummaryTextUpdate = useCallback((id: string, field: string, value: string) => {
-    dispatch({ type: 'UPDATE_TEXT', payload: { id, field: field as any, value } });
+    dispatchSummary({ type: 'UPDATE_TEXT', payload: { id, field: field as any, value } });
   }, []);
 
   const handleSummaryAddItem = useCallback((type: 'group' | 'task' | 'activity', parentId?: string, date?: string) => {
-    dispatch({ type: 'ADD_ITEM', payload: { type, parentId, date, status: Status.Programado } });
+    dispatchSummary({ type: 'ADD_ITEM', payload: { type, parentId, date, status: Status.Programado } });
   }, []);
 
   const handleSummaryDeleteItem = useCallback((id: string, type: 'group' | 'task' | 'activity') => {
-    dispatch({ type: 'BATCH_DELETE_ITEMS', payload: [{ id, type }] });
+    dispatchSummary({ type: 'BATCH_DELETE_ITEMS', payload: [{ id, type }] });
   }, []);
 
   useEffect(() => {
@@ -1734,7 +1734,7 @@ export const App = () => {
                       </table>
                     </div>
                   )}
-                  {currentPage === 'dailySummary' && <DailySummaryView data={liveData} dates={dates} onTextUpdate={handleSummaryTextUpdate} onAddItem={handleSummaryAddItem} onDeleteItem={(id, type) => handleSummaryDeleteItem(id, type)} onSyncWithSchedule={() => {}} />}
+                  {currentPage === 'dailySummary' && <DailySummaryView data={summaryData} dates={dates} onTextUpdate={handleSummaryTextUpdate} onAddItem={handleSummaryAddItem} onDeleteItem={(id, type) => handleSummaryDeleteItem(id, type)} onSyncWithSchedule={() => dispatchSummary({ type: 'LOAD_DATA', payload: liveData })} />}
                   {currentPage === 'dashboard' && <DashboardView data={liveData} title={title} programmerName={activeProject.programmerName} dynamicColumns={activeProject.dynamicColumns}/>}
                   {currentPage === 'comparison' && <ComparisonView savedPlan={savedPlan} liveData={liveData} dates={dates} columnWidths={comparisonTableColumnWidths} onResizeStart={handleResizeStart} stickyColumnPositions={stickyColumnPositions} title={title} dynamicColumns={activeProject.dynamicColumns}/>}
                   {currentPage === 'manpower' && <ManpowerAllocationView project={activeProject} setProject={setActiveProject} dates={dates} title={title} zoomLevel={zoomLevels.manpower} />}

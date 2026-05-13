@@ -12,7 +12,7 @@ interface DailySummaryViewProps {
 }
 
 export const DailySummaryView: React.FC<DailySummaryViewProps> = ({ data, dates, onTextUpdate, onAddItem, onDeleteItem, onSyncWithSchedule }) => {
-    const [viewMode, setViewMode] = useState<'daily' | 'weekly'>('daily');
+    const [viewMode, setViewMode] = useState<'daily' | 'weekly' | 'next4weeks'>('daily');
     const todayStr = formatDate(new Date());
     const initialDate = dates.find(d => formatDate(d) === todayStr) ? todayStr : (dates.length > 0 ? formatDate(dates[0]) : todayStr);
     const [selectedDateStr, setSelectedDateStr] = useState<string>(initialDate);
@@ -133,17 +133,26 @@ export const DailySummaryView: React.FC<DailySummaryViewProps> = ({ data, dates,
     };
 
     const weeklySummaryByDay = useMemo(() => {
-        if (!customStart || !customEnd) return [];
-        
-        const dStartIndex = dates.findIndex(d => formatDate(d) === customStart);
-        const dEndIndex = dates.findIndex(d => formatDate(d) === customEnd);
-        
         const periodDates: string[] = [];
-        if (dStartIndex !== -1 && dEndIndex !== -1) {
-            const start = Math.min(dStartIndex, dEndIndex);
-            const end = Math.max(dStartIndex, dEndIndex);
-            for (let i = start; i <= end; i++) {
+
+        if (viewMode === 'next4weeks') {
+            const dStartIndex = dates.findIndex(d => formatDate(d) === todayStr) !== -1 ? dates.findIndex(d => formatDate(d) === todayStr) : 0;
+            const end = Math.min(dStartIndex + 27, dates.length - 1);
+            for (let i = dStartIndex; i <= end; i++) {
                 periodDates.push(formatDate(dates[i]));
+            }
+        } else {
+            if (!customStart || !customEnd) return [];
+            
+            const dStartIndex = dates.findIndex(d => formatDate(d) === customStart);
+            const dEndIndex = dates.findIndex(d => formatDate(d) === customEnd);
+            
+            if (dStartIndex !== -1 && dEndIndex !== -1) {
+                const start = Math.min(dStartIndex, dEndIndex);
+                const end = Math.max(dStartIndex, dEndIndex);
+                for (let i = start; i <= end; i++) {
+                    periodDates.push(formatDate(dates[i]));
+                }
             }
         }
 
@@ -166,6 +175,9 @@ export const DailySummaryView: React.FC<DailySummaryViewProps> = ({ data, dates,
                     (task.activities || []).forEach(a => {
                         const status = a.schedule[dateStr];
                         if (status !== null && status !== undefined) {
+                            if (viewMode === 'next4weeks' && status !== Status.Programado) {
+                                return;
+                            }
                             if (selectedStatus && status !== selectedStatus) {
                                 return;
                             }
@@ -257,6 +269,21 @@ export const DailySummaryView: React.FC<DailySummaryViewProps> = ({ data, dates,
                         >
                             Filtro Semanal
                         </button>
+                        <button 
+                            onClick={() => setViewMode('next4weeks')}
+                            style={{ 
+                                padding: '6px 16px', 
+                                borderRadius: '6px', 
+                                border: 'none', 
+                                cursor: 'pointer',
+                                backgroundColor: viewMode === 'next4weeks' ? 'white' : 'transparent',
+                                boxShadow: viewMode === 'next4weeks' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
+                                fontWeight: viewMode === 'next4weeks' ? 'bold' : 'normal',
+                                color: viewMode === 'next4weeks' ? '#0f172a' : '#64748b'
+                            }}
+                        >
+                            Próxim. 4 Semanas
+                        </button>
                     </div>
                 </div>
                 
@@ -330,7 +357,7 @@ export const DailySummaryView: React.FC<DailySummaryViewProps> = ({ data, dates,
                                 ))}
                             </select>
                         </div>
-                    ) : (
+                    ) : viewMode === 'weekly' ? (
                         <div style={{ display: 'flex', gap: '16px', alignItems: 'center', flexWrap: 'wrap' }}>
                             <div>
                                 <label style={{ marginRight: '8px', fontWeight: 'bold', color: '#475569' }}>De:</label>
@@ -361,7 +388,15 @@ export const DailySummaryView: React.FC<DailySummaryViewProps> = ({ data, dates,
                                 </select>
                             </div>
                         </div>
-                    )}
+                    ) : null}
+                    <button 
+                        onClick={onSyncWithSchedule}
+                        className="control-button" 
+                        style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '8px 16px', backgroundColor: '#3b82f6', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}
+                        title="Sincronizar com os dados atuais da aba Programação"
+                    >
+                        <span className="material-icons" style={{ fontSize: '18px' }}>sync</span> Sincronizar
+                    </button>
                     <button onClick={handlePrint} className="control-button" style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '8px 16px', backgroundColor: '#fbbf24', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}>
                         <span className="material-icons" style={{ fontSize: '18px' }}>print</span> Imprimir
                     </button>
