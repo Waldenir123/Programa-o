@@ -1505,6 +1505,65 @@ export const App = () => {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [selectionBlock, liveData, activeProject?.dates, handleUndo, handleRedo]);
 
+  const handleIntelligentReschedule = useCallback(() => {
+    if (!selectionBlock) {
+        addToast("Selecione um bloco de células primeiro.", "error");
+        return;
+    }
+
+    const activityIdToRowIndex = new Map(
+        (renderableRows || [])
+            .filter(r => r.activity)
+            .map((r, i) => [r.activity!.id, renderableRows.indexOf(r)])
+    );
+    const datesStr = (dates || []).map(d => formatDate(d));
+    const dateToColIndex = new Map((datesStr || []).map((d, i) => [d, i]));
+
+    const anchorRow = activityIdToRowIndex.get(selectionBlock.anchor.activityId);
+    const anchorCol = dateToColIndex.get(selectionBlock.anchor.date);
+    const endRow = activityIdToRowIndex.get(selectionBlock.end.activityId);
+    const endCol = dateToColIndex.get(selectionBlock.end.date);
+
+    if (anchorRow !== undefined && anchorCol !== undefined && endRow !== undefined && endCol !== undefined) {
+        const minRow = Math.min(anchorRow as number, endRow as number);
+        const maxRow = Math.max(anchorRow as number, endRow as number);
+        const minCol = Math.min(anchorCol as number, endCol as number);
+        const maxCol = Math.max(anchorCol as number, endCol as number);
+
+        const affectedItems: { activityId: string, taskId: string, dateStr: string }[] = [];
+
+        const allActivityIds = Array.from(activityIdToRowIndex.keys());
+        for (let r = minRow; r <= maxRow; r++) {
+            const activityId = allActivityIds[r];
+            if (!activityId) continue;
+            const rowInfo = renderableRows.find(row => row.activity?.id === activityId);
+            if (rowInfo && rowInfo.activity) {
+                for (let c = minCol; c <= maxCol; c++) {
+                    const dateStr = datesStr[c];
+                    if (!dateStr) continue;
+                    const status = rowInfo.activity.schedule[dateStr];
+                    if (status === Status.NaoRealizado || status === Status.Cancelado) {
+                        affectedItems.push({
+                            activityId: rowInfo.activity.id,
+                            taskId: rowInfo.task.id,
+                            dateStr
+                        });
+                    }
+                }
+            }
+        }
+
+        const selectionMaxDate = datesStr[maxCol];
+
+        if (affectedItems.length > 0) {
+            dispatch({ type: 'INTELLIGENT_RESCHEDULE', payload: { affectedItems, selectionMaxDate } });
+            addToast(`Reprogramação inteligente aplicada a ${affectedItems.length} atividades.`, 'success');
+        } else {
+            addToast("Nenhuma programação Não Realizada (N) ou Cancelada (C) na seleção.", "error");
+        }
+    }
+  }, [selectionBlock, renderableRows, dates, dispatch, addToast]);
+
   if (!isAuthReady) {
     return <div style={{display:'flex',justifyContent:'center',alignItems:'center',height:'100vh',fontSize:'1.2rem',color:'#64748b'}}>Carregando...</div>;
   }
@@ -1627,6 +1686,8 @@ export const App = () => {
                 visibleColumns={visibleColumns}
                 toggleColumnVisibility={(col) => setVisibleColumns(prev => ({ ...prev, [col]: !prev[col] }))}
                 onCloseMobile={() => setIsMobileNavVisible(false)}
+                handleIntelligentReschedule={handleIntelligentReschedule}
+                hasSelection={!!selectionBlock}
               />
             )}
             <main className="main-content" ref={gridRef}>

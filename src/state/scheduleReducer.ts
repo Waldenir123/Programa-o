@@ -1,5 +1,5 @@
 import { ScheduleData, Status } from './types';
-import { generateId, deepClone } from '../utils/dataUtils';
+import { generateId, deepClone, getNextWorkingDay } from '../utils/dataUtils';
 import { aiDeletionAgent } from '../ai/aiAgents';
 
 // Define the shape of the state managed by the reducer
@@ -28,6 +28,7 @@ export type ScheduleAction =
     | { type: 'TOGGLE_HIDE_ACTIVITY'; payload: string }
     | { type: 'TOGGLE_HIDE_ITEM'; payload: { id: string; type: 'group' | 'task' | 'activity' } }
     | { type: 'DUPLICATE_TASK'; payload: { taskId: string } }
+    | { type: 'INTELLIGENT_RESCHEDULE'; payload: { affectedItems: { activityId: string, taskId: string, dateStr: string }[], selectionMaxDate: string } }
     | { type: 'CLEAR_ALL' };
 
 // The reducer function that handles state transitions
@@ -265,6 +266,92 @@ export const scheduleReducer = (state: ScheduleState, action: ScheduleAction): S
         case 'UPDATE_SCHEDULE':
              return createNewStateWithHistory(action.payload);
         
+        case 'INTELLIGENT_RESCHEDULE': {
+            const { affectedItems, selectionMaxDate } = action.payload; // array of { activityId, taskId, dateStr }
+            if (affectedItems.length === 0) return state;
+
+            const newData = deepClone(state.liveData);
+
+            // Group by taskId to apply changes per task as requested
+            const affectedByTask = new Map<string, { activityId: string, dateStr: string }[]>();
+            for (const item of affectedItems) {
+                if (!affectedByTask.has(item.taskId)) {
+                    affectedByTask.set(item.taskId, []);
+                }
+                affectedByTask.get(item.taskId)!.push({ activityId: item.activityId, dateStr: item.dateStr });
+            }
+
+            for (const [taskId, items] of Array.from(affectedByTask.entries())) {
+                // Group by activity within task
+                const ncByActivity = new Map<string, string[]>();
+                for (const item of items) {
+                    if (!ncByActivity.has(item.activityId)) {
+                        ncByActivity.set(item.activityId, []);
+                    }
+                    ncByActivity.get(item.activityId)!.push(item.dateStr);
+                }
+
+                // calculate taskShiftDays
+                let taskShiftDays = 0;
+                for (const dates of Array.from(ncByActivity.values())) {
+                    if (dates.length > taskShiftDays) {
+                        taskShiftDays = dates.length;
+                    }
+                }
+
+                if (taskShiftDays === 0) continue;
+
+                // Find the task in newData
+                let foundTask: any = null;
+                for (const group of newData) {
+                    const t = group.tarefas.find((t: any) => t.id === taskId);
+                    if (t) {
+                        foundTask = t;
+                        break;
+                    }
+                }
+
+                if (!foundTask) continue;
+
+                // apply shifts for all activities in this task
+                for (const activity of foundTask.activities) {
+                    const futureDates = Object.keys(activity.schedule)
+                        .filter(d => d > selectionMaxDate)
+                        .sort();
+
+                    // Shift future dates
+                    const shiftedFutureMap = new Map<string, Status>();
+                    for (let i = futureDates.length - 1; i >= 0; i--) {
+                        const oldDate = futureDates[i];
+                        let newDate = oldDate;
+                        for (let s = 0; s < taskShiftDays; s++) {
+                            newDate = getNextWorkingDay(newDate);
+                        }
+                        shiftedFutureMap.set(newDate, activity.schedule[oldDate]);
+                        delete activity.schedule[oldDate];
+                    }
+
+                    // Insert new Programados (X) for the specific activities that had N/C
+                    const ncDatesForThisActivity = ncByActivity.get(activity.id);
+                    if (ncDatesForThisActivity && ncDatesForThisActivity.length > 0) {
+                        const shiftDaysForThisActivity = ncDatesForThisActivity.length;
+                        let insertDate = selectionMaxDate;
+                        for (let s = 0; s < shiftDaysForThisActivity; s++) {
+                            insertDate = getNextWorkingDay(insertDate);
+                            activity.schedule[insertDate] = Status.Programado;
+                        }
+                    }
+
+                    // Re-apply shifted
+                    for (const [newDate, status] of Array.from(shiftedFutureMap.entries())) {
+                        activity.schedule[newDate] = status;
+                    }
+                }
+            }
+
+            return createNewStateWithHistory(newData);
+        }
+
         case 'MOVE_GROUP': {
             const { fromId, toId } = action.payload;
             const data = [...state.liveData];

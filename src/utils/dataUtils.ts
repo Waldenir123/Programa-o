@@ -17,6 +17,15 @@ export const cleanText = (val: string) => {
 };
 
 export const getDayAbbr = (date: Date) => ['DOM', 'SEG', 'TER', 'QUA', 'QUI', 'SEX', 'SÁB'][date.getUTCDay()];
+
+export const getNextWorkingDay = (dateStr: string): string => {
+    const d = new Date(dateStr + 'T00:00:00Z');
+    do {
+        d.setUTCDate(d.getUTCDate() + 1);
+    } while (d.getUTCDay() === 0 || d.getUTCDay() === 6);
+    return formatDate(d);
+};
+
 export const getWeekRangeStr = (date: Date): string => {
     const d = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
     const day = d.getUTCDay();

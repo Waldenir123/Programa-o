@@ -31,6 +31,8 @@ interface SidebarProps {
     visibleColumns: Record<string, boolean>;
     toggleColumnVisibility: (column: string) => void;
     onCloseMobile?: () => void;
+    handleIntelligentReschedule?: () => void;
+    hasSelection?: boolean;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -43,7 +45,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     selectedItems, handleDeleteSelectedItems, handleClearAll,
     handleQuickImportClick, onImportExcelClick,
     visibleColumns, toggleColumnVisibility,
-    onCloseMobile
+    onCloseMobile, handleIntelligentReschedule, hasSelection
 }) => {
     const typeLabels: Record<string, string> = {
         group: 'Grupo',
@@ -69,6 +71,19 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 <button className="control-button" onClick={handleQuickImportClick}><span className="material-icons" aria-hidden="true">file_upload</span>Importar PDF/Imagem (IA)</button>
                 <button className="control-button" onClick={() => setImportModalOpen(true)}><span className="material-icons" aria-hidden="true">input</span>Importação Avançada (IA)</button>
                 <button className="control-button" style={{ backgroundColor: '#e0f2fe', color: '#0369a1', borderColor: '#bae6fd' }} onClick={handleOpenTutorial}><span className="material-icons" aria-hidden="true">help_outline</span> Tutorial / Ajuda</button>
+            </div>
+
+            <div className="control-section">
+                <h3>Operações em Bloco</h3>
+                <button
+                    onClick={handleIntelligentReschedule}
+                    disabled={!hasSelection}
+                    className="control-button"
+                    style={{ backgroundColor: '#3b82f6', color: 'white', borderColor: '#2563eb', opacity: hasSelection ? 1 : 0.5, cursor: hasSelection ? 'pointer' : 'not-allowed' }}
+                    title="Reprogramação Inteligente: copia N e C para os próximos dias úteis e empurra o cronograma adiante."
+                >
+                    <span className="material-icons" aria-hidden="true">smart_button</span> Reprogramação Inteligente
+                </button>
             </div>
 
             <div className="control-section">
