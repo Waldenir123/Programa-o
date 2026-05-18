@@ -783,8 +783,8 @@ export const App = () => {
     }
   }, [activeProject, currentUser, addToast, liveData]);
 
-  const handleAddItem = useCallback((type: 'group' | 'task' | 'activity', parentId?: string) => {
-      dispatch({ type: 'ADD_ITEM', payload: { type, parentId } });
+  const handleAddItem = useCallback((type: 'group' | 'task' | 'activity', parentId?: string, insertAfterId?: string) => {
+      dispatch({ type: 'ADD_ITEM', payload: { type, parentId, insertAfterId } });
   }, []);
 
   const handleDuplicateTask = useCallback((taskId: string) => {

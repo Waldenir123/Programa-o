@@ -16,7 +16,7 @@ export type ScheduleAction =
     | { type: 'APPEND_DATA'; payload: ScheduleData }
     | { type: 'UNDO' }
     | { type: 'REDO' }
-    | { type: 'ADD_ITEM'; payload: { type: 'group' | 'task' | 'activity'; parentId?: string; date?: string; status?: Status } }
+    | { type: 'ADD_ITEM'; payload: { type: 'group' | 'task' | 'activity'; parentId?: string; insertAfterId?: string; date?: string; status?: Status } }
     | { type: 'BATCH_DELETE_ITEMS'; payload: { id: string; type: 'group' | 'task' | 'activity' }[] }
     | { type: 'UPDATE_TEXT'; payload: { id: string; field: string; value: string } }
     | { type: 'UPDATE_STATUS'; payload: { activityId: string; date: string; status: Status | null } }
@@ -123,7 +123,7 @@ export const scheduleReducer = (state: ScheduleState, action: ScheduleAction): S
         }
 
         case 'ADD_ITEM': {
-            const { type, parentId, date, status } = action.payload;
+            const { type, parentId, insertAfterId, date, status } = action.payload;
             const initialSchedule = date && status ? { [date]: status } : {};
             const newActivity = { id: generateId(), name: 'Nova Atividade', schedule: initialSchedule };
             const newTask = { id: generateId(), title: 'Nova Tarefa Principal', activities: [newActivity] };
@@ -131,23 +131,49 @@ export const scheduleReducer = (state: ScheduleState, action: ScheduleAction): S
 
             const newData = (() => {
                 if (type === 'group') {
+                    if (insertAfterId) {
+                        const index = (state.liveData || []).findIndex(g => g.id === insertAfterId);
+                        if (index !== -1) {
+                            const newArr = [...state.liveData];
+                            newArr.splice(index + 1, 0, newGroup);
+                            return newArr;
+                        }
+                    }
                     return [...(state.liveData || []), newGroup];
                 }
                 if (type === 'task' && parentId) {
-                    return (state.liveData || []).map(group =>
-                        group.id === parentId
-                            ? { ...group, tarefas: [...(group.tarefas || []), newTask] }
-                            : group
-                    );
+                    return (state.liveData || []).map(group => {
+                        if (group.id === parentId) {
+                            let newTasks = [...(group.tarefas || [])];
+                            if (insertAfterId) {
+                                const index = newTasks.findIndex(t => t.id === insertAfterId);
+                                if (index !== -1) {
+                                    newTasks.splice(index + 1, 0, newTask);
+                                    return { ...group, tarefas: newTasks };
+                                }
+                            }
+                            return { ...group, tarefas: [...newTasks, newTask] };
+                        }
+                        return group;
+                    });
                 }
                 if (type === 'activity' && parentId) {
                     return (state.liveData || []).map(group => ({
                         ...group,
-                        tarefas: (group.tarefas || []).map(task =>
-                            task.id === parentId
-                                ? { ...task, activities: [...(task.activities || []), newActivity] }
-                                : task
-                        ),
+                        tarefas: (group.tarefas || []).map(task => {
+                            if (task.id === parentId) {
+                                let newActivities = [...(task.activities || [])];
+                                if (insertAfterId) {
+                                    const index = newActivities.findIndex(a => a.id === insertAfterId);
+                                    if (index !== -1) {
+                                        newActivities.splice(index + 1, 0, newActivity);
+                                        return { ...task, activities: newActivities };
+                                    }
+                                }
+                                return { ...task, activities: [...newActivities, newActivity] };
+                            }
+                            return task;
+                        })
                     }));
                 }
                 return state.liveData;

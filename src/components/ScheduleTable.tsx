@@ -84,7 +84,7 @@ interface ScheduleRowProps {
     onActivityDrop: (targetTaskId: string, targetActivityId: string | null) => void;
     onDragEnd: () => void;
     onDropTargetChange: (targetId: string | null) => void;
-    onAddItem: (type: 'group' | 'task' | 'activity', parentId?: string) => void;
+    onAddItem: (type: 'group' | 'task' | 'activity', parentId?: string, insertAfterId?: string) => void;
     onDeleteItem: (id: string, type: 'group' | 'task' | 'activity') => void;
     onTextUpdate: (id: string, field: string, value: string) => void;
     onDuplicateTask: (taskId: string) => void;
@@ -292,7 +292,7 @@ const ScheduleRow = memo((props: ScheduleRowProps) => {
                             </button>
                         </>
                     )}
-                    <button onClick={(e) => { e.stopPropagation(); onAddItem('activity', task.id); }} title="Adicionar Atividade" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#e2e8f0', borderRadius: '4px', width: '24px', height: '24px', pointerEvents: 'auto' }}>
+                    <button onClick={(e) => { e.stopPropagation(); onAddItem('activity', task.id, activity?.id); }} title="Adicionar Atividade" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#e2e8f0', borderRadius: '4px', width: '24px', height: '24px', pointerEvents: 'auto' }}>
                         <span className="material-icons" style={{ fontSize: '18px', color: '#10b981' }}>add</span>
                     </button>
                     {activity && (
@@ -553,7 +553,7 @@ interface ScheduleBodyProps {
     isMovingBlock: boolean;
     ghostBlockCells: Set<string>;
     onTextUpdate: (id: string, field: string, value: string) => void;
-    onAddItem: (type: 'group' | 'task' | 'activity', parentId?: string) => void;
+    onAddItem: (type: 'group' | 'task' | 'activity', parentId?: string, insertAfterId?: string) => void;
     onDuplicateTask: (taskId: string) => void;
     onDeleteItem: (id: string, type: 'group' | 'task' | 'activity') => void;
     onMoveItem: (id: string, type: 'task' | 'activity', direction: 'up' | 'down') => void;
