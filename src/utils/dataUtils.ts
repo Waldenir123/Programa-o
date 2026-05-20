@@ -6,14 +6,13 @@ export const formatDate = (date: Date): string => date.toISOString().split('T')[
 
 export const cleanText = (val: string) => {
     if (!val) return '';
-    let parsed = val;
-    try {
-        const doc = new DOMParser().parseFromString(parsed, 'text/html');
-        parsed = doc.body.textContent || "";
-        const doc2 = new DOMParser().parseFromString(parsed, 'text/html');
-        parsed = doc2.body.textContent || "";
-    } catch(e) {}
-    return parsed.replace(/<[^>]*>?/gm, '').replace(/&nbsp;/g, ' ').trim();
+    let cleaned = val.replace(/&nbsp;/g, ' ');
+    cleaned = cleaned.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
+                     .replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, '')
+                     .replace(/ on\w+="[^"]*"/g, '')
+                     .replace(/ on\w+='[^']*'/g, '')
+                     .replace(/ on\w+=\w+/g, '');
+    return cleaned.trim();
 };
 
 export const getDayAbbr = (date: Date) => ['DOM', 'SEG', 'TER', 'QUA', 'QUI', 'SEX', 'SÁB'][date.getUTCDay()];
