@@ -81,6 +81,8 @@ interface ScheduleRowProps {
     ghostBlockCells: Set<string>;
     onRowClick: (e: React.MouseEvent, item: SelectedItem) => void;
     onGroupDragStart: (group: Grupo, index: number) => void;
+    onTaskDragStart: (task: TarefaPrincipal, groupId: string) => void;
+    onTaskDrop: (targetGroupId: string, targetTaskId: string | null) => void;
     onActivityDragStart: (activity: Atividade, taskId: string) => void;
     onActivityDrop: (targetTaskId: string, targetActivityId: string | null) => void;
     onDragEnd: () => void;
@@ -350,7 +352,56 @@ const ScheduleRow = memo((props: ScheduleRowProps) => {
     );
 });
 
-ScheduleRow.displayName = 'ScheduleRow';
+const areScheduleRowEqual = (prevProps: ScheduleRowProps, nextProps: ScheduleRowProps) => {
+    if (prevProps.row !== nextProps.row) return false;
+    if (prevProps.index !== nextProps.index) return false;
+    if (prevProps.printNumWeeks !== nextProps.printNumWeeks) return false;
+    if (prevProps.dropTargetId !== nextProps.dropTargetId) return false;
+    if (prevProps.isMovingBlock !== nextProps.isMovingBlock) return false;
+    if (prevProps.dates !== nextProps.dates) return false;
+
+    const activityId = prevProps.row.activity?.id;
+    if (activityId) {
+        const wasActive = prevProps.activeCell?.activityId === activityId;
+        const isActive = nextProps.activeCell?.activityId === activityId;
+        if (wasActive !== isActive) return false;
+        
+        if (prevProps.selectionBlock !== nextProps.selectionBlock) {
+            const wasInOld = prevProps.dates.some(d => prevProps.isCellInBlock(activityId, formatDate(d), prevProps.selectionBlock));
+            const isInNew = nextProps.dates.some(d => nextProps.isCellInBlock(activityId, formatDate(d), nextProps.selectionBlock));
+            if (wasInOld || isInNew) return false;
+        }
+
+        if (prevProps.cutSelectionBlock !== nextProps.cutSelectionBlock) {
+            const wasInOld = prevProps.dates.some(d => prevProps.isCellInBlock(activityId, formatDate(d), prevProps.cutSelectionBlock));
+            const isInNew = nextProps.dates.some(d => nextProps.isCellInBlock(activityId, formatDate(d), nextProps.cutSelectionBlock));
+            if (wasInOld || isInNew) return false;
+        }
+        
+        if (prevProps.ghostBlockCells !== nextProps.ghostBlockCells) {
+            let oldGhost = false, newGhost = false;
+            for (const val of prevProps.ghostBlockCells) { if (val.startsWith(activityId + '-')) { oldGhost = true; break; } }
+            for (const val of nextProps.ghostBlockCells) { if (val.startsWith(activityId + '-')) { newGhost = true; break; } }
+            if (oldGhost || newGhost) return false;
+        }
+    }
+    
+    const groupChanged = (prevProps.draggedGroupInfo?.group?.id === prevProps.row.group.id) !== (nextProps.draggedGroupInfo?.group?.id === nextProps.row.group.id);
+    const taskChanged = (prevProps.draggedTaskInfo?.task?.id === prevProps.row.task.id) !== (nextProps.draggedTaskInfo?.task?.id === nextProps.row.task.id);
+    const activityChanged = activityId && ((prevProps.draggedActivityInfo?.activity?.id === activityId) !== (nextProps.draggedActivityInfo?.activity?.id === activityId));
+    if (groupChanged || taskChanged || activityChanged) return false;
+    
+    if (prevProps.selectedItems !== nextProps.selectedItems) {
+        const checkSelected = (items: SelectedItem[]) => items.some(i => i.id === prevProps.row.group.id || i.id === prevProps.row.task.id || (activityId && i.id === activityId));
+        if (checkSelected(prevProps.selectedItems) !== checkSelected(nextProps.selectedItems)) return false;
+    }
+
+    return true;
+};
+
+// Re-assign memo with custom comparison function
+const MemoizedScheduleRow = memo(ScheduleRow.type || ScheduleRow, areScheduleRowEqual);
+MemoizedScheduleRow.displayName = 'ScheduleRow';
 
 // --- Schedule Header Component ---
 interface ScheduleHeaderProps {
@@ -581,11 +632,11 @@ interface ScheduleBodyProps {
     onDeleteItem: (id: string, type: 'group' | 'task' | 'activity') => void;
     onMoveItem: (id: string, type: 'task' | 'activity', direction: 'up' | 'down') => void;
     draggedGroupInfo: { group: Grupo, index: number } | null;
-    draggedTaskInfo: { task: Tarefa, groupId: string } | null;
+    draggedTaskInfo: { task: TarefaPrincipal, groupId: string } | null;
     draggedActivityInfo: { activity: Atividade, taskId: string } | null;
     onGroupDragStart: (group: Grupo, index: number) => void;
     onGroupDrop: () => void;
-    onTaskDragStart: (task: Tarefa, groupId: string) => void;
+    onTaskDragStart: (task: TarefaPrincipal, groupId: string) => void;
     onTaskDrop: (targetGroupId: string, targetTaskId: string | null) => void;
     onActivityDragStart: (activity: Atividade, taskId: string) => void;
     onActivityDrop: (targetTaskId: string, targetActivityId: string | null) => void;
@@ -642,7 +693,7 @@ export const ScheduleBody: React.FC<ScheduleBodyProps> = (props) => {
     return (
         <tbody onMouseUp={onGroupDrop}>
              {(renderableRows || []).map((row, index) => (
-                <ScheduleRow
+                <MemoizedScheduleRow
                     key={row.activity?.id || `empty-${row.task.id}-${index}`}
                     printNumWeeks={printNumWeeks}
                     index={index}

@@ -57,10 +57,28 @@ export const exportToExcelAgent = async (
     const worksheet = workbook.addWorksheet('Cronograma');
 
     // 1. Build Headers
+    const firstWeek = dates.length > 0 ? getWeek(dates[0]) : '';
+    const lastWeek = dates.length > 0 ? getWeek(dates[dates.length - 1]) : '';
+    const weekRange = firstWeek === lastWeek ? `${firstWeek}` : `${firstWeek}@${lastWeek}`;
+
+    const titleRow = Array(baseCols + dates.length).fill('');
+    titleRow[0] = `PROGRAMAÇÃO SEMANAL -${weekRange}\n${title.toUpperCase()}`;
+    worksheet.addRow(titleRow);
+    worksheet.addRow(Array(baseCols + dates.length).fill(''));
+    // Merge cell for the title spanning all columns
+    worksheet.mergeCells(1, 1, 2, baseCols + dates.length);
+
     const weekHeadersRow: string[] = Array(baseCols).fill('');
+    if (baseCols > 1) {
+        weekHeadersRow[0] = `Elaborado por: ${activeProject.programmerName || ''}`;
+        weekHeadersRow[baseCols - 1] = `Atualizado em: ${new Date(activeProject.lastModified).toLocaleDateString('pt-BR')}`;
+    } else if (baseCols === 1) {
+        weekHeadersRow[0] = `Elaborado por: ${activeProject.programmerName || ''} | Atualizado em: ${new Date(activeProject.lastModified).toLocaleDateString('pt-BR')}`;
+    }
+
     const dayNameHeadersRow: string[] = [];
     if (showID) dayNameHeadersRow.push('ID');
-    visibleDynamicColsMapping.forEach(c => dayNameHeadersRow.push(c.label));
+    visibleDynamicColsMapping.forEach(c => dayNameHeadersRow.push(c.label.toUpperCase()));
     if (showTask) dayNameHeadersRow.push('TAREFA PRINCIPAL');
     if (showActivity) dayNameHeadersRow.push('ATIVIDADE');
     const dayNumHeadersRow: string[] = Array(baseCols).fill('');
@@ -82,6 +100,11 @@ export const exportToExcelAgent = async (
     worksheet.addRow(dayNameHeadersRow);
     worksheet.addRow(dayNumHeadersRow);
 
+    // Merge Elaborado por...
+    if (baseCols > 1) {
+        worksheet.mergeCells(3, 1, 3, baseCols - 1);
+    }
+
     // Merge Week Headers
     let currentWeek = '';
     let weekColStart = baseCols + 1;
@@ -89,23 +112,23 @@ export const exportToExcelAgent = async (
         const colIndex = baseCols + 1 + i;
         if (h.week !== currentWeek) {
             if (currentWeek) {
-                worksheet.mergeCells(1, weekColStart, 1, colIndex - 1);
+                worksheet.mergeCells(3, weekColStart, 3, colIndex - 1);
             }
             currentWeek = h.week;
             weekColStart = colIndex;
         }
     });
     if (currentWeek) {
-        worksheet.mergeCells(1, weekColStart, 1, baseCols + dateHeaders.length);
+        worksheet.mergeCells(3, weekColStart, 3, baseCols + dateHeaders.length);
     }
 
     // Merge Fixed Columns Vertically
     for (let c = 1; c <= baseCols; c++) {
-        worksheet.mergeCells(2, c, 3, c);
+        worksheet.mergeCells(4, c, 5, c);
     }
 
     // 2. Build Body
-    let currentRow = 4;
+    let currentRow = 6;
     let wbsGroup = 1;
 
     filteredData.forEach(group => {
@@ -189,10 +212,24 @@ export const exportToExcelAgent = async (
             cell.border = borderStyle;
             cell.font = { name: 'Arial', size: 10 };
 
-            if (rowNumber <= 3) {
-                // Header styling
+            if (rowNumber <= 2) {
+                // Main title styling
                 cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFDDEBF7' } };
-                cell.font = { name: 'Arial', size: 10, bold: true };
+                cell.font = { name: 'Arial', size: 14, bold: true };
+                cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
+            } else if (rowNumber <= 5) {
+                // Headers styling
+                if (rowNumber === 3) {
+                     cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF1F5F9' } };
+                     cell.font = { name: 'Arial', size: 10, bold: true };
+                } else {
+                     if (colNumber <= baseCols) {
+                         cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFDDEBF7' } };
+                     } else {
+                         cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFFFF' } };
+                     }
+                     cell.font = { name: 'Arial', size: 9, bold: true };
+                }
                 cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
             } else {
                 // Body styling
@@ -270,17 +307,6 @@ export const exportToPdfAgent = (
         format: [pageWidth, pageHeight] 
     });
 
-    // Header
-    doc.setFontSize(16);
-    doc.setTextColor(45, 55, 72);
-    doc.text(title, 40, 40);
-
-    const updatedDate = new Date(lastModified).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
-    doc.setFontSize(9);
-    doc.setTextColor(100);
-    doc.text(`Responsável: ${programmerName}`, 40, 55);
-    doc.text(`Última Atualização: ${updatedDate}`, doc.internal.pageSize.getWidth() - 40, 40, { align: 'right' });
-
     // Define columns for autoTable
     const columns: any[] = [];
     if (showID) columns.push({ header: 'ID', dataKey: 'id' });
@@ -293,16 +319,40 @@ export const exportToPdfAgent = (
         columns.push({ header: `date_${i}`, dataKey: `date_${i}` });
     });
 
-    // Build head (3 levels for Weeks, Days, Dates)
-    const row1: any[] = [];
-    if (showID) row1.push({ content: 'ID', rowSpan: 3, styles: { halign: 'center', vAlign: 'middle' } });
-    visibleDynamicCols.forEach(col => {
-        row1.push({ content: col.name, rowSpan: 3, styles: { halign: 'center', vAlign: 'middle' } });
-    });
-    if (showTask) row1.push({ content: 'TAREFA PRINCIPAL', rowSpan: 3, styles: { halign: 'center', vAlign: 'middle' } });
-    if (showActivity) row1.push({ content: 'ATIVIDADE', rowSpan: 3, styles: { halign: 'center', vAlign: 'middle' } });
+    // Build head
+    const totalCols = columns.length;
+    const fixedCols = (showID ? 1 : 0) + visibleDynamicCols.length + (showTask ? 1 : 0) + (showActivity ? 1 : 0);
 
-    const head: any[] = [row1, [], []];
+    const firstWeek = dates.length > 0 ? getWeek(dates[0]) : '';
+    const lastWeek = dates.length > 0 ? getWeek(dates[dates.length - 1]) : '';
+    const weekRange = firstWeek === lastWeek ? `${firstWeek}` : `${firstWeek}@${lastWeek}`;
+    const mainTitle = `PROGRAMAÇÃO SEMANAL -${weekRange}\n${title.toUpperCase()}`;
+
+    const head0 = [{
+        content: mainTitle,
+        colSpan: totalCols,
+        styles: { halign: 'center', valign: 'middle', fontSize: 14, fontStyle: 'bold', fillColor: [221, 235, 247], textColor: [0, 0, 0] }
+    }];
+
+    const head1: any[] = [];
+    if (fixedCols > 1) {
+        head1.push({
+            content: `Elaborado por: ${programmerName || ''}`,
+            colSpan: fixedCols - 1,
+            styles: { halign: 'center', valign: 'middle', fontStyle: 'bold', fillColor: [241, 245, 249], textColor: [0, 0, 0] }
+        });
+        head1.push({
+            content: `Atualizado em: ${new Date(lastModified).toLocaleDateString('pt-BR')}`,
+            colSpan: 1,
+            styles: { halign: 'center', valign: 'middle', fontStyle: 'bold', fillColor: [241, 245, 249], textColor: [0, 0, 0] }
+        });
+    } else {
+        head1.push({
+            content: `Elaborado por: ${programmerName || ''} | Atualizado em: ${new Date(lastModified).toLocaleDateString('pt-BR')}`,
+            colSpan: 1,
+            styles: { halign: 'center', valign: 'middle', fontStyle: 'bold', fillColor: [241, 245, 249], textColor: [0, 0, 0] }
+        });
+    }
 
     const weekHeaders: any[] = [];
     if (dates.length > 0) {
@@ -311,20 +361,33 @@ export const exportToPdfAgent = (
         dates.forEach((date, index) => {
             const week = getWeek(date);
             if (week !== currentWeek) {
-                weekHeaders.push({ content: `Semana ${currentWeek}`, colSpan: dayCount, styles: { halign: 'center' } });
+                weekHeaders.push({ content: `Semana ${currentWeek}`, colSpan: dayCount, styles: { halign: 'center', valign: 'middle', fillColor: [241, 245, 249], textColor: [0, 0, 0] } });
                 currentWeek = week;
                 dayCount = 1;
             } else {
                 dayCount++;
             }
             if (index === dates.length - 1) {
-                weekHeaders.push({ content: `Semana ${currentWeek}`, colSpan: dayCount, styles: { halign: 'center' } });
+                weekHeaders.push({ content: `Semana ${currentWeek}`, colSpan: dayCount, styles: { halign: 'center', valign: 'middle', fillColor: [241, 245, 249], textColor: [0, 0, 0] } });
             }
         });
     }
-    head[0].push(...weekHeaders);
-    head[1].push(...dates.map(date => ({ content: getDayAbbr(date), styles: { halign: 'center' } })));
-    head[2].push(...dates.map(date => ({ content: date.getUTCDate().toString(), styles: { halign: 'center' } })));
+    head1.push(...weekHeaders);
+
+    const head2: any[] = [];
+    const head3: any[] = [];
+    
+    if (showID) head2.push({ content: 'ID', rowSpan: 2, styles: { halign: 'center', valign: 'middle', fillColor: [221, 235, 247], textColor: [0, 0, 0] } });
+    visibleDynamicCols.forEach(col => {
+        head2.push({ content: col.name.toUpperCase(), rowSpan: 2, styles: { halign: 'center', valign: 'middle', fillColor: [221, 235, 247], textColor: [0, 0, 0] } });
+    });
+    if (showTask) head2.push({ content: 'TAREFA PRINCIPAL', rowSpan: 2, styles: { halign: 'center', valign: 'middle', fillColor: [221, 235, 247], textColor: [0, 0, 0] } });
+    if (showActivity) head2.push({ content: 'ATIVIDADE', rowSpan: 2, styles: { halign: 'center', valign: 'middle', fillColor: [221, 235, 247], textColor: [0, 0, 0] } });
+
+    head2.push(...dates.map(date => ({ content: getDayAbbr(date), styles: { halign: 'center', fillColor: [255, 255, 255], textColor: [0, 0, 0] } })));
+    head3.push(...dates.map(date => ({ content: date.getUTCDate().toString(), styles: { halign: 'center', fillColor: [255, 255, 255], textColor: [0, 0, 0] } })));
+
+    const head: any[] = [head0, head1, head2, head3];
 
     const body: any[] = [];
     let wbsGroup = 1;
@@ -397,7 +460,7 @@ export const exportToPdfAgent = (
         columns: columns,
         head: head,
         body: body,
-        startY: 70,
+        startY: 20,
         theme: 'grid',
         headStyles: { fillColor: [233, 238, 245], textColor: [45, 55, 72], fontStyle: 'bold', lineWidth: 0.5, lineColor: [45, 55, 72] },
         styles: { fontSize: 7, cellPadding: 3, valign: 'middle', halign: 'center', lineColor: [45, 55, 72], lineWidth: 0.5, overflow: 'linebreak' },

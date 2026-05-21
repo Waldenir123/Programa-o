@@ -23,6 +23,11 @@ export const useScheduleInteraction = (
     const [selectionBlock, setSelectionBlock] = useState<SelectionBlock | null>(null);
     const [clipboard, setClipboard] = useState<ClipboardData | null>(null);
     const [cutSelectionBlock, setCutSelectionBlock] = useState<SelectionBlock | null>(null);
+
+    const stateRef = React.useRef({ isSelecting, isMovingBlock, dragStartCell, selectionBlock, ghostBlockCells });
+    React.useEffect(() => {
+        stateRef.current = { isSelecting, isMovingBlock, dragStartCell, selectionBlock, ghostBlockCells };
+    }, [isSelecting, isMovingBlock, dragStartCell, selectionBlock, ghostBlockCells]);
     
     const activityIdToRowIndex = useMemo(() => new Map(
         (renderableRows || [])
@@ -57,9 +62,10 @@ export const useScheduleInteraction = (
 
     const handleCellMouseDown = useCallback((event: React.MouseEvent, activityId: string, dateStr: string) => {
         if (event.button !== 0 || activityId.startsWith('empty-')) return;
+        const currentRef = stateRef.current;
 
         // Check if clicking inside an existing selection to start a move
-        if (selectionBlock && isCellInBlock(activityId, dateStr, selectionBlock)) {
+        if (currentRef.selectionBlock && isCellInBlock(activityId, dateStr, currentRef.selectionBlock)) {
             setIsMovingBlock(true);
             setDragStartCell({ activityId, date: dateStr });
             document.body.classList.add('dragging');
@@ -75,10 +81,10 @@ export const useScheduleInteraction = (
         
         if(!event.shiftKey) {
             setSelectionBlock({ anchor: newActiveCell, end: newActiveCell });
-        } else if (selectionBlock) {
+        } else if (currentRef.selectionBlock) {
              setSelectionBlock(prev => prev ? { ...prev, end: newActiveCell } : { anchor: newActiveCell, end: newActiveCell });
         }
-    }, [selectionBlock, isCellInBlock]);
+    }, [isCellInBlock]);
     
     const handleCellRightClick = useCallback((event: React.MouseEvent, activityId: string, dateStr: string) => {
         event.preventDefault();
@@ -92,14 +98,15 @@ export const useScheduleInteraction = (
     }, [liveData, dispatch]);
 
     const handleCellMouseEnter = useCallback((activityId: string, dateStr: string) => {
-        if (isSelecting) {
+        const currentRef = stateRef.current;
+        if (currentRef.isSelecting) {
             setSelectionBlock(prev => {
                 if (!prev || (prev.end.activityId === activityId && prev.end.date === dateStr)) return prev;
                 return { ...prev, end: { activityId, date: dateStr } };
             });
-        } else if (isMovingBlock && dragStartCell && selectionBlock) {
-            const startRow = activityIdToRowIndex.get(dragStartCell.activityId);
-            const startCol = dateToColIndex.get(dragStartCell.date);
+        } else if (currentRef.isMovingBlock && currentRef.dragStartCell && currentRef.selectionBlock) {
+            const startRow = activityIdToRowIndex.get(currentRef.dragStartCell.activityId);
+            const startCol = dateToColIndex.get(currentRef.dragStartCell.date);
             const currentRow = activityIdToRowIndex.get(activityId);
             const currentCol = dateToColIndex.get(dateStr);
 
@@ -110,8 +117,9 @@ export const useScheduleInteraction = (
 
             // Only update if delta changed
             setGhostBlockCells(prev => {
-                const blockIndices = getBlockIndices(selectionBlock);
+                const blockIndices = getBlockIndices(currentRef.selectionBlock!);
                 if (!blockIndices) return prev;
+
 
                 const newGhostCells = new Set<string>();
                 for (let r = blockIndices.minRow; r <= blockIndices.maxRow; r++) {
@@ -134,18 +142,19 @@ export const useScheduleInteraction = (
                 return newGhostCells;
             });
         }
-    }, [isSelecting, isMovingBlock, dragStartCell, selectionBlock, getBlockIndices, activityIdToRowIndex, dateToColIndex, renderableRows, dates]);
+    }, [getBlockIndices, activityIdToRowIndex, dateToColIndex, renderableRows, dates]);
 
     const handleGlobalMouseUp = useCallback(() => {
-        if (isSelecting) {
+        const currentRef = stateRef.current;
+        if (currentRef.isSelecting) {
             setIsSelecting(false);
             document.body.classList.remove('dragging');
         }
-        if (isMovingBlock && dragStartCell && selectionBlock && ghostBlockCells.size > 0) {
+        if (currentRef.isMovingBlock && currentRef.dragStartCell && currentRef.selectionBlock && currentRef.ghostBlockCells.size > 0) {
             const newData = deepClone(liveData);
             const activityMap = new Map((newData || []).flatMap(g => (g.tarefas || []).flatMap(t => t.activities || [])).map(a => [a.id, a]));
             
-            const blockIndices = getBlockIndices(selectionBlock);
+            const blockIndices = getBlockIndices(currentRef.selectionBlock);
             if (!blockIndices) return;
 
             const statusesToMove: (Status | null)[][] = [];
@@ -166,7 +175,7 @@ export const useScheduleInteraction = (
             }
             
             let minGhostRow = Infinity, minGhostCol = Infinity;
-            ghostBlockCells.forEach(cellId => {
+            currentRef.ghostBlockCells.forEach(cellId => {
                 const [actId, dateStr] = cellId.split(/(?<=id_\d+_\w+)-/);
                 const r = activityIdToRowIndex.get(actId);
                 const c = dateToColIndex.get(dateStr);
@@ -202,22 +211,22 @@ export const useScheduleInteraction = (
                 const targetActivityId = renderableRows[r].activity?.id || `empty-${r}`;
                 return { activityId: targetActivityId, date: formatDate(dates[c]) };
             };
-            const newSelectionBlock = { anchor: updateCell(selectionBlock.anchor), end: updateCell(selectionBlock.end) };
+            const newSelectionBlock = { anchor: updateCell(currentRef.selectionBlock.anchor), end: updateCell(currentRef.selectionBlock.end) };
             setSelectionBlock(newSelectionBlock);
             setActiveCell(newSelectionBlock.end);
         }
         
-        if (isMovingBlock) {
+        if (currentRef.isMovingBlock) {
             setIsMovingBlock(false);
         }
-        if (dragStartCell !== null) {
+        if (currentRef.dragStartCell !== null) {
             setDragStartCell(null);
         }
-        if (ghostBlockCells.size > 0) {
+        if (currentRef.ghostBlockCells.size > 0) {
             setGhostBlockCells(new Set());
         }
         document.body.classList.remove('dragging');
-    }, [isSelecting, isMovingBlock, dragStartCell, selectionBlock, ghostBlockCells, liveData, dispatch, getBlockIndices, activityIdToRowIndex, dateToColIndex, renderableRows, dates]);
+    }, [liveData, dispatch, getBlockIndices, activityIdToRowIndex, dateToColIndex, renderableRows, dates]);
 
     useEffect(() => {
         window.addEventListener('mouseup', handleGlobalMouseUp);

@@ -48,7 +48,7 @@ testConnection();
 // State and Types
 import { scheduleReducer } from './state/scheduleReducer';
 import { 
-    Project, UserProjects, Page, SelectedItem, ScheduleData, ToastMessage, RenderableRow, Status, Atividade,
+    Project, UserProjects, Page, SelectedItem, ScheduleData, ToastMessage, RenderableRow, Status, Atividade, TarefaPrincipal,
     PREDEFINED_MANPOWER_ROLES, STATUS_LABELS, STATUS_COLOR_MAP, DynamicColumn 
 } from './state/types';
 
@@ -132,6 +132,7 @@ export const App = () => {
   const [activeFilters, setActiveFilters] = useState<Record<string, Set<string>>>({});
   const [openFilter, setOpenFilter] = useState<{ column: string; rect: DOMRect } | null>(null);
   const [showHiddenActivities, setShowHiddenActivities] = useState(false);
+  const [activitySearchText, setActivitySearchText] = useState('');
   
   const [isImportModalOpen, setImportModalOpen] = useState(false);
 
@@ -169,7 +170,7 @@ export const App = () => {
   const [selectedItems, setSelectedItems] = useState<SelectedItem[]>([]);
   
   const [draggedGroupInfo, setDraggedGroupInfo] = useState<{ group: ScheduleData[0], index: number } | null>(null);
-  const [draggedTaskInfo, setDraggedTaskInfo] = useState<{ task: Tarefa, groupId: string } | null>(null);
+  const [draggedTaskInfo, setDraggedTaskInfo] = useState<{ task: TarefaPrincipal, groupId: string } | null>(null);
   const [draggedActivityInfo, setDraggedActivityInfo] = useState<{ activity: Atividade, taskId: string } | null>(null);
   const [dropTargetId, setDropTargetId] = useState<string | null>(null);
 
@@ -298,8 +299,13 @@ export const App = () => {
                 .map(task => {
                     const actSelections = filters['atividade'];
                     const isAtividadeFilterActive = actSelections && actSelections.size > 0;
+                    const searchLower = activitySearchText.toLowerCase();
                     
                     const filteredActivities = (task.activities || []).filter(act => {
+                        if (searchLower && act.name && !act.name.toLowerCase().includes(searchLower)) {
+                            return false;
+                        }
+                        
                         if (isAtividadeFilterActive) {
                             // If filter is active and name is selected, ALWAYS show it. Otherwise hide it.
                             return actSelections.has(act.name);
@@ -356,7 +362,7 @@ export const App = () => {
     });
     
     return finalGroups;
-  }, [liveData, activeFilters, showHiddenActivities]);
+  }, [liveData, activeFilters, showHiddenActivities, activitySearchText]);
 
   const renderableRows = useMemo(() => flattenData(filteredData), [filteredData]);
 
@@ -1203,7 +1209,7 @@ export const App = () => {
     handleDragEnd();
   }, [draggedGroupInfo, dropTargetId]);
 
-  const handleTaskDragStart = useCallback((task: Tarefa, groupId: string) => {
+  const handleTaskDragStart = useCallback((task: TarefaPrincipal, groupId: string) => {
     setDraggedTaskInfo({ task, groupId });
   }, []);
 
@@ -1719,8 +1725,8 @@ export const App = () => {
               ) : (
                 <>
                   {currentPage === 'schedule' && (
-                    <div className="table-wrapper">
-                      <div className="project-detail-header" style={{ display: 'flex', gap: '24px', padding: '16px', backgroundColor: '#fff', borderBottom: '1px solid #e2e8f0', marginBottom: '8px', borderRadius: '8px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)', flexWrap: 'wrap', alignItems: 'center' }}>
+                    <>
+                      <div className="project-detail-header" style={{ display: 'flex', gap: '24px', padding: '16px', backgroundColor: '#fff', borderBottom: '1px solid #e2e8f0', marginBottom: '8px', zIndex: 10, flexWrap: 'wrap', alignItems: 'center' }}>
                         <div style={{ flex: 1, minWidth: '200px' }}>
                             <label style={{ display: 'block', fontSize: '0.75rem', color: '#64748b', fontWeight: '600', textTransform: 'uppercase', marginBottom: '4px' }}>Obra / Projeto</label>
                             <div contentEditable suppressContentEditableWarning onBlur={e => handleTextUpdate('', 'name', e.currentTarget.textContent || '')} style={{ fontSize: '1.25rem', fontWeight: 'bold', color: '#1e293b', borderBottom: '1px dashed #cbd5e1', paddingBottom: '2px' }}>{activeProject.name}</div>
@@ -1730,7 +1736,23 @@ export const App = () => {
                             <div contentEditable suppressContentEditableWarning onBlur={e => handleTextUpdate('', 'programmerName', e.currentTarget.textContent || '')} style={{ fontWeight: '500', color: '#334155', borderBottom: '1px dashed #cbd5e1' }}>{activeProject.programmerName || 'Não definido'}</div>
                         </div>
                         <RichTextToolbar />
-                        <div style={{ width: '200px', textAlign: 'right' }}>
+                        <div style={{ width: '200px' }}>
+                            <label style={{ display: 'block', fontSize: '0.75rem', color: '#64748b', fontWeight: '600', textTransform: 'uppercase', marginBottom: '4px' }}>Buscar Atividade</label>
+                            <input
+                                type="text"
+                                value={activitySearchText}
+                                onChange={(e) => setActivitySearchText(e.target.value)}
+                                placeholder="ex: corte, ensaio..."
+                                style={{
+                                    width: '100%',
+                                    padding: '4px 8px',
+                                    border: '1px solid #cbd5e1',
+                                    borderRadius: '4px',
+                                    fontSize: '0.875rem'
+                                }}
+                            />
+                        </div>
+                        <div style={{ width: '150px', textAlign: 'right' }}>
                             <label style={{ display: 'block', fontSize: '0.75rem', color: '#64748b', fontWeight: '600', textTransform: 'uppercase', marginBottom: '4px' }}>Último Salvamento</label>
                             <div style={{ color: '#64748b' }}>{lastSavedTime ? new Date(lastSavedTime).toLocaleString('pt-BR') : 'Aguardando...'}</div>
                         </div>
@@ -1748,12 +1770,15 @@ export const App = () => {
                                 <span className="material-icons" style={{ fontSize: '18px' }}>{isAutoSaveEnabled ? 'autorenew' : 'sync_disabled'}</span>
                                 {isAutoSaveEnabled ? 'Auto-Save: ON' : 'Auto-Save: OFF'}
                             </button>
-                            {Object.values(activeFilters).some(s => s && s.size > 0) && (
+                            {(Object.values(activeFilters).some((s: any) => s && s.size > 0) || activitySearchText) && (
                                 <button
-                                    onClick={() => setActiveFilters({})}
+                                    onClick={() => {
+                                        setActiveFilters({});
+                                        setActivitySearchText('');
+                                    }}
                                     className="control-button"
                                     style={{ display: 'flex', alignItems: 'center', gap: '4px', backgroundColor: '#fee2e2', color: '#b91c1c', border: '1px solid', borderColor: '#fca5a5', height: 'fit-content' }}
-                                    title="Limpar todos os filtros ativos"
+                                    title="Limpar todos os filtros ativos e busca"
                                 >
                                     <span className="material-icons" style={{ fontSize: '18px' }}>filter_alt_off</span>
                                     Limpar Filtros
@@ -1770,7 +1795,8 @@ export const App = () => {
                             </button>
                         </div>
                       </div>
-                      <table className="schedule-table" style={{ width: scheduleTableColumnWidths.reduce((a, b) => a + b, 0) }}>
+                      <div className="table-wrapper">
+                        <table className="schedule-table" style={{ width: scheduleTableColumnWidths.reduce((a, b) => a + b, 0) }}>
                           <ScheduleHeader 
                               printNumWeeks={printNumWeeks}
                               dates={dates} 
@@ -1827,6 +1853,7 @@ export const App = () => {
                           />
                       </table>
                     </div>
+                  </>
                   )}
                   {currentPage === 'dailySummary' && <DailySummaryView data={summaryData} dates={dates} onTextUpdate={handleSummaryTextUpdate} onAddItem={handleSummaryAddItem} onDeleteItem={(id, type) => handleSummaryDeleteItem(id, type)} onSyncWithSchedule={() => dispatchSummary({ type: 'LOAD_DATA', payload: liveData })} />}
                   {currentPage === 'dashboard' && <DashboardView data={liveData} title={title} programmerName={activeProject.programmerName} dynamicColumns={activeProject.dynamicColumns}/>}
