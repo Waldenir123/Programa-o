@@ -1,1 +1,1 @@
-export const APP_VERSION = 'v6.1.1 (Última atualização: 30/04/2026 - 15:46)';
+export const APP_VERSION = 'v6.2.0 (Última atualização: 20/05/2026 - 12:35)';

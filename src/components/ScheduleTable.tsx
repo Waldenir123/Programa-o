@@ -71,6 +71,7 @@ interface ScheduleRowProps {
     visibleColumns?: Record<string, boolean>;
     selectedItems: SelectedItem[];
     draggedGroupInfo: any;
+    draggedTaskInfo: any;
     draggedActivityInfo: any;
     dropTargetId: string | null;
     activeCell: { activityId: string; date: string } | null;
@@ -99,9 +100,9 @@ interface ScheduleRowProps {
 const ScheduleRow = memo((props: ScheduleRowProps) => {
     const { 
         printNumWeeks, row, index, dates, dynamicColumns, columnWidths, stickyColumnPositions, visibleColumns,
-        selectedItems, draggedGroupInfo, draggedActivityInfo, dropTargetId, activeCell,
+        selectedItems, draggedGroupInfo, draggedTaskInfo, draggedActivityInfo, dropTargetId, activeCell,
         selectionBlock, cutSelectionBlock, isMovingBlock, ghostBlockCells,
-        onRowClick, onGroupDragStart, onActivityDragStart, onActivityDrop, onDragEnd, onDropTargetChange,
+        onRowClick, onGroupDragStart, onTaskDragStart, onTaskDrop, onActivityDragStart, onActivityDrop, onDragEnd, onDropTargetChange,
         onAddItem, onDeleteItem, onTextUpdate,
         onDuplicateTask,
         onCellMouseDown, onCellMouseEnter, onCellRightClick, isCellInBlock,
@@ -119,8 +120,9 @@ const ScheduleRow = memo((props: ScheduleRowProps) => {
     const isSelected = isActivitySelected || isTaskSelected || isGroupSelected;
     
     const isGroupBeingDragged = draggedGroupInfo?.group.id === group.id;
+    const isTaskBeingDragged = draggedTaskInfo?.task.id === task.id;
     const isActivityBeingDragged = draggedActivityInfo?.activity.id === activity?.id;
-    const isDropTarget = dropTargetId === group.id || (dropTargetId === activity?.id); // dropTargetId handles both group and activity drops by id
+    const isDropTarget = dropTargetId === group.id || dropTargetId === task.id || (dropTargetId === activity?.id); // dropTargetId handles both group, task, and activity drops by id
 
     const handlePaste = (e: React.ClipboardEvent<HTMLDivElement>) => {
         e.preventDefault();
@@ -138,11 +140,12 @@ const ScheduleRow = memo((props: ScheduleRowProps) => {
 
     return (
         <tr
-            className={`${isSelected ? 'selected-row' : ''} ${isLastInGroup ? 'group-divider' : ''} ${isLastInTask ? 'task-divider' : ''} ${isGroupBeingDragged || isActivityBeingDragged ? 'group-dragging' : ''} ${isDropTarget ? 'drop-target-top' : ''}`}
+            className={`${isSelected ? 'selected-row' : ''} ${isLastInGroup ? 'group-divider' : ''} ${isLastInTask ? 'task-divider' : ''} ${isGroupBeingDragged || isTaskBeingDragged || isActivityBeingDragged ? 'group-dragging' : ''} ${isDropTarget ? 'drop-target-top' : ''}`}
             style={{ opacity: (group.isHidden || task.isHidden || activity?.isHidden) ? 0.5 : 1, transition: 'opacity 0.2s' }}
             onDragOver={(e) => { 
               e.preventDefault(); 
               if (draggedGroupInfo) onDropTargetChange(group.id);
+              if (draggedTaskInfo) onDropTargetChange(task.id);
               if (draggedActivityInfo && activity) onDropTargetChange(activity.id);
               if (draggedActivityInfo && !activity) onDropTargetChange(task.id + '_empty'); // When dropping on empty task
             }}
@@ -150,6 +153,10 @@ const ScheduleRow = memo((props: ScheduleRowProps) => {
               if (draggedActivityInfo) {
                  e.preventDefault();
                  onActivityDrop(task.id, activity ? activity.id : null);
+              }
+              if (draggedTaskInfo) {
+                 e.preventDefault();
+                 onTaskDrop(group.id, task.id);
               }
             }}
         >
@@ -200,9 +207,25 @@ const ScheduleRow = memo((props: ScheduleRowProps) => {
             
             {renderTask && (
                 <td className={`col-sticky col-sticky-${dynamicColumnsBefore.length + 2}`} rowSpan={taskRowSpan} style={{ width: columnWidths[dynamicColumnsBefore.length + 1], left: stickyColumnPositions[dynamicColumnsBefore.length + 1], display: visibleColumns && visibleColumns['TAREFA PRINCIPAL'] === false ? 'none' : 'table-cell' }} onClick={(e) => onRowClick(e, { id: task.id, name: task.title, type: 'task', wbsId: wbsId.split('.').slice(0, 2).join('.') })}>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                        <div className="task-title-input" contentEditable suppressContentEditableWarning onPaste={handlePaste} onMouseDown={e => e.stopPropagation()} onMouseUp={e => e.stopPropagation()} onClick={e => e.stopPropagation()} onKeyDown={handleKeyDown} onBlur={e => onTextUpdate(task.id, 'tarefa', e.currentTarget.innerHTML || '')} style={{ fontWeight: '500' }} dangerouslySetInnerHTML={{ __html: cleanText(task.title) }} />
-                        <div className="task-fa-input" contentEditable suppressContentEditableWarning onPaste={handlePaste} onMouseDown={e => e.stopPropagation()} onMouseUp={e => e.stopPropagation()} onClick={e => e.stopPropagation()} onKeyDown={handleKeyDown} onBlur={e => onTextUpdate(task.id, 'tarefa_fa', e.currentTarget.innerHTML || '')} style={{ fontSize: '0.75rem', color: '#64748b', fontStyle: 'italic', borderTop: '1px solid #e2e8f0', paddingTop: '2px' }} dangerouslySetInnerHTML={{ __html: cleanText(task.fa || 'Nº FA') }} />
+                    <div style={{ display: 'flex', alignItems: 'flex-start' }}>
+                        {!task.id.includes('_placeholder_task') && (
+                            <span
+                                className="drag-handle material-icons"
+                                style={{ cursor: 'grab', marginRight: '4px', marginTop: '2px', fontSize: '16px', color: '#cbd5e1' }}
+                                draggable
+                                onDragStart={(e) => {
+                                    e.stopPropagation();
+                                    onTaskDragStart(task, group.id);
+                                }}
+                                onDragEnd={onDragEnd}
+                            >
+                                drag_indicator
+                            </span>
+                        )}
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', flexGrow: 1 }}>
+                            <div className="task-title-input" contentEditable suppressContentEditableWarning onPaste={handlePaste} onMouseDown={e => e.stopPropagation()} onMouseUp={e => e.stopPropagation()} onClick={e => e.stopPropagation()} onKeyDown={handleKeyDown} onBlur={e => onTextUpdate(task.id, 'tarefa', e.currentTarget.innerHTML || '')} style={{ fontWeight: '500' }} dangerouslySetInnerHTML={{ __html: cleanText(task.title) }} />
+                            <div className="task-fa-input" contentEditable suppressContentEditableWarning onPaste={handlePaste} onMouseDown={e => e.stopPropagation()} onMouseUp={e => e.stopPropagation()} onClick={e => e.stopPropagation()} onKeyDown={handleKeyDown} onBlur={e => onTextUpdate(task.id, 'tarefa_fa', e.currentTarget.innerHTML || '')} style={{ fontSize: '0.75rem', color: '#64748b', fontStyle: 'italic', borderTop: '1px solid #e2e8f0', paddingTop: '2px' }} dangerouslySetInnerHTML={{ __html: cleanText(task.fa || 'Nº FA') }} />
+                        </div>
                     </div>
                     <div className="cell-actions" style={{ display: 'flex', gap: '4px', zIndex: 10 }}>
                         {!task.id.includes('_placeholder_task') && (
@@ -558,9 +581,12 @@ interface ScheduleBodyProps {
     onDeleteItem: (id: string, type: 'group' | 'task' | 'activity') => void;
     onMoveItem: (id: string, type: 'task' | 'activity', direction: 'up' | 'down') => void;
     draggedGroupInfo: { group: Grupo, index: number } | null;
+    draggedTaskInfo: { task: Tarefa, groupId: string } | null;
     draggedActivityInfo: { activity: Atividade, taskId: string } | null;
     onGroupDragStart: (group: Grupo, index: number) => void;
     onGroupDrop: () => void;
+    onTaskDragStart: (task: Tarefa, groupId: string) => void;
+    onTaskDrop: (targetGroupId: string, targetTaskId: string | null) => void;
     onActivityDragStart: (activity: Atividade, taskId: string) => void;
     onActivityDrop: (targetTaskId: string, targetActivityId: string | null) => void;
     onDragEnd: () => void;
@@ -576,7 +602,8 @@ export const ScheduleBody: React.FC<ScheduleBodyProps> = (props) => {
         selectedItems, onRowClick, activeCell, onCellMouseDown, onCellMouseEnter, onCellRightClick,
         selectionBlock, cutSelectionBlock, isMovingBlock, ghostBlockCells,
         onTextUpdate, onAddItem, onDeleteItem, onMoveItem, onDuplicateTask,
-        draggedGroupInfo, draggedActivityInfo, onGroupDragStart, onGroupDrop, 
+        draggedGroupInfo, draggedTaskInfo, draggedActivityInfo, onGroupDragStart, onGroupDrop, 
+        onTaskDragStart, onTaskDrop,
         onActivityDragStart, onActivityDrop,
         onDragEnd, onDropTargetChange, dropTargetId,
         visibleColumns, onToggleHideItem
@@ -627,6 +654,7 @@ export const ScheduleBody: React.FC<ScheduleBodyProps> = (props) => {
                     visibleColumns={visibleColumns}
                     selectedItems={selectedItems}
                     draggedGroupInfo={draggedGroupInfo}
+                    draggedTaskInfo={draggedTaskInfo}
                     draggedActivityInfo={draggedActivityInfo}
                     dropTargetId={dropTargetId}
                     activeCell={activeCell}
@@ -636,6 +664,8 @@ export const ScheduleBody: React.FC<ScheduleBodyProps> = (props) => {
                     ghostBlockCells={ghostBlockCells}
                     onRowClick={onRowClick}
                     onGroupDragStart={onGroupDragStart}
+                    onTaskDragStart={onTaskDragStart}
+                    onTaskDrop={onTaskDrop}
                     onActivityDragStart={onActivityDragStart}
                     onActivityDrop={onActivityDrop}
                     onDragEnd={onDragEnd}

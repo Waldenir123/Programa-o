@@ -169,6 +169,7 @@ export const App = () => {
   const [selectedItems, setSelectedItems] = useState<SelectedItem[]>([]);
   
   const [draggedGroupInfo, setDraggedGroupInfo] = useState<{ group: ScheduleData[0], index: number } | null>(null);
+  const [draggedTaskInfo, setDraggedTaskInfo] = useState<{ task: Tarefa, groupId: string } | null>(null);
   const [draggedActivityInfo, setDraggedActivityInfo] = useState<{ activity: Atividade, taskId: string } | null>(null);
   const [dropTargetId, setDropTargetId] = useState<string | null>(null);
 
@@ -1202,6 +1203,23 @@ export const App = () => {
     handleDragEnd();
   }, [draggedGroupInfo, dropTargetId]);
 
+  const handleTaskDragStart = useCallback((task: Tarefa, groupId: string) => {
+    setDraggedTaskInfo({ task, groupId });
+  }, []);
+
+  const handleTaskDrop = useCallback((targetGroupId: string, targetTaskId: string | null) => {
+    if (!draggedTaskInfo) {
+      handleDragEnd();
+      return;
+    }
+    if (draggedTaskInfo.task.id === targetTaskId) {
+      handleDragEnd();
+      return;
+    }
+    dispatch({ type: 'MOVE_TASK_DND', payload: { draggedId: draggedTaskInfo.task.id, targetGroupId, targetId: targetTaskId } });
+    handleDragEnd();
+  }, [draggedTaskInfo]);
+
   const handleActivityDragStart = useCallback((activity: Atividade, taskId: string) => {
     setDraggedActivityInfo({ activity, taskId });
   }, []);
@@ -1226,6 +1244,7 @@ export const App = () => {
   
   const handleDragEnd = useCallback(() => {
       setDraggedGroupInfo(null);
+      setDraggedTaskInfo(null);
       setDraggedActivityInfo(null);
       setDropTargetId(null);
   }, []);
@@ -1729,6 +1748,17 @@ export const App = () => {
                                 <span className="material-icons" style={{ fontSize: '18px' }}>{isAutoSaveEnabled ? 'autorenew' : 'sync_disabled'}</span>
                                 {isAutoSaveEnabled ? 'Auto-Save: ON' : 'Auto-Save: OFF'}
                             </button>
+                            {Object.values(activeFilters).some(s => s && s.size > 0) && (
+                                <button
+                                    onClick={() => setActiveFilters({})}
+                                    className="control-button"
+                                    style={{ display: 'flex', alignItems: 'center', gap: '4px', backgroundColor: '#fee2e2', color: '#b91c1c', border: '1px solid', borderColor: '#fca5a5', height: 'fit-content' }}
+                                    title="Limpar todos os filtros ativos"
+                                >
+                                    <span className="material-icons" style={{ fontSize: '18px' }}>filter_alt_off</span>
+                                    Limpar Filtros
+                                </button>
+                            )}
                             <button
                                 onClick={() => setShowHiddenActivities(prev => !prev)}
                                 className="control-button"
@@ -1781,9 +1811,12 @@ export const App = () => {
                               onMoveItem={handleMoveItem}
                               onDuplicateTask={handleDuplicateTask}
                               draggedGroupInfo={draggedGroupInfo}
+                              draggedTaskInfo={draggedTaskInfo}
                               draggedActivityInfo={draggedActivityInfo}
                               onGroupDragStart={handleGroupDragStart}
                               onGroupDrop={handleGroupDrop}
+                              onTaskDragStart={handleTaskDragStart}
+                              onTaskDrop={handleTaskDrop}
                               onActivityDragStart={handleActivityDragStart}
                               onActivityDrop={handleActivityDrop}
                               onDragEnd={handleDragEnd}

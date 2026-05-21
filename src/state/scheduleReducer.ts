@@ -24,6 +24,7 @@ export type ScheduleAction =
     | { type: 'UPDATE_SCHEDULE'; payload: ScheduleData }
     | { type: 'MOVE_GROUP'; payload: { fromId: string, toId: string | null } }
     | { type: 'MOVE_ITEM'; payload: { id: string; type: 'task' | 'activity'; direction: 'up' | 'down' } }
+    | { type: 'MOVE_TASK_DND'; payload: { draggedId: string, targetGroupId: string, targetId: string | null } }
     | { type: 'MOVE_ACTIVITY_DND'; payload: { draggedId: string, targetId: string | null, taskId: string } }
     | { type: 'TOGGLE_HIDE_ACTIVITY'; payload: string }
     | { type: 'TOGGLE_HIDE_ITEM'; payload: { id: string; type: 'group' | 'task' | 'activity' } }
@@ -392,6 +393,49 @@ export const scheduleReducer = (state: ScheduleState, action: ScheduleAction): S
                 if (toIndex === -1) return state;
                 data.splice(toIndex, 0, movedGroup);
             }
+            return createNewStateWithHistory(data);
+        }
+
+        case 'MOVE_TASK_DND': {
+            const { draggedId, targetGroupId, targetId } = action.payload;
+
+            let sourceGroupIdx = -1;
+            let sourceTaskIdx = -1;
+            const data = deepClone(state.liveData || []);
+
+            // Find the task to extract
+            for (let gIdx = 0; gIdx < data.length; gIdx++) {
+                const tIdx = data[gIdx].tarefas.findIndex((t: any) => t.id === draggedId);
+                if (tIdx !== -1) {
+                    sourceGroupIdx = gIdx;
+                    sourceTaskIdx = tIdx;
+                    break;
+                }
+            }
+
+            if (sourceGroupIdx === -1) return state;
+
+            // Extract the task
+            const [draggedTask] = data[sourceGroupIdx].tarefas.splice(sourceTaskIdx, 1);
+
+            // Find target group
+            const targetGroupIdx = data.findIndex((g: any) => g.id === targetGroupId);
+            if (targetGroupIdx === -1) {
+                // Return task if group not found
+                data[sourceGroupIdx].tarefas.splice(sourceTaskIdx, 0, draggedTask);
+                return state;
+            }
+
+            let targetTaskIdx = data[targetGroupIdx].tarefas.length;
+            if (targetId) {
+                const idx = data[targetGroupIdx].tarefas.findIndex((t: any) => t.id === targetId);
+                if (idx !== -1) {
+                    targetTaskIdx = idx;
+                }
+            }
+
+            data[targetGroupIdx].tarefas.splice(targetTaskIdx, 0, draggedTask);
+            
             return createNewStateWithHistory(data);
         }
 
