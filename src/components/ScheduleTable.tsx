@@ -15,15 +15,18 @@ interface ScheduleCellProps {
     onMouseDown: (e: React.MouseEvent, activityId: string, date: string) => void;
     onMouseEnter: (activityId: string, date: string) => void;
     onRightClick: (e: React.MouseEvent, activityId: string, date: string) => void;
+    onDoubleClick: (activityId: string, date: string) => void;
+    onAnnotationClick: (e: React.MouseEvent, annotation: string, activityId: string, date: string, rect: DOMRect) => void;
     className?: string;
 }
 
 const ScheduleCell = memo(({ 
     date, activity, isActive, isSelected, isCut, isMoving, isGhost, 
-    onMouseDown, onMouseEnter, onRightClick, className 
+    onMouseDown, onMouseEnter, onRightClick, onDoubleClick, onAnnotationClick, className 
 }: ScheduleCellProps) => {
     const dateStr = formatDate(date);
     const status = activity ? activity.schedule[dateStr] : undefined;
+    const annotation = activity ? activity.annotations?.[dateStr] : undefined;
     const dayAbbr = getDayAbbr(date);
     const weekendClass = dayAbbr === 'SÁB' || dayAbbr === 'DOM' ? 'saturday-col' : '';
 
@@ -52,8 +55,26 @@ const ScheduleCell = memo(({
             }}
             onMouseEnter={() => activity && onMouseEnter(activity.id, dateStr)}
             onContextMenu={(e) => activity && onRightClick(e, activity.id, dateStr)}
+            onDoubleClick={(e) => {
+                if (activity) {
+                    e.preventDefault();
+                    onDoubleClick(activity.id, dateStr);
+                }
+            }}
+            style={{ position: 'relative' }}
         >
            {status && <span className="status-indicator">{status}</span>}
+           {annotation && (
+               <div 
+                   className="annotation-triangle" 
+                   onClick={(e) => {
+                       if (activity) {
+                           e.stopPropagation();
+                           onAnnotationClick(e, annotation, activity.id, dateStr, e.currentTarget.getBoundingClientRect());
+                       }
+                   }}
+               />
+           )}
         </td>
     );
 });
@@ -94,6 +115,9 @@ interface ScheduleRowProps {
     onCellMouseDown: (e: React.MouseEvent, activityId: string, date: string) => void;
     onCellMouseEnter: (activityId: string, date: string) => void;
     onCellRightClick: (e: React.MouseEvent, activityId: string, date: string) => void;
+    onCellDoubleClick: (activityId: string, date: string) => void;
+    onAnnotationClick: (e: React.MouseEvent, annotation: string, activityId: string, date: string, rect: DOMRect) => void;
+    onWhatsAppClick: (e: React.MouseEvent, activityId: string) => void;
     isCellInBlock: (activityId: string, date: string, block: any) => boolean;
     onMoveItem: (id: string, type: 'task' | 'activity', direction: 'up' | 'down') => void;
     onToggleHideItem: (id: string, type: 'group' | 'task' | 'activity') => void;
@@ -107,7 +131,7 @@ const ScheduleRow = memo((props: ScheduleRowProps) => {
         onRowClick, onGroupDragStart, onTaskDragStart, onTaskDrop, onActivityDragStart, onActivityDrop, onDragEnd, onDropTargetChange,
         onAddItem, onDeleteItem, onTextUpdate,
         onDuplicateTask,
-        onCellMouseDown, onCellMouseEnter, onCellRightClick, isCellInBlock,
+        onCellMouseDown, onCellMouseEnter, onCellRightClick, onCellDoubleClick, onAnnotationClick, onWhatsAppClick, isCellInBlock,
         onMoveItem, onToggleHideItem
     } = props;
 
@@ -306,6 +330,9 @@ const ScheduleRow = memo((props: ScheduleRowProps) => {
                 <div className="cell-actions" style={{ display: 'flex', gap: '4px', zIndex: 10 }}>
                     {activity && (
                         <>
+                            <button onClick={(e) => onWhatsAppClick(e, activity.id)} title="Perguntar status via WhatsApp" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#e2e8f0', borderRadius: '4px', width: '24px', height: '24px', pointerEvents: 'auto', border: '1px solid #cbd5e1' }}>
+                                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#25D366" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-message-circle"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"/></svg>
+                            </button>
                             <button onClick={(e) => { e.stopPropagation(); onToggleHideItem(activity.id, 'activity'); }} title={activity.isHidden ? "Mostrar Atividade" : "Ocultar Atividade"} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#e2e8f0', borderRadius: '4px', width: '24px', height: '24px', pointerEvents: 'auto' }}>
                                 <span className="material-icons" style={{ fontSize: '16px', color: activity.isHidden ? '#94a3b8' : '#64748b' }}>{activity.isHidden ? 'visibility_off' : 'visibility'}</span>
                             </button>
@@ -344,6 +371,8 @@ const ScheduleRow = memo((props: ScheduleRowProps) => {
                         onMouseDown={onCellMouseDown}
                         onMouseEnter={onCellMouseEnter}
                         onRightClick={onCellRightClick}
+                        onDoubleClick={onCellDoubleClick}
+                        onAnnotationClick={onAnnotationClick}
                         className={isPrintable ? '' : 'no-print'}
                     />
                 );
@@ -622,6 +651,9 @@ interface ScheduleBodyProps {
     onCellMouseDown: (event: React.MouseEvent, activityId: string, date: string) => void;
     onCellMouseEnter: (activityId: string, date: string) => void;
     onCellRightClick: (event: React.MouseEvent, activityId: string, date: string) => void;
+    onCellDoubleClick: (activityId: string, date: string) => void;
+    onAnnotationClick: (e: React.MouseEvent, annotation: string, activityId: string, date: string, rect: DOMRect) => void;
+    onWhatsAppClick: (e: React.MouseEvent, activityId: string) => void;
     selectionBlock: { anchor: { activityId: string; date: string; }; end: { activityId: string; date: string; }; } | null;
     cutSelectionBlock: { anchor: { activityId: string; date: string; }; end: { activityId: string; date: string; }; } | null;
     isMovingBlock: boolean;
@@ -650,7 +682,7 @@ interface ScheduleBodyProps {
 export const ScheduleBody: React.FC<ScheduleBodyProps> = (props) => {
     const { 
         printNumWeeks, renderableRows, dates, dynamicColumns, columnWidths, stickyColumnPositions, 
-        selectedItems, onRowClick, activeCell, onCellMouseDown, onCellMouseEnter, onCellRightClick,
+        selectedItems, onRowClick, activeCell, onCellMouseDown, onCellMouseEnter, onCellRightClick, onCellDoubleClick, onAnnotationClick, onWhatsAppClick,
         selectionBlock, cutSelectionBlock, isMovingBlock, ghostBlockCells,
         onTextUpdate, onAddItem, onDeleteItem, onMoveItem, onDuplicateTask,
         draggedGroupInfo, draggedTaskInfo, draggedActivityInfo, onGroupDragStart, onGroupDrop, 
@@ -729,6 +761,9 @@ export const ScheduleBody: React.FC<ScheduleBodyProps> = (props) => {
                     onCellMouseDown={onCellMouseDown}
                     onCellMouseEnter={onCellMouseEnter}
                     onCellRightClick={onCellRightClick}
+                    onCellDoubleClick={onCellDoubleClick}
+                    onAnnotationClick={onAnnotationClick}
+                    onWhatsAppClick={onWhatsAppClick}
                     isCellInBlock={isCellInBlock}
                     onToggleHideItem={onToggleHideItem}
                 />

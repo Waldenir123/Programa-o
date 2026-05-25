@@ -20,6 +20,7 @@ export type ScheduleAction =
     | { type: 'BATCH_DELETE_ITEMS'; payload: { id: string; type: 'group' | 'task' | 'activity' }[] }
     | { type: 'UPDATE_TEXT'; payload: { id: string; field: string; value: string } }
     | { type: 'UPDATE_STATUS'; payload: { activityId: string; date: string; status: Status | null } }
+    | { type: 'UPDATE_ANNOTATION'; payload: { activityId: string; date: string; text: string | null } }
     | { type: 'BATCH_UPDATE_STATUS'; payload: { activityId: string; date: string; status: Status | null }[] }
     | { type: 'UPDATE_SCHEDULE'; payload: ScheduleData }
     | { type: 'MOVE_GROUP'; payload: { fromId: string, toId: string | null } }
@@ -252,6 +253,28 @@ export const scheduleReducer = (state: ScheduleState, action: ScheduleAction): S
                                 newSchedule[date] = status;
                             }
                             return { ...activity, schedule: newSchedule };
+                        }
+                        return activity;
+                    })
+                }))
+            }));
+            return createNewStateWithHistory(newData);
+        }
+        case 'UPDATE_ANNOTATION': {
+            const { activityId, date, text } = action.payload;
+            const newData = (state.liveData || []).map(group => ({
+                ...group,
+                tarefas: (group.tarefas || []).map(task => ({
+                    ...task,
+                    activities: (task.activities || []).map(activity => {
+                        if (activity.id === activityId) {
+                            const newAnnotations = { ...(activity.annotations || {}) };
+                            if (text === null || text.trim() === '') {
+                                delete newAnnotations[date];
+                            } else {
+                                newAnnotations[date] = text;
+                            }
+                            return { ...activity, annotations: newAnnotations };
                         }
                         return activity;
                     })

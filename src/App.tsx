@@ -144,6 +144,7 @@ export const App = () => {
   const [isDeletionModalOpen, setDeletionModalOpen] = useState(false);
   const [isPrintModalOpen, setPrintModalOpen] = useState(false);
   const [isTutorialModalOpen, setTutorialModalOpen] = useState(false);
+  const [annotationPopup, setAnnotationPopup] = useState<{ activityId: string, date: string, rect: DOMRect, isEditing: boolean, text: string } | null>(null);
 
   // Global monitoring of machine allocations across all projects for conflict detection
   const allMachineAllocationsGlobal = useMemo(() => {
@@ -1148,6 +1149,60 @@ export const App = () => {
     if (!activeProject) return;
     exportToExcelAgent(filteredData, dates, activeProject, activeProject.dynamicColumns, visibleColumns);
   };
+
+  const handleCellDoubleClick = useCallback((activityId: string, dateStr: string) => {
+    const activity = liveData.flatMap(g => g.tarefas.flatMap(t => t.activities)).find(a => a.id === activityId);
+    if (!activity) return;
+    let text = activity.annotations?.[dateStr] || '';
+    const userName = currentUser?.name || 'Usuário';
+    
+    // Automatically prepare text with the user name if it's empty
+    if (!text) {
+        text = `${userName}:\n`;
+    }
+    
+    // Find the cell in the DOM to position the popup
+    const cellElement = document.querySelector(`td[data-cell-id="${activityId}-${dateStr}"]`);
+    if (cellElement) {
+        const rect = cellElement.getBoundingClientRect();
+        setAnnotationPopup({ activityId, date: dateStr, rect, isEditing: true, text });
+    }
+  }, [liveData, currentUser]);
+
+  const handleAnnotationClick = useCallback((event: React.MouseEvent, annotation: string, activityId: string, dateStr: string, rect: DOMRect) => {
+      setAnnotationPopup({ activityId, date: dateStr, rect, isEditing: false, text: annotation });
+  }, []);
+
+  const handleWhatsAppClick = useCallback((e: React.MouseEvent, activityId: string) => {
+      e.stopPropagation();
+      let activityName = '';
+      let taskTitle = '';
+      let taskFA = '';
+
+      for (const group of liveData) {
+          for (const task of group.tarefas) {
+              const act = task.activities.find(a => a.id === activityId);
+              if (act) {
+                  activityName = act.name;
+                  taskTitle = task.title;
+                  taskFA = task.fa || '';
+                  break;
+              }
+          }
+          if (activityName) break;
+      }
+
+      const cleanTitle = taskTitle.replace(/<[^>]*>?/gm, '');
+      const cleanActivity = activityName.replace(/<[^>]*>?/gm, '');
+      
+      const message = `Olá, tudo bem? Poderia me informar, por favor, qual status dessa atividade:\n\n📌 Tarefa Principal: ${cleanTitle}${taskFA ? ` (Nº FA ${taskFA})` : ''}\n⚙️ Atividade: ${cleanActivity}\n\nFico no aguardo, obrigado!`;
+      
+      navigator.clipboard.writeText(message).then(() => {
+          addToast("Mensagem do WhatsApp copiada!", "success");
+      }).catch(() => {
+          addToast("Erro ao copiar mensagem do WhatsApp.", "error");
+      });
+  }, [liveData, addToast]);
   
   const handleConfirmPrint = () => {
     if (!activeProject) return;
@@ -1825,6 +1880,9 @@ export const App = () => {
                               onCellMouseDown={handleCellMouseDown}
                               onCellMouseEnter={handleCellMouseEnter}
                               onCellRightClick={handleCellRightClick}
+                              onCellDoubleClick={handleCellDoubleClick}
+                              onAnnotationClick={handleAnnotationClick}
+                              onWhatsAppClick={handleWhatsAppClick}
                               selectionBlock={selectionBlock}
                               cutSelectionBlock={cutSelectionBlock}
                               isMovingBlock={isMovingBlock}
@@ -1874,6 +1932,60 @@ export const App = () => {
           <span style={{ fontSize: '0.8rem', opacity: 0.8 }}>Criado por: <strong>Waldenir Oliveira</strong></span>
       </footer>
       <TutorialModal isOpen={isTutorialModalOpen} onClose={() => setTutorialModalOpen(false)} />
+      {annotationPopup && (
+          <div 
+            style={{
+                position: 'fixed', // Fixed so it won't scroll with page/table if we calculate rect on fixed viewport
+                top: annotationPopup.rect.bottom + 5,
+                left: annotationPopup.rect.left,
+                zIndex: 1000,
+                backgroundColor: '#fef9c3', // light yellow
+                border: '1px solid #eab308',
+                padding: '8px',
+                borderRadius: '4px',
+                boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+                minWidth: '200px'
+            }}
+          >
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                  <span style={{ fontSize: '12px', fontWeight: 'bold', color: '#854d0e' }}>Anotação</span>
+                  <div style={{ display: 'flex', gap: '4px' }}>
+                      {!annotationPopup.isEditing && (
+                          <button onClick={() => setAnnotationPopup(p => ({ ...p!, isEditing: true }))} style={{ border: 'none', background: 'none', cursor: 'pointer', padding: 0 }}>
+                              <span className="material-icons" style={{ fontSize: '14px', color: '#854d0e' }}>edit</span>
+                          </button>
+                      )}
+                      <button onClick={() => setAnnotationPopup(null)} style={{ border: 'none', background: 'none', cursor: 'pointer', padding: 0 }}>
+                          <span className="material-icons" style={{ fontSize: '14px', color: '#854d0e' }}>close</span>
+                      </button>
+                  </div>
+              </div>
+              {annotationPopup.isEditing ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                      <textarea
+                          autoFocus
+                          value={annotationPopup.text}
+                          onChange={(e) => setAnnotationPopup(p => ({ ...p!, text: e.target.value }))}
+                          style={{ width: '100%', minHeight: '60px', padding: '4px', fontSize: '12px', border: '1px solid #fde047', backgroundColor: '#fffbeb', borderRadius: '2px', resize: 'vertical' }}
+                      />
+                      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '4px' }}>
+                          <button onClick={() => {
+                              dispatch({ type: 'UPDATE_ANNOTATION', payload: { activityId: annotationPopup.activityId, date: annotationPopup.date, text: null } });
+                              setAnnotationPopup(null);
+                          }} style={{ padding: '2px 8px', fontSize: '11px', border: '1px solid #ef4444', backgroundColor: '#fee2e2', color: '#ef4444', borderRadius: '2px', cursor: 'pointer' }}>Excluir</button>
+                          <button onClick={() => {
+                              dispatch({ type: 'UPDATE_ANNOTATION', payload: { activityId: annotationPopup.activityId, date: annotationPopup.date, text: annotationPopup.text } });
+                              setAnnotationPopup(null);
+                          }} style={{ padding: '2px 8px', fontSize: '11px', border: '1px solid #10b981', backgroundColor: '#d1fae5', color: '#10b981', borderRadius: '2px', cursor: 'pointer' }}>Salvar</button>
+                      </div>
+                  </div>
+              ) : (
+                  <div style={{ fontSize: '12px', color: '#3f6212', whiteSpace: 'pre-wrap' }}>
+                      {annotationPopup.text}
+                  </div>
+              )}
+          </div>
+      )}
     </div>
   );
 };

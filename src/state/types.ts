@@ -35,6 +35,7 @@ export interface Atividade {
   id: string;
   name: string;
   schedule: Record<string, Status>;
+  annotations?: Record<string, string>;
   sector?: string;
   isHidden?: boolean;
 }
