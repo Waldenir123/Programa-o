@@ -113,7 +113,7 @@ export const App = () => {
   const [isAuthReady, setIsAuthReady] = useState(false);
   const [activeProject, setActiveProject] = useState<Project | null>(null);
   const [lastSavedTime, setLastSavedTime] = useState<number | null>(null);
-  const [isAutoSaveEnabled, setIsAutoSaveEnabled] = useState(true);
+  const [isAutoSaveEnabled, setIsAutoSaveEnabled] = useState(false);
 
   const [scheduleState, dispatch] = useReducer(scheduleReducer, {
       liveData: [],
