@@ -1592,6 +1592,19 @@ tr.add-group-row.drop-target-end > .add-group-cell {
   -webkit-overflow-scrolling: touch;
 }
 
+@media (max-width: 768px) {
+  .col-sticky:not(.col-sticky-1):not(.col-sticky-2) {
+    position: static !important;
+  }
+  .schedule-table td, .schedule-table th {
+    padding: 2px !important;
+    font-size: 11px !important;
+  }
+  .schedule-table th {
+    font-size: 10px !important;
+  }
+}
+
 .folder-card-wrapper {
     transition: transform 0.2s;
 }
