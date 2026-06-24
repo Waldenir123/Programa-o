@@ -127,7 +127,7 @@ export const scheduleReducer = (state: ScheduleState, action: ScheduleAction): S
         case 'ADD_ITEM': {
             const { type, parentId, insertAfterId, date, status } = action.payload;
             const initialSchedule = date && status ? { [date]: status } : {};
-            const newActivity = { id: generateId(), name: 'Nova Atividade', schedule: initialSchedule };
+            const newActivity = { id: generateId(), name: 'Nova Atividade', schedule: initialSchedule, sector: '' };
             const newTask = { id: generateId(), title: 'Nova Tarefa Principal', activities: [newActivity] };
             const newGroup = { id: generateId(), tarefas: [newTask], customValues: {} };
 

@@ -50,8 +50,9 @@ export const exportToExcelAgent = async (
     const showID = visibleColumns ? visibleColumns['ID'] !== false : true;
     const showTask = visibleColumns ? visibleColumns['TAREFA PRINCIPAL'] !== false : true;
     const showActivity = visibleColumns ? visibleColumns['ATIVIDADE'] !== false : true;
+    const showSector = visibleColumns ? visibleColumns['SETOR'] !== false : true;
 
-    const baseCols = (showID ? 1 : 0) + visibleDynamicColsMapping.length + (showTask ? 1 : 0) + (showActivity ? 1 : 0);
+    const baseCols = (showID ? 1 : 0) + visibleDynamicColsMapping.length + (showTask ? 1 : 0) + (showActivity ? 1 : 0) + (showSector ? 1 : 0);
 
     const workbook = new ExcelJS.Workbook();
     const worksheet = workbook.addWorksheet('Cronograma');
@@ -81,6 +82,7 @@ export const exportToExcelAgent = async (
     visibleDynamicColsMapping.forEach(c => dayNameHeadersRow.push(c.label.toUpperCase()));
     if (showTask) dayNameHeadersRow.push('TAREFA PRINCIPAL');
     if (showActivity) dayNameHeadersRow.push('ATIVIDADE');
+    if (showSector) dayNameHeadersRow.push('SETOR');
     const dayNumHeadersRow: string[] = Array(baseCols).fill('');
 
     const dateHeaders = dates.map(d => ({
@@ -159,6 +161,7 @@ export const exportToExcelAgent = async (
                     rowData.push(taskText);
                 }
                 if (showActivity) rowData.push(stripHtmlTags(activity.name));
+                if (showSector) rowData.push(stripHtmlTags(activity.sector || ''));
                 
                 dates.forEach(date => {
                     const status = activity.schedule[formatDate(date)];
@@ -198,6 +201,7 @@ export const exportToExcelAgent = async (
     visibleDynamicColsMapping.forEach(() => colWidthsMapping.push({ width: 25 }));
     if (showTask) colWidthsMapping.push({ width: 40 });
     if (showActivity) colWidthsMapping.push({ width: 40 });
+    if (showSector) colWidthsMapping.push({ width: 15 });
     dateHeaders.forEach(() => colWidthsMapping.push({ width: 5 }));
 
     worksheet.columns = colWidthsMapping;
@@ -235,6 +239,37 @@ export const exportToExcelAgent = async (
                 // Body styling
                 if (colNumber <= baseCols) {
                     cell.alignment = { vertical: 'middle', horizontal: 'left', wrapText: true };
+                    
+                    const sectorColNumber = (showID ? 1 : 0) + visibleDynamicColsMapping.length + (showTask ? 1 : 0) + (showActivity ? 1 : 0) + 1;
+                    if (showSector && colNumber === sectorColNumber) {
+                        const sectorText = cell.value?.toString().trim().toUpperCase() || '';
+                        if (sectorText) {
+                            let argbFill = 'FFF1F5F9';
+                            let argbText = 'FF475569';
+                            if (sectorText === 'CTMSP' || sectorText.startsWith('IE')) {
+                                argbFill = 'FFD9D9D9';
+                                argbText = 'FF000000';
+                            } else if (sectorText === 'IPC-C' || sectorText === 'IPC-T') {
+                                argbFill = 'FFFF3B30';
+                                argbText = 'FFFFFFFF';
+                            } else if (sectorText.startsWith('IPC')) {
+                                argbFill = 'FF92D050';
+                                argbText = 'FF000000';
+                            } else if (sectorText.startsWith('IPS')) {
+                                argbFill = 'FFFFFF00';
+                                argbText = 'FF000000';
+                            } else if (sectorText.startsWith('IPU')) {
+                                argbFill = 'FFC6E0B4';
+                                argbText = 'FF000000';
+                            } else if (sectorText.startsWith('IQ')) {
+                                argbFill = 'FF00B0F0';
+                                argbText = 'FFFFFFFF';
+                            }
+                            cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: argbFill } };
+                            cell.font = { name: 'Arial', size: 9, bold: true, color: { argb: argbText } };
+                            cell.alignment = { vertical: 'middle', horizontal: 'center' };
+                        }
+                    }
                 } else {
                     cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
                     
@@ -285,6 +320,7 @@ export const exportToPdfAgent = (
     const showID = visibleColumns ? visibleColumns['ID'] !== false : true;
     const showTask = visibleColumns ? visibleColumns['TAREFA PRINCIPAL'] !== false : true;
     const showActivity = visibleColumns ? visibleColumns['ATIVIDADE'] !== false : true;
+    const showSector = visibleColumns ? visibleColumns['SETOR'] !== false : true;
 
     const N = visibleDynamicCols.length;
 
@@ -294,6 +330,7 @@ export const exportToPdfAgent = (
     fixedColsWidth += (N * 80);
     if (showTask) fixedColsWidth += 140;
     if (showActivity) fixedColsWidth += 110;
+    if (showSector) fixedColsWidth += 70;
 
     const dateColWidth = 33; 
     const margins = 80;
@@ -315,13 +352,14 @@ export const exportToPdfAgent = (
     });
     if (showTask) columns.push({ header: 'TAREFA PRINCIPAL', dataKey: 'task' });
     if (showActivity) columns.push({ header: 'ATIVIDADE', dataKey: 'activity' });
+    if (showSector) columns.push({ header: 'SETOR', dataKey: 'sector' });
     dates.forEach((d, i) => {
         columns.push({ header: `date_${i}`, dataKey: `date_${i}` });
     });
 
     // Build head
     const totalCols = columns.length;
-    const fixedCols = (showID ? 1 : 0) + visibleDynamicCols.length + (showTask ? 1 : 0) + (showActivity ? 1 : 0);
+    const fixedCols = (showID ? 1 : 0) + visibleDynamicCols.length + (showTask ? 1 : 0) + (showActivity ? 1 : 0) + (showSector ? 1 : 0);
 
     const firstWeek = dates.length > 0 ? getWeek(dates[0]) : '';
     const lastWeek = dates.length > 0 ? getWeek(dates[dates.length - 1]) : '';
@@ -383,6 +421,7 @@ export const exportToPdfAgent = (
     });
     if (showTask) head2.push({ content: 'TAREFA PRINCIPAL', rowSpan: 2, styles: { halign: 'center', valign: 'middle', fillColor: [221, 235, 247], textColor: [0, 0, 0] } });
     if (showActivity) head2.push({ content: 'ATIVIDADE', rowSpan: 2, styles: { halign: 'center', valign: 'middle', fillColor: [221, 235, 247], textColor: [0, 0, 0] } });
+    if (showSector) head2.push({ content: 'SETOR', rowSpan: 2, styles: { halign: 'center', valign: 'middle', fillColor: [221, 235, 247], textColor: [0, 0, 0] } });
 
     head2.push(...dates.map(date => ({ content: getDayAbbr(date), styles: { halign: 'center', fillColor: [255, 255, 255], textColor: [0, 0, 0] } })));
     head3.push(...dates.map(date => ({ content: date.getUTCDate().toString(), styles: { halign: 'center', fillColor: [255, 255, 255], textColor: [0, 0, 0] } })));
@@ -407,6 +446,9 @@ export const exportToPdfAgent = (
                     id: `${wbsGroup}.${wbsTask}.${wbsActivity}`,
                     activity: stripHtmlTags(activity.name)
                 };
+                if (showSector) {
+                    row.sector = stripHtmlTags(activity.sector || '');
+                }
 
                 // Add grouping fields only on the first row of span
                 if (isFirstRowOfGroup) {
@@ -455,6 +497,10 @@ export const exportToPdfAgent = (
         columnStyles[colIdx] = { cellWidth: 110, halign: 'left' };
         colIdx++;
     }
+    if (showSector) {
+        columnStyles[colIdx] = { cellWidth: 70, halign: 'center' };
+        colIdx++;
+    }
 
     autoTable(doc, {
         columns: columns,
@@ -466,6 +512,42 @@ export const exportToPdfAgent = (
         styles: { fontSize: 7, cellPadding: 3, valign: 'middle', halign: 'center', lineColor: [45, 55, 72], lineWidth: 0.5, overflow: 'linebreak' },
         columnStyles: columnStyles,
         didDrawCell: (data) => {
+            if (data.section === 'body' && data.column.dataKey === 'sector') {
+                const sectorVal = String(data.cell.text[0] || '').trim().toUpperCase();
+                if (sectorVal) {
+                    let rgbFill = [241, 245, 249];
+                    let rgbText = [71, 85, 105];
+                    if (sectorVal === 'CTMSP' || sectorVal.startsWith('IE')) {
+                        rgbFill = [217, 217, 217];
+                        rgbText = [0, 0, 0];
+                    } else if (sectorVal === 'IPC-C' || sectorVal === 'IPC-T') {
+                        rgbFill = [255, 59, 48];
+                        rgbText = [255, 255, 255];
+                    } else if (sectorVal.startsWith('IPC')) {
+                        rgbFill = [146, 208, 80];
+                        rgbText = [0, 0, 0];
+                    } else if (sectorVal.startsWith('IPS')) {
+                        rgbFill = [255, 255, 0];
+                        rgbText = [0, 0, 0];
+                    } else if (sectorVal.startsWith('IPU')) {
+                        rgbFill = [198, 224, 180];
+                        rgbText = [0, 0, 0];
+                    } else if (sectorVal.startsWith('IQ')) {
+                        rgbFill = [0, 176, 240];
+                        rgbText = [255, 255, 255];
+                    }
+                    doc.setFillColor(rgbFill[0], rgbFill[1], rgbFill[2]);
+                    doc.rect(data.cell.x, data.cell.y, data.cell.width, data.cell.height, 'F');
+                    doc.setTextColor(rgbText[0], rgbText[1], rgbText[2]);
+                    doc.setFont(data.cell.styles.font, 'bold');
+                    doc.text(String(data.cell.text[0] || ''), data.cell.x + data.cell.width / 2, data.cell.y + data.cell.height / 2, { align: 'center', baseline: 'middle' });
+                    
+                    doc.setDrawColor(45, 55, 72);
+                    doc.setLineWidth(0.5);
+                    doc.rect(data.cell.x, data.cell.y, data.cell.width, data.cell.height, 'S');
+                }
+            }
+
             if (data.section === 'body' && String(data.column.dataKey).startsWith('date_')) {
                 const dateIndex = parseInt(String(data.column.dataKey).split('_')[1], 10);
                 const currentDate = dates[dateIndex];

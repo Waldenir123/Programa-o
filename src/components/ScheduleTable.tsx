@@ -1,5 +1,5 @@
-import React, { useMemo, useCallback, memo } from 'react';
-import { ScheduleData, Status, SelectedItem, Atividade, Grupo, TarefaPrincipal, RenderableRow, STATUS_CLASS_MAP, DynamicColumn } from '../state/types';
+import React, { useMemo, useCallback, memo, useState, useEffect, useRef } from 'react';
+import { ScheduleData, Status, SelectedItem, Atividade, Grupo, TarefaPrincipal, RenderableRow, STATUS_CLASS_MAP, DynamicColumn, PREDEFINED_SECTORS, getSectorStyle } from '../state/types';
 import { formatDate, getDayAbbr, getWeek, cleanText } from '../utils/dataUtils';
 
 // --- Sub-components for better performance ---
@@ -122,6 +122,269 @@ interface ScheduleRowProps {
     onMoveItem: (id: string, type: 'task' | 'activity', direction: 'up' | 'down') => void;
     onToggleHideItem: (id: string, type: 'group' | 'task' | 'activity') => void;
 }
+
+interface SectorCellProps {
+    activity: Atividade | undefined;
+    taskId: string;
+    columnWidth: number;
+    stickyLeft: number;
+    stickyIndex: number;
+    isVisible: boolean;
+    onTextUpdate: (id: string, field: string, value: string) => void;
+}
+
+const SectorCell: React.FC<SectorCellProps> = ({
+    activity,
+    columnWidth,
+    stickyLeft,
+    stickyIndex,
+    isVisible,
+    onTextUpdate
+}) => {
+    const [isOpen, setIsOpen] = useState(false);
+    const [searchText, setSearchText] = useState('');
+    const containerRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        if (!isOpen) return;
+        const handleClickOutside = (event: MouseEvent) => {
+            if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+                setIsOpen(false);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, [isOpen]);
+
+    if (!isVisible) {
+        return (
+            <td 
+                className={`col-sticky col-sticky-${stickyIndex}`} 
+                style={{ display: 'none' }}
+            />
+        );
+    }
+    if (!activity) {
+        return (
+            <td 
+                className={`col-sticky col-sticky-${stickyIndex}`} 
+                style={{ width: columnWidth, left: stickyLeft, backgroundColor: '#f8fafc', display: 'table-cell' }}
+            />
+        );
+    }
+
+    const currentSector = activity.sector || '';
+    const style = getSectorStyle(currentSector);
+
+    const handleSelectOption = (val: string) => {
+        onTextUpdate(activity.id, 'sector', val);
+        setIsOpen(false);
+    };
+
+    const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            handleSelectOption(searchText.trim());
+        } else if (e.key === 'Escape') {
+            setIsOpen(false);
+        }
+    };
+
+    const filteredSectors = PREDEFINED_SECTORS.filter(s =>
+        s.toLowerCase().includes(searchText.toLowerCase())
+    );
+
+    const isCustomOptionVisible = searchText.trim() !== '' && 
+        !PREDEFINED_SECTORS.some(s => s.toLowerCase() === searchText.trim().toLowerCase());
+
+    return (
+        <td 
+            className={`col-sticky col-sticky-${stickyIndex}`} 
+            style={{ 
+                width: columnWidth, 
+                left: stickyLeft, 
+                verticalAlign: 'middle', 
+                userSelect: 'none',
+                zIndex: isOpen ? 50 : undefined,
+                display: 'table-cell'
+            }}
+        >
+            <div 
+                ref={containerRef}
+                style={{ position: 'relative', width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+            >
+                <div 
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        setIsOpen(true);
+                        setSearchText(currentSector);
+                    }}
+                    style={{
+                        backgroundColor: currentSector ? style.background : '#f1f5f9',
+                        color: currentSector ? style.color : '#64748b',
+                        border: currentSector ? (style.border || '1px solid transparent') : '1px dashed #cbd5e1',
+                        padding: '3px 8px',
+                        borderRadius: '4px',
+                        fontWeight: '600',
+                        fontSize: '11px',
+                        textAlign: 'center',
+                        cursor: 'pointer',
+                        minWidth: '55px',
+                        maxWidth: '100%',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap',
+                        transition: 'all 0.15s ease'
+                    }}
+                    title={currentSector || "Clique para definir um setor"}
+                >
+                    {currentSector || '...'}
+                </div>
+
+                {isOpen && (
+                    <div 
+                        style={{
+                            position: 'absolute',
+                            top: '100%',
+                            left: 0,
+                            zIndex: 1000,
+                            width: '200px',
+                            maxHeight: '260px',
+                            backgroundColor: '#ffffff',
+                            border: '1px solid #cbd5e1',
+                            borderRadius: '6px',
+                            boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            overflow: 'hidden',
+                            marginTop: '4px'
+                        }}
+                        onMouseDown={e => e.stopPropagation()}
+                        onMouseUp={e => e.stopPropagation()}
+                        onClick={e => e.stopPropagation()}
+                    >
+                        <div style={{ padding: '6px', borderBottom: '1px solid #e2e8f0', display: 'flex', gap: '4px' }}>
+                            <input 
+                                type="text"
+                                autoFocus
+                                value={searchText}
+                                onChange={(e) => setSearchText(e.target.value)}
+                                onKeyDown={handleKeyDown}
+                                placeholder="Buscar ou digite setor..."
+                                style={{
+                                    width: '100%',
+                                    padding: '4px 8px',
+                                    fontSize: '12px',
+                                    border: '1px solid #cbd5e1',
+                                    borderRadius: '4px',
+                                    outline: 'none',
+                                    color: '#1e293b'
+                                }}
+                            />
+                            {searchText.trim() && (
+                                <button
+                                    onClick={() => handleSelectOption(searchText.trim())}
+                                    style={{
+                                        padding: '4px 8px',
+                                        fontSize: '11px',
+                                        backgroundColor: '#10b981',
+                                        color: '#ffffff',
+                                        border: 'none',
+                                        borderRadius: '4px',
+                                        cursor: 'pointer',
+                                        fontWeight: '500'
+                                    }}
+                                >
+                                    Ok
+                                </button>
+                            )}
+                        </div>
+
+                        <div style={{ overflowY: 'auto', flexGrow: 1, maxHeight: '200px', padding: '4px 0' }}>
+                            {currentSector && (
+                                <div 
+                                    onClick={() => handleSelectOption('')}
+                                    style={{
+                                        padding: '5px 10px',
+                                        fontSize: '11px',
+                                        cursor: 'pointer',
+                                        color: '#ef4444',
+                                        backgroundColor: '#fef2f2',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '4px',
+                                        fontWeight: '500',
+                                        borderBottom: '1px solid #fee2e2'
+                                    }}
+                                >
+                                    <span className="material-icons" style={{ fontSize: '14px' }}>clear</span> Limpar Campo
+                                </div>
+                            )}
+
+                            {isCustomOptionVisible && (
+                                <div 
+                                    onClick={() => handleSelectOption(searchText.trim())}
+                                    style={{
+                                        padding: '6px 10px',
+                                        fontSize: '11px',
+                                        cursor: 'pointer',
+                                        backgroundColor: '#eff6ff',
+                                        color: '#1d4ed8',
+                                        borderBottom: '1px solid #dbeafe',
+                                        fontWeight: '600'
+                                    }}
+                                >
+                                    + Adicionar "{searchText.trim()}"
+                                </div>
+                            )}
+
+                            {filteredSectors.map(sec => {
+                                const secStyle = getSectorStyle(sec);
+                                return (
+                                    <div 
+                                        key={sec}
+                                        onClick={() => handleSelectOption(sec)}
+                                        style={{
+                                            padding: '6px 10px',
+                                            fontSize: '11px',
+                                            cursor: 'pointer',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'space-between',
+                                            backgroundColor: '#ffffff',
+                                            transition: 'background-color 0.1s',
+                                            color: '#1e293b'
+                                        }}
+                                        className="hover:bg-slate-100"
+                                    >
+                                        <span>{sec}</span>
+                                        <span style={{
+                                            backgroundColor: secStyle.background,
+                                            color: secStyle.color,
+                                            border: secStyle.border || '1px solid transparent',
+                                            padding: '1px 5px',
+                                            borderRadius: '3px',
+                                            fontSize: '9px',
+                                            fontWeight: 'bold'
+                                        }}>
+                                            Cor
+                                        </span>
+                                    </div>
+                                );
+                            })}
+
+                            {filteredSectors.length === 0 && !isCustomOptionVisible && (
+                                <div style={{ padding: '8px 12px', fontSize: '11px', color: '#64748b', fontStyle: 'italic', textAlign: 'center' }}>
+                                    Nenhum setor encontrado
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                )}
+            </div>
+        </td>
+    );
+};
 
 const ScheduleRow = memo((props: ScheduleRowProps) => {
     const { 
@@ -354,6 +617,15 @@ const ScheduleRow = memo((props: ScheduleRowProps) => {
                     )}
                 </div>
             </td>
+            <SectorCell
+                activity={activity}
+                taskId={task.id}
+                columnWidth={columnWidths[dynamicColumns.length + 3]}
+                stickyLeft={stickyColumnPositions[dynamicColumns.length + 3]}
+                stickyIndex={dynamicColumns.length + 4}
+                isVisible={visibleColumns ? visibleColumns['SETOR'] !== false : true}
+                onTextUpdate={onTextUpdate}
+            />
             {(dates || []).map((date, dateIndex) => {
                 const isPrintable = printNumWeeks === undefined || dateIndex < printNumWeeks * 7;
                 const dateStr = formatDate(date);
@@ -604,6 +876,24 @@ export const ScheduleHeader: React.FC<ScheduleHeaderProps> = ({
                         </button>
                     </div>
                     <div className="resize-handle" onMouseDown={(e) => onResizeStart(dynamicColumns.length + 2, e)}></div>
+                </th>
+
+                <th
+                    rowSpan={3}
+                    style={{ width: columnWidths[dynamicColumns.length + 3], left: stickyColumnPositions[dynamicColumns.length + 3], display: visibleColumns && visibleColumns['SETOR'] === false ? 'none' : 'table-cell' }}
+                    className={`col-sticky col-sticky-${dynamicColumns.length + 4}`}
+                >
+                    <div className="header-content">
+                        <span>SETOR</span>
+                        <button
+                            className={`filter-icon-button ${activeFilters['sector']?.size > 0 ? 'active' : ''}`}
+                            onClick={(e) => onOpenFilter('sector', e.currentTarget.getBoundingClientRect())}
+                            aria-label="Filtrar Setor"
+                        >
+                            <span className="material-icons">filter_list</span>
+                        </button>
+                    </div>
+                    <div className="resize-handle" onMouseDown={(e) => onResizeStart(dynamicColumns.length + 3, e)}></div>
                 </th>
 
                 {weekSpans.map((span, index) => {

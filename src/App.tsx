@@ -49,7 +49,7 @@ testConnection();
 import { scheduleReducer } from './state/scheduleReducer';
 import { 
     Project, UserProjects, Page, SelectedItem, ScheduleData, ToastMessage, RenderableRow, Status, Atividade, TarefaPrincipal,
-    PREDEFINED_MANPOWER_ROLES, STATUS_LABELS, STATUS_COLOR_MAP, DynamicColumn 
+    PREDEFINED_MANPOWER_ROLES, STATUS_LABELS, STATUS_COLOR_MAP, DynamicColumn, Machine, MachineStatus 
 } from './state/types';
 
 // Hooks
@@ -105,6 +105,100 @@ import { RichTextToolbar } from './components/RichTextToolbar';
   machines: [],
   dailyMachineAllocation: {}
 });
+
+const createDemoProject = (userId: string): Project => {
+  const projId = 'demo-project-id';
+  const demoData: ScheduleData = [
+    {
+      id: 'g-1',
+      customValues: {
+        'fa': 'Fase 1 - Fundações'
+      },
+      tarefas: [
+        {
+          id: 't-1',
+          title: 'Escavações de valas',
+          activities: [
+            {
+              id: 'a-1',
+              name: 'Escavação mecânica com retro',
+              sector: 'Setor A',
+              schedule: {
+                '2026-04-13': Status.Realizado,
+                '2026-04-14': Status.Realizado,
+                '2026-04-15': Status.Programado,
+                '2026-04-16': Status.Programado,
+              }
+            }
+          ]
+        },
+        {
+          id: 't-2',
+          title: 'Montagem de formas',
+          activities: [
+            {
+              id: 'a-2',
+              name: 'Carpintaria de fôrmas',
+              sector: 'Setor A',
+              schedule: {
+                '2026-04-15': Status.Programado,
+                '2026-04-16': Status.Programado,
+                '2026-04-17': Status.NaoRealizado,
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ];
+
+  return {
+    id: projId,
+    name: 'Projeto de Teste (PCP)',
+    ownerId: userId,
+    obra: 'Demonstração PCP',
+    lastModified: Date.now(),
+    title: 'Programação de Teste Semanal',
+    startDate: '2026-04-13',
+    programmerName: 'Waldenir Oliveira',
+    liveData: demoData,
+    savedPlan: deepClone(demoData),
+    manpowerAllocation: {
+      roles: [...PREDEFINED_MANPOWER_ROLES],
+      hasSecondShift: false,
+      data: {
+          adm: {
+            'Linha de Frente': { '2026-16': 10, '2026-17': 12 },
+            'Encarregado': { '2026-16': 1, '2026-17': 1 }
+          },
+          shift2: {}
+      }
+    },
+    dailyManpowerAllocation: {},
+    machines: [
+      { id: 'm-1', name: 'Escavadeira CAT 320', category: 'Escavação', status: MachineStatus.Funcionamento },
+      { id: 'm-2', name: 'Mini Escavadeira Bobcat', category: 'Escavação', status: MachineStatus.Funcionamento }
+    ],
+    dailyMachineAllocation: {
+      'a-1': {
+        '2026-04-13': ['m-1'],
+        '2026-04-14': ['m-2']
+      }
+    },
+    dynamicColumns: [
+      { id: 'fa', name: 'Fase/Agrupador', width: 120 }
+    ],
+    displaySettings: {
+      visibleColumns: {
+        'ID': true,
+        'Fase/Agrupador': true,
+        'TAREFA PRINCIPAL': true,
+        'ATIVIDADE': true,
+        'SETOR': true,
+      }
+    }
+  };
+};
 
 export const App = () => {
   // --- STATE MANAGEMENT ---
@@ -176,8 +270,8 @@ export const App = () => {
   const [dropTargetId, setDropTargetId] = useState<string | null>(null);
 
   // Column resizing and zoom state
-  const [fixedColumnWidths, setFixedColumnWidths] = useState<number[]>([50, 130, 280, 250]);
-  const [comparisonFixedColumnWidths, setComparisonFixedColumnWidths] = useState<number[]>([50, 130, 280, 250, 80]);
+  const [fixedColumnWidths, setFixedColumnWidths] = useState<number[]>([50, 130, 280, 250, 110]);
+  const [comparisonFixedColumnWidths, setComparisonFixedColumnWidths] = useState<number[]>([50, 130, 280, 250, 110, 80]);
   const [zoomLevels, setZoomLevels] = useState<Record<Page, number>>({
       schedule: 135,
       dashboard: 100,
@@ -195,6 +289,7 @@ export const App = () => {
       'Fase/Agrupador': true,
       'TAREFA PRINCIPAL': true,
       'ATIVIDADE': true,
+      'SETOR': true,
   });
   
   const gridRef = useRef<HTMLDivElement>(null);
@@ -300,6 +395,8 @@ export const App = () => {
                 .map(task => {
                     const actSelections = filters['atividade'];
                     const isAtividadeFilterActive = actSelections && actSelections.size > 0;
+                    const sectorSelections = filters['sector'];
+                    const isSectorFilterActive = sectorSelections && sectorSelections.size > 0;
                     const searchLower = activitySearchText.toLowerCase();
                     
                     const filteredActivities = (task.activities || []).filter(act => {
@@ -307,12 +404,14 @@ export const App = () => {
                             return false;
                         }
                         
-                        if (isAtividadeFilterActive) {
-                            // If filter is active and name is selected, ALWAYS show it. Otherwise hide it.
-                            return actSelections.has(act.name);
+                        if (isAtividadeFilterActive && !actSelections.has(act.name)) {
+                            return false;
+                        }
+
+                        if (isSectorFilterActive && !sectorSelections.has(act.sector || '')) {
+                            return false;
                         }
                         
-                        // If no filter on atividade, behave normally regarding hidden
                         if (act.isHidden && !showHiddenActivities) return false;
                         
                         return true;
@@ -327,7 +426,7 @@ export const App = () => {
         groupsFiltered = groupsFiltered.filter(group => {
             for (const [colId, selections] of Object.entries(filters)) {
                 if (selections && selections.size > 0) {
-                    if (colId === 'tarefaPrincipal' || colId === 'atividade') continue;
+                    if (colId === 'tarefaPrincipal' || colId === 'atividade' || colId === 'sector') continue;
                     const value = group.customValues?.[colId] || '';
                     if (!selections.has(value)) return false;
                 }
@@ -413,6 +512,37 @@ export const App = () => {
        setProjects({});
        return;
     }
+
+    if (currentUser.uid === 'guest-user') {
+       let localProjects: Record<string, Project> = {};
+       const localProjectsRaw = localStorage.getItem('pcp-local-projects');
+       if (localProjectsRaw) {
+           try {
+               localProjects = JSON.parse(localProjectsRaw);
+           } catch (e) {
+               console.error("Local projects parse error:", e);
+           }
+       }
+       
+       if (Object.keys(localProjects).length === 0) {
+           const demo = createDemoProject('guest-user');
+           localProjects[demo.id] = demo;
+           localStorage.setItem('pcp-local-projects', JSON.stringify(localProjects));
+       }
+       
+       setProjects(localProjects);
+       
+       const lastActiveId = localStorage.getItem(`pcp-lastActive-guest-user`);
+       const projectToLoad = localProjects[lastActiveId!] || Object.values(localProjects)[0];
+       if (projectToLoad) {
+           setLastSavedTime(projectToLoad.lastModified);
+           setActiveProject(projectToLoad);
+           dispatch({ type: 'LOAD_DATA', payload: projectToLoad.liveData });
+           dispatchSummary({ type: 'LOAD_DATA', payload: projectToLoad.summaryData || projectToLoad.liveData });
+       }
+       return;
+    }
+
     const q = query(collection(db, 'projects'));
     const unsubscribe = onSnapshot(q, (snapshot) => {
         const newProjects: Record<string, Project> = {};
@@ -484,12 +614,42 @@ export const App = () => {
     return unsubscribe;
   }, [currentUser, isAuthReady, activeProject]);
 
+  const handleGuestLogin = () => {
+    const guestUser = {
+      uid: 'guest-user',
+      email: 'guest@example.com',
+      displayName: 'Usuário de Teste (Convidado)',
+      emailVerified: true,
+      isAnonymous: true,
+    } as any;
+    setCurrentUser(guestUser);
+    setIsAuthReady(true);
+  };
+
   const handleLogout = async () => {
+    if (currentUser?.uid === 'guest-user') {
+      setCurrentUser(null);
+      setActiveProject(null);
+      return;
+    }
     await signOut(auth);
     setActiveProject(null);
   };
 
   const persistProjectToFirebase = async (project: Project) => {
+    if (currentUser?.uid === 'guest-user') {
+      try {
+        const localProjectsRaw = localStorage.getItem('pcp-local-projects');
+        const localProjects = localProjectsRaw ? JSON.parse(localProjectsRaw) : {};
+        localProjects[project.id] = project;
+        localStorage.setItem('pcp-local-projects', JSON.stringify(localProjects));
+        setLastSavedTime(Date.now());
+        setProjects(localProjects);
+      } catch (e) {
+        console.error("Local save error:", e);
+      }
+      return;
+    }
     try {
       const dbProject = {
         ...project,
@@ -611,6 +771,28 @@ export const App = () => {
   const handleDeleteProject = async (projectId: string) => {
     if (!currentUser) return;
     const deletedProjectName = projects[projectId]?.name || 'Projeto';
+    if (currentUser.uid === 'guest-user') {
+      try {
+        const localProjectsRaw = localStorage.getItem('pcp-local-projects');
+        const localProjects = localProjectsRaw ? JSON.parse(localProjectsRaw) : {};
+        delete localProjects[projectId];
+        localStorage.setItem('pcp-local-projects', JSON.stringify(localProjects));
+        setProjects(localProjects);
+        addToast(`Projeto '${deletedProjectName}' excluído.`, 'success');
+        if (activeProject?.id === projectId) {
+            const nextProject = Object.values(localProjects as Record<string, Project>).sort((a,b) => b.lastModified - a.lastModified)[0];
+            if (nextProject) {
+                handleLoadProject(nextProject.id);
+            } else {
+                 setActiveProject(null);
+                 localStorage.removeItem('pcp-lastActive-guest-user');
+            }
+        }
+      } catch (e) {
+         console.error(e);
+      }
+      return;
+    }
     try {
         await deleteDoc(doc(db, 'projects', projectId));
         addToast(`Projeto '${deletedProjectName}' excluído.`, 'success');
@@ -630,6 +812,25 @@ export const App = () => {
   
   const handleMoveProject = async (id: string, newObra: string) => {
     if (!currentUser) return;
+    if (currentUser.uid === 'guest-user') {
+      try {
+        const localProjectsRaw = localStorage.getItem('pcp-local-projects');
+        const localProjects = localProjectsRaw ? JSON.parse(localProjectsRaw) : {};
+        if (localProjects[id]) {
+          localProjects[id].obra = newObra;
+          localProjects[id].lastModified = Date.now();
+          localStorage.setItem('pcp-local-projects', JSON.stringify(localProjects));
+          setProjects(localProjects);
+          if (activeProject && activeProject.id === id) {
+              setActiveProject(prev => prev ? { ...prev, obra: newObra } : prev);
+          }
+          addToast(`Projeto movido para pasta '${newObra}'`, 'success');
+        }
+      } catch (e) {
+        console.error(e);
+      }
+      return;
+    }
     try {
       await setDoc(doc(db, 'projects', id), { obra: newObra, lastModified: Date.now() }, { merge: true });
       addToast(`Projeto movido para pasta '${newObra}'`, 'success');
@@ -643,6 +844,25 @@ export const App = () => {
 
   const handleRenameProject = async (id: string, newName: string) => {
     if (!currentUser) return;
+    if (currentUser.uid === 'guest-user') {
+      try {
+        const localProjectsRaw = localStorage.getItem('pcp-local-projects');
+        const localProjects = localProjectsRaw ? JSON.parse(localProjectsRaw) : {};
+        if (localProjects[id]) {
+          localProjects[id].name = newName;
+          localProjects[id].lastModified = Date.now();
+          localStorage.setItem('pcp-local-projects', JSON.stringify(localProjects));
+          setProjects(localProjects);
+          addToast(`Projeto renomeado para '${newName}'`, 'success');
+          if (activeProject && activeProject.id === id) {
+              setActiveProject(prev => prev ? { ...prev, name: newName } : prev);
+          }
+        }
+      } catch (e) {
+        console.error(e);
+      }
+      return;
+    }
     try {
       await setDoc(doc(db, 'projects', id), { name: newName, lastModified: Date.now() }, { merge: true });
       addToast(`Projeto renomeado para '${newName}'`, 'success');
@@ -675,6 +895,28 @@ export const App = () => {
       return;
     }
 
+    if (currentUser.uid === 'guest-user') {
+      try {
+        const localProjectsRaw = localStorage.getItem('pcp-local-projects');
+        const localProjects = localProjectsRaw ? JSON.parse(localProjectsRaw) : {};
+        projectsInFolder.forEach(project => {
+          if (localProjects[project.id]) {
+            localProjects[project.id].obra = newName;
+            localProjects[project.id].lastModified = Date.now();
+          }
+        });
+        localStorage.setItem('pcp-local-projects', JSON.stringify(localProjects));
+        setProjects(localProjects);
+        addToast(`Pasta '${oldName}' renomeada para '${newName}'`, 'success');
+        if (activeProject && (activeProject.obra || 'Geral') === oldName) {
+            setActiveProject(prev => prev ? { ...prev, obra: newName } : prev);
+        }
+      } catch (e) {
+         console.error(e);
+      }
+      return;
+    }
+
     try {
       await Promise.all(projectsInFolder.map(project => 
         setDoc(doc(db, 'projects', project.id), { obra: newName, lastModified: Date.now() }, { merge: true })
@@ -691,6 +933,31 @@ export const App = () => {
     
     if (projectsInFolder.length === 0) {
       addToast("Nenhum projeto encontrado para excluir.", "error");
+      return;
+    }
+
+    if (currentUser.uid === 'guest-user') {
+      try {
+        const localProjectsRaw = localStorage.getItem('pcp-local-projects');
+        const localProjects = localProjectsRaw ? JSON.parse(localProjectsRaw) : {};
+        projectsInFolder.forEach(project => {
+          delete localProjects[project.id];
+        });
+        localStorage.setItem('pcp-local-projects', JSON.stringify(localProjects));
+        setProjects(localProjects);
+        addToast(`Pasta '${folderName}' e seus ${projectsInFolder.length} arquivos foram excluídos.`, 'success');
+        if (activeProject && (activeProject.obra || 'Geral') === folderName) {
+            const nextProject = Object.values(localProjects as Record<string, Project>).sort((a,b) => b.lastModified - a.lastModified)[0];
+            if (nextProject) {
+                handleLoadProject(nextProject.id);
+            } else {
+                 setActiveProject(null);
+                 localStorage.removeItem('pcp-lastActive-guest-user');
+            }
+        }
+      } catch (e) {
+         console.error(e);
+      }
       return;
     }
 
@@ -1100,7 +1367,7 @@ export const App = () => {
   }, []);
   
   const filterOptions = useMemo(() => {
-    const options: Record<string, string[]> = { tarefaPrincipal: [], atividade: [] };
+    const options: Record<string, string[]> = { tarefaPrincipal: [], atividade: [], sector: [] };
     if (!activeProject) return options;
     
     activeProject.dynamicColumns.forEach(col => {
@@ -1121,6 +1388,10 @@ export const App = () => {
             task.activities.forEach(act => {
                 if (act.name && !options.atividade.includes(act.name)) {
                     options.atividade.push(act.name);
+                }
+                const s = act.sector || '';
+                if (s && !options.sector.includes(s)) {
+                    options.sector.push(s);
                 }
             });
         });
@@ -1223,14 +1494,14 @@ export const App = () => {
     const dynamicCols = activeProject?.dynamicColumns || [];
     const beforeNames = dynamicCols.filter(c => c.position !== 'after').map(col => col.name);
     const afterNames = dynamicCols.filter(c => c.position === 'after').map(col => col.name);
-    return ['ID', ...beforeNames, 'TAREFA PRINCIPAL', ...afterNames, 'ATIVIDADE'];
+    return ['ID', ...beforeNames, 'TAREFA PRINCIPAL', ...afterNames, 'ATIVIDADE', 'SETOR'];
   }, [activeProject?.dynamicColumns]);
 
   const comparisonHeaders = useMemo(() => {
     const dynamicCols = activeProject?.dynamicColumns || [];
     const beforeNames = dynamicCols.filter(c => c.position !== 'after').map(col => col.name);
     const afterNames = dynamicCols.filter(c => c.position === 'after').map(col => col.name);
-    return ['ID', ...beforeNames, 'TAREFA PRINCIPAL', ...afterNames, 'ATIVIDADE', 'PLANO'];
+    return ['ID', ...beforeNames, 'TAREFA PRINCIPAL', ...afterNames, 'ATIVIDADE', 'SETOR', 'PLANO'];
   }, [activeProject?.dynamicColumns]);
   const headers = currentPage === 'comparison' ? comparisonHeaders : scheduleHeaders;
 
@@ -1648,7 +1919,7 @@ export const App = () => {
     return <div style={{display:'flex',justifyContent:'center',alignItems:'center',height:'100vh',fontSize:'1.2rem',color:'#64748b'}}>Carregando...</div>;
   }
   if (!currentUser) {
-    return <AuthScreen />;
+    return <AuthScreen onGuestLogin={handleGuestLogin} />;
   }
 
   return (

@@ -2,7 +2,11 @@ import React, { useState } from 'react';
 import { signInWithPopup, GoogleAuthProvider } from 'firebase/auth';
 import { auth } from '../firebase';
 
-export const AuthScreen = () => {
+interface AuthScreenProps {
+    onGuestLogin?: () => void;
+}
+
+export const AuthScreen: React.FC<AuthScreenProps> = ({ onGuestLogin }) => {
     const [error, setError] = useState('');
 
     const handleGoogleLogin = async () => {
@@ -44,6 +48,41 @@ export const AuthScreen = () => {
                     </svg>
                     Entrar com o Google
                 </button>
+
+                {onGuestLogin && (
+                    <>
+                        <div style={{ display: 'flex', alignItems: 'center', margin: '20px 0', width: '100%' }}>
+                            <div style={{ flex: 1, height: '1px', backgroundColor: '#cbd5e1' }}></div>
+                            <span style={{ padding: '0 10px', color: '#94a3b8', fontSize: '0.875rem' }}>ou</span>
+                            <div style={{ flex: 1, height: '1px', backgroundColor: '#cbd5e1' }}></div>
+                        </div>
+
+                        <button 
+                            onClick={onGuestLogin} 
+                            className="submit-button" 
+                            style={{ 
+                                backgroundColor: '#f1f5f9', 
+                                color: '#475569', 
+                                borderColor: '#cbd5e1', 
+                                borderStyle: 'solid',
+                                borderWidth: '1px',
+                                display: 'flex', 
+                                alignItems: 'center', 
+                                justifyContent: 'center', 
+                                gap: '10px',
+                                transition: 'all 0.2s',
+                            }}
+                        >
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                <path d="M18 21a6 6 0 0 0-12 0" />
+                                <circle cx="12" cy="10" r="4" />
+                                <path d="M12 2v2" />
+                            </svg>
+                            Acessar Modo de Teste (Sem Login)
+                        </button>
+                    </>
+                )}
+
                 <p className="auth-footer" style={{ marginTop: '20px' }}>Desenvolvido por: Waldenir Oliveira | Versão: V10</p>
             </div>
         </div>

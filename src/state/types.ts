@@ -184,3 +184,58 @@ export const MACHINE_CATEGORIES = [
     'Forno',
     'Cabine de Jato'
 ];
+
+export const PREDEFINED_SECTORS = [
+  'CTMSP',
+  'IE',
+  'IEI',
+  'IEP',
+  'IE-TS',
+  'IPC-C',
+  'IPC-M',
+  'IPC-MC',
+  'IPC-T',
+  'IPS',
+  'IPS-S',
+  'IPS-TT',
+  'IPU',
+  'IPU-F',
+  'IPU-U',
+  'IQ',
+  'IQ-DT',
+  'IQ-LAB',
+  'IQ-LP',
+  'IQ-REC',
+  'IQ-RT',
+  'IQ-RX',
+  'IQ-SOLDA',
+  'IQ-UT',
+  'IQ-VT'
+];
+
+export const getSectorStyle = (sector?: string): { background: string; color: string; border?: string } => {
+  if (!sector) return { background: 'transparent', color: 'inherit' };
+  const s = sector.trim().toUpperCase();
+  
+  if (s === 'CTMSP' || s.startsWith('IE')) {
+    return { background: '#d9d9d9', color: '#000000', border: '1px solid #bfbfbf' };
+  }
+  if (s === 'IPC-C' || s === 'IPC-T') {
+    return { background: '#ff3b30', color: '#ffffff', border: '1px solid #e02d22' };
+  }
+  if (s.startsWith('IPC')) {
+    return { background: '#92d050', color: '#000000', border: '1px solid #76b039' };
+  }
+  if (s.startsWith('IPS')) {
+    return { background: '#ffff00', color: '#000000', border: '1px solid #e6e600' };
+  }
+  if (s.startsWith('IPU')) {
+    return { background: '#c6e0b4', color: '#000000', border: '1px solid #a8cfa8' };
+  }
+  if (s.startsWith('IQ')) {
+    return { background: '#00b0f0', color: '#ffffff', border: '1px solid #0096cc' };
+  }
+  
+  return { background: '#f1f5f9', color: '#475569', border: '1px solid #cbd5e1' };
+};
+
