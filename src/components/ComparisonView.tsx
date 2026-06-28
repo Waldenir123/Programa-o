@@ -7,11 +7,11 @@ const flattenComparisonData = (data: ScheduleData): RenderableRow[] => {
     if (!data) return [];
     const rows: any[] = [];
     let wbsGroup = 1;
-    data.forEach(group => {
+    (data || []).forEach(group => {
         let wbsTask = 1;
-        group.tarefas.forEach(task => {
+        (group.tarefas || []).forEach(task => {
             let wbsActivity = 1;
-            task.activities.forEach(activity => {
+            (task.activities || []).forEach(activity => {
                 rows.push({
                     group, task, activity, wbsId: `${wbsGroup}.${wbsTask}.${wbsActivity}`
                 });

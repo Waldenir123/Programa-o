@@ -103,7 +103,7 @@ ${JSON.stringify(simplifiedData, null, 2)}
 - Não inclua explicações, formatação markdown (como \`\`\`json\`\`\`) ou comentários. A resposta deve começar com \`{\` e terminar com \`}\`.`;
 
     const response = await ai.models.generateContent({
-        model: "gemini-2.5-flash",
+        model: "gemini-3.5-flash",
         contents: prompt,
         config: {
             responseMimeType: "application/json",
@@ -220,7 +220,7 @@ Agora, por favor, processe os dados da Folha de Atividades fornecidos a seguir.`
     }
 
     const response = await ai.models.generateContent({
-        model: "gemini-2.5-flash",
+        model: "gemini-3.5-flash",
         contents: { parts: contentParts },
         config: {
             responseMimeType: "application/json",
@@ -275,7 +275,7 @@ Para cada máquina encontrada no texto, identifique seu nome, categoria e status
 - Não inclua explicações ou markdown.`;
 
     const response = await ai.models.generateContent({
-        model: "gemini-2.5-flash",
+        model: "gemini-3.5-flash",
         contents: prompt + `\n\nTexto para análise: """${text}"""`,
         config: {
             responseMimeType: "application/json",
@@ -313,31 +313,17 @@ export const parseScheduleWithAI = async (ai: GoogleGenAI, text: string, fileDat
                     type: Type.OBJECT,
                     properties: {
                       name: { type: Type.STRING, description: "A descrição da atividade (texto normal). Deve ser um resumo curto, com menos de 200 caracteres." },
-                      schedule: {
-                        type: Type.ARRAY,
-                        description: "Para Layouts 1 e 2: Uma lista de datas e seus respectivos status. Para Layout 3, deve ser um array vazio.",
-                        items: {
-                            type: Type.OBJECT,
-                            properties: {
-                                date: {
-                                    type: Type.STRING,
-                                    description: "A data da atividade no formato YYYY-MM-DD."
-                                },
-                                status: {
-                                    type: Type.STRING,
-                                    description: "O status da atividade nesta data.",
-                                    enum: Object.values(Status)
-                                }
-                            }
-                        }
+                      scheduleString: {
+                        type: Type.STRING,
+                        description: "Para Layouts 1, 2 e 4: Uma string com as datas e status compactados no formato 'YYYY-MM-DD:STATUS,YYYY-MM-DD:STATUS' (ex: '2024-06-15:Ok,2024-06-16:X'). Use 'Ok', 'X', 'N', 'C' como status. Se não houver marcações, deixe a string vazia."
                       },
                       startDate: {
                           type: Type.STRING,
-                          description: "Para Layout 3: A data de início no formato YYYY-MM-DD. Não usar para Layouts 1 e 2."
+                          description: "Para Layout 3: A data de início no formato YYYY-MM-DD. Não usar para Layouts 1, 2 e 4."
                       },
                       endDate: {
                           type: Type.STRING,
-                          description: "Para Layout 3: A data de término no formato YYYY-MM-DD. Não usar para Layouts 1 e 2."
+                          description: "Para Layout 3: A data de término no formato YYYY-MM-DD. Não usar para Layouts 1, 2 e 4."
                       }
                     },
                   },
@@ -352,7 +338,7 @@ export const parseScheduleWithAI = async (ai: GoogleGenAI, text: string, fileDat
     const prompt = `Você é um assistente especialista em Planejamento e Controle de Produção (PCP), focado em extrair dados estruturados de cronogramas visuais ou textuais.
 
 **Objetivo Principal:**
-Sua tarefa é interpretar o cronograma fornecido, que pode ser uma imagem, um PDF, ou texto, e converter seu conteúdo em um formato JSON estruturado.
+Sua tarefa é interpretar o cronograma fornecido, que pode ser uma imagem, um PDF, ou texto, e converter seu conteúdo em um formato JSON estruturado extremamente compacto para evitar estouro de tokens.
 
 **IMPORTANTE: Análise de Layout**
 Sua primeira tarefa é identificar qual dos três layouts de cronograma a seguir está sendo usado no documento e aplicar as regras de extração correspondentes.
@@ -404,19 +390,19 @@ Sua primeira tarefa é identificar qual dos três layouts de cronograma a seguir
     1.  O nome aglutinador (ex: \`GRUPO 37 - FABRICAÇÃO...\`) deve ser mapeado para o campo \`fa\`.
     2.  Como não há uma Tarefa Principal definida separadamente, crie apenas UMA única Tarefa Principal dentro deste grupo, usando um \`title\` neutro, como "Atividades Gerais", ou repita o nome do \`fa\`.
     3.  As linhas seguintes que contêm nomes de atividades (ex: \`ENSAIO DE VT...\`, \`CORTE...\`) devem ser mapeadas como \`activities\` desta única Tarefa Principal.
-    4.  Extraia as datas e os status (\`Ok\`, \`X\`, etc.) como nos Layouts 1 e 2.
+    4.  Extraia as datas e os status (\`Ok\`, \`X\`, etc.) populando o \`scheduleString\` como nos Layouts 1 e 2.
     
 ---
 
 ### **Regras Comuns para Todos os Layouts**
 
-1.  **Datas e Status (Layouts 1 e 2):**
+1.  **Datas e Status (Layouts 1, 2 e 4):**
     - O cabeçalho contém datas. Reconstrua a data completa. **Converta todas as datas para o formato \`YYYY-MM-DD\`**.
     - Para cada linha de **Atividade**, leia as marcações ('X', 'Ok', etc.) nas colunas de data.
-    - Crie o array \`schedule\` com os objetos \`{date, status}\` para cada marcação.
+    - **Crie a string \`scheduleString\`** com as marcações no formato \`YYYY-MM-DD:STATUS\` separadas por vírgula (ex: \`2024-06-15:Ok,2024-06-16:X\`). Isso é fundamental para economizar tokens e não truncar a resposta.
     - **Mapeamento de Status (OBRIGATÓRIO):** "Ok" -> \`"Ok"\`, "X" -> \`"X"\`, "N" -> \`"N"\`, "C" -> \`"C"\`.
     - Ignore células de data vazias.
-    - **NÃO GERE os campos \`startDate\` e \`endDate\` para os Layouts 1 e 2.**
+    - **NÃO GERE os campos \`startDate\` e \`endDate\` para os Layouts 1, 2 e 4.**
 2.  **Documentos de Múltiplas Páginas:** Mantenha o contexto das células mescladas de uma página para a outra.
 3.  **Regra Crítica de Formatação:** Todos os valores de string no JSON de saída DEVEM ser de uma única linha. Remova quaisquer caracteres de quebra de linha dos textos extraídos.
 
@@ -430,7 +416,7 @@ Agora, por favor, processe os seguintes dados de cronograma:`;
     if (fileData) { contentParts.push({ inlineData: { mimeType: fileData.mimeType, data: fileData.data } }); }
     
     const response = await ai.models.generateContent({
-        model: "gemini-2.5-flash",
+        model: "gemini-3.5-flash",
         contents: { parts: contentParts },
         config: { 
             responseMimeType: "application/json", 
@@ -501,7 +487,23 @@ Agora, por favor, processe os seguintes dados de cronograma:`;
                 }
                 newActivity.schedule = schedule;
             } 
-            // Case 2: Layout 1/2 with schedule array
+            // Case 2: Layout 1, 2 or 4 with scheduleString (compact representation)
+            else if (activity.scheduleString && typeof activity.scheduleString === 'string' && activity.scheduleString.trim().length > 0) {
+                const schedule: Record<string, Status> = {};
+                const parts = activity.scheduleString.split(',');
+                for (const part of parts) {
+                    const colonIdx = part.indexOf(':');
+                    if (colonIdx !== -1) {
+                        const dateStr = part.substring(0, colonIdx).trim();
+                        const statusStr = part.substring(colonIdx + 1).trim();
+                        if (dateStr.match(/^\d{4}-\d{2}-\d{2}$/) && Object.values(Status).includes(statusStr as Status)) {
+                            schedule[dateStr] = statusStr as Status;
+                        }
+                    }
+                }
+                newActivity.schedule = schedule;
+            }
+            // Case 3: Layout 1, 2 or 4 fallback (old format with schedule array of objects)
             else if (Array.isArray(activity.schedule)) {
                 newActivity.schedule = activity.schedule.reduce((acc: Record<string, Status>, item: any) => {
                     if (item && typeof item.date === 'string' && item.date.match(/^\d{4}-\d{2}-\d{2}$/) && typeof item.status === 'string' && Object.values(Status).includes(item.status as Status)) {

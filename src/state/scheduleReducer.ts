@@ -30,6 +30,7 @@ export type ScheduleAction =
     | { type: 'TOGGLE_HIDE_ACTIVITY'; payload: string }
     | { type: 'TOGGLE_HIDE_ITEM'; payload: { id: string; type: 'group' | 'task' | 'activity' } }
     | { type: 'DUPLICATE_TASK'; payload: { taskId: string } }
+    | { type: 'SHIFT_HOLIDAY'; payload: { holidayDateStr: string; skipWeekends: boolean } }
     | { type: 'INTELLIGENT_RESCHEDULE'; payload: { affectedItems: { activityId: string, taskId: string, dateStr: string }[], selectionMaxDate: string } }
     | { type: 'CLEAR_ALL' };
 
@@ -315,84 +316,316 @@ export const scheduleReducer = (state: ScheduleState, action: ScheduleAction): S
 
         case 'UPDATE_SCHEDULE':
              return createNewStateWithHistory(action.payload);
+         
+        case 'SHIFT_HOLIDAY': {
+            const { holidayDateStr, skipWeekends } = action.payload;
+            if (!holidayDateStr) return state;
+
+            const newData = (state.liveData || []).map(group => {
+                return {
+                    ...group,
+                    tarefas: (group.tarefas || []).map(task => {
+                        return {
+                            ...task,
+                            activities: (task.activities || []).map(activity => {
+                                const newSchedule: Record<string, Status> = {};
+                                const newAnnotations: Record<string, string> = {};
+
+                                // Copy unaffected dates (< holidayDateStr)
+                                if (activity.schedule) {
+                                    Object.entries(activity.schedule).forEach(([dateStr, status]) => {
+                                        if (dateStr < holidayDateStr) {
+                                            newSchedule[dateStr] = status;
+                                        }
+                                    });
+                                }
+                                if (activity.annotations) {
+                                    Object.entries(activity.annotations).forEach(([dateStr, note]) => {
+                                        if (dateStr < holidayDateStr) {
+                                            newAnnotations[dateStr] = note;
+                                        }
+                                    });
+                                }
+
+                                // Collect all affected dates (>= holidayDateStr)
+                                const affectedDates = new Set<string>();
+                                if (activity.schedule) {
+                                    Object.keys(activity.schedule).forEach(dateStr => {
+                                        if (dateStr >= holidayDateStr) affectedDates.add(dateStr);
+                                    });
+                                }
+                                if (activity.annotations) {
+                                    Object.keys(activity.annotations).forEach(dateStr => {
+                                        if (dateStr >= holidayDateStr) affectedDates.add(dateStr);
+                                    });
+                                }
+
+                                // Sort affected dates in descending order to shift right-to-left without overwriting
+                                const sortedAffectedDates = Array.from(affectedDates).sort().reverse();
+
+                                // Shift affected dates
+                                sortedAffectedDates.forEach(dateStr => {
+                                    const d = new Date(dateStr + 'T00:00:00Z');
+                                    if (skipWeekends) {
+                                        do {
+                                            d.setUTCDate(d.getUTCDate() + 1);
+                                        } while (d.getUTCDay() === 0 || d.getUTCDay() === 6);
+                                    } else {
+                                        d.setUTCDate(d.getUTCDate() + 1);
+                                    }
+                                    const nextDayStr = d.toISOString().split('T')[0];
+
+                                    if (activity.schedule && activity.schedule[dateStr] !== undefined) {
+                                        newSchedule[nextDayStr] = activity.schedule[dateStr];
+                                    }
+                                    if (activity.annotations && activity.annotations[dateStr] !== undefined) {
+                                        newAnnotations[nextDayStr] = activity.annotations[dateStr];
+                                    }
+                                });
+
+                                return {
+                                    ...activity,
+                                    schedule: newSchedule,
+                                    annotations: Object.keys(newAnnotations).length > 0 ? newAnnotations : undefined
+                                };
+                            })
+                        };
+                    })
+                };
+            });
+
+            return createNewStateWithHistory(newData);
+        }
         
         case 'INTELLIGENT_RESCHEDULE': {
             const { affectedItems, selectionMaxDate } = action.payload; // array of { activityId, taskId, dateStr }
             if (affectedItems.length === 0) return state;
 
+            const formatDateStr = (date: Date): string => date.toISOString().split('T')[0];
+
+            const addWorkingDays = (startDateStr: string, days: number): string => {
+                let d = new Date(startDateStr + 'T00:00:00Z');
+                if (days === 0) return startDateStr;
+                const step = days > 0 ? 1 : -1;
+                const target = Math.abs(days);
+                let added = 0;
+                while (added < target) {
+                    d.setUTCDate(d.getUTCDate() + step);
+                    if (d.getUTCDay() !== 0 && d.getUTCDay() !== 6) {
+                        added++;
+                    }
+                }
+                return formatDateStr(d);
+            };
+
+            const getWorkingDaysDiff = (startDateStr: string, endDateStr: string): number => {
+                if (startDateStr === endDateStr) return 0;
+                let start = new Date(startDateStr + 'T00:00:00Z');
+                let end = new Date(endDateStr + 'T00:00:00Z');
+                const isReverse = start > end;
+                if (isReverse) {
+                    const temp = start;
+                    start = end;
+                    end = temp;
+                }
+                let diff = 0;
+                const curr = new Date(start);
+                while (formatDateStr(curr) !== formatDateStr(end)) {
+                    curr.setUTCDate(curr.getUTCDate() + 1);
+                    if (curr.getUTCDay() !== 0 && curr.getUTCDay() !== 6) {
+                        diff++;
+                    }
+                }
+                return isReverse ? -diff : diff;
+            };
+
+            // Find the selectionMinDate as the earliest dateStr in the affectedItems
+            const selectionMinDate = affectedItems.reduce((min, item) => item.dateStr < min ? item.dateStr : min, affectedItems[0].dateStr);
+
+            // Calculate the delay in working days
+            const firstAvailableDate = getNextWorkingDay(selectionMaxDate);
+            const delay = getWorkingDaysDiff(selectionMinDate, firstAvailableDate);
+
             const newData = deepClone(state.liveData);
 
-            // Group by groupId to apply changes per group
-            const affectedGroups = new Map<string, { activityId: string, dateStr: string }[]>();
-            
-            for (const item of affectedItems) {
-                for (const group of newData) {
-                    if (group.tarefas.some((t: any) => t.id === item.taskId)) {
-                        if (!affectedGroups.has(group.id)) {
-                            affectedGroups.set(group.id, []);
-                        }
-                        affectedGroups.get(group.id)!.push({ activityId: item.activityId, dateStr: item.dateStr });
-                        break;
-                    }
-                }
-            }
-
-            for (const [groupId, items] of Array.from(affectedGroups.entries())) {
-                const group = newData.find((g: any) => g.id === groupId);
-                if (!group) continue;
-
-                // Group by activity within group to find the max shift
-                const ncByActivity = new Map<string, string[]>();
-                for (const item of items) {
-                    if (!ncByActivity.has(item.activityId)) {
-                        ncByActivity.set(item.activityId, []);
-                    }
-                    ncByActivity.get(item.activityId)!.push(item.dateStr);
-                }
-
-                // calculate groupShiftDays
-                let groupShiftDays = 0;
-                for (const dates of Array.from(ncByActivity.values())) {
-                    if (dates.length > groupShiftDays) {
-                        groupShiftDays = dates.length;
-                    }
-                }
-
-                if (groupShiftDays === 0) continue;
-
-                // apply shifts for all activities in all tasks in this group
+            // Group by group id to apply changes per group
+            for (const group of newData) {
                 for (const task of group.tarefas) {
-                    for (const activity of task.activities) {
-                        const futureDates = Object.keys(activity.schedule)
-                            .filter(d => d > selectionMaxDate)
+                    const taskAffected = affectedItems.filter(item => item.taskId === task.id);
+                    if (taskAffected.length === 0) continue;
+
+                    const affectedActivityIds = new Set(taskAffected.map(item => item.activityId));
+
+                    interface ActivityInfo {
+                        activity: any;
+                        origPlannedDates: string[];
+                        origStart: string | null;
+                        origEnd: string | null;
+                        offsets: number[];
+                        isShifted: boolean;
+                        newStart: string | null;
+                        newEnd: string | null;
+                    }
+
+                    const activityInfos: ActivityInfo[] = task.activities.map((activity: any) => {
+                        // Get all dates from selectionMinDate onwards where status is N, C, or X
+                        const origPlannedDates = Object.keys(activity.schedule)
+                            .filter(d => d >= selectionMinDate && (
+                                activity.schedule[d] === Status.NaoRealizado ||
+                                activity.schedule[d] === Status.Cancelado ||
+                                activity.schedule[d] === Status.Programado
+                            ))
                             .sort();
 
-                        // Shift future dates
-                        const shiftedFutureMap = new Map<string, Status>();
-                        for (let i = futureDates.length - 1; i >= 0; i--) {
-                            const oldDate = futureDates[i];
-                            let newDate = oldDate;
-                            for (let s = 0; s < groupShiftDays; s++) {
-                                newDate = getNextWorkingDay(newDate);
-                            }
-                            shiftedFutureMap.set(newDate, activity.schedule[oldDate]);
-                            delete activity.schedule[oldDate];
+                        const isShifted = affectedActivityIds.has(activity.id);
+
+                        if (origPlannedDates.length === 0) {
+                            return {
+                                activity,
+                                origPlannedDates: [],
+                                origStart: null,
+                                origEnd: null,
+                                offsets: [],
+                                isShifted: false,
+                                newStart: null,
+                                newEnd: null
+                            };
                         }
 
-                        // Insert new Programados (X) for the specific activities that had N/C
-                        const ncDatesForThisActivity = ncByActivity.get(activity.id);
-                        if (ncDatesForThisActivity && ncDatesForThisActivity.length > 0) {
-                            const shiftDaysForThisActivity = ncDatesForThisActivity.length;
-                            let insertDate = selectionMaxDate;
-                            for (let s = 0; s < shiftDaysForThisActivity; s++) {
-                                insertDate = getNextWorkingDay(insertDate);
-                                activity.schedule[insertDate] = Status.Programado;
+                        const origStart = origPlannedDates[0];
+                        const origEnd = origPlannedDates[origPlannedDates.length - 1];
+                        const offsets = origPlannedDates.map(d => getWorkingDaysDiff(origStart, d));
+
+                        return {
+                            activity,
+                            origPlannedDates,
+                            origStart,
+                            origEnd,
+                            offsets,
+                            isShifted,
+                            newStart: null,
+                            newEnd: null
+                        };
+                    });
+
+                    // Reschedule activity sequences
+                    for (let i = 0; i < activityInfos.length; i++) {
+                        const info = activityInfos[i];
+                        if (info.origPlannedDates.length === 0) continue;
+
+                        // Find the predecessor p < i whose original end date is before this activity's start date
+                        let predIndex = -1;
+                        let maxOrigEnd: string | null = null;
+
+                        for (let p = 0; p < i; p++) {
+                            const predInfo = activityInfos[p];
+                            if (predInfo.origPlannedDates.length === 0 || !predInfo.origEnd || !info.origStart) continue;
+
+                            if (predInfo.origEnd < info.origStart) {
+                                if (maxOrigEnd === null || predInfo.origEnd > maxOrigEnd) {
+                                    maxOrigEnd = predInfo.origEnd;
+                                    predIndex = p;
+                                }
                             }
                         }
 
-                        // Re-apply shifted
-                        for (const [newDate, status] of Array.from(shiftedFutureMap.entries())) {
-                            activity.schedule[newDate] = status;
+                        if (predIndex !== -1) {
+                            const predInfo = activityInfos[predIndex];
+                            // If predecessor was shifted, then this activity must shift too
+                            if (predInfo.isShifted) {
+                                info.isShifted = true;
+                                const lag = getWorkingDaysDiff(predInfo.origEnd!, info.origStart!);
+                                info.newStart = addWorkingDays(predInfo.newEnd!, lag);
+                            } else {
+                                info.isShifted = false;
+                                info.newStart = info.origStart;
+                            }
+                        } else {
+                            // No predecessor
+                            if (info.isShifted) {
+                                info.newStart = addWorkingDays(info.origStart!, delay);
+                            } else {
+                                info.isShifted = false;
+                                info.newStart = info.origStart;
+                            }
+                        }
+
+                        if (info.isShifted && info.newStart) {
+                            const lastOffset = info.offsets[info.offsets.length - 1];
+                            info.newEnd = addWorkingDays(info.newStart, lastOffset);
+                        } else {
+                            info.newEnd = info.origEnd;
+                        }
+                    }
+
+                    // Apply schedule and annotation updates
+                    for (const info of activityInfos) {
+                        if (info.origPlannedDates.length === 0) continue;
+
+                        if (info.isShifted && info.newStart) {
+                            const oldToNewMap = new Map<string, string>();
+                            for (let j = 0; j < info.origPlannedDates.length; j++) {
+                                const oldDate = info.origPlannedDates[j];
+                                const newDate = addWorkingDays(info.newStart, info.offsets[j]);
+                                oldToNewMap.set(oldDate, newDate);
+                            }
+
+                            const scheduleUpdates: { date: string, status: Status | null }[] = [];
+                            const annotationUpdates: { date: string, text: string | null }[] = [];
+
+                            for (const oldDate of info.origPlannedDates) {
+                                const isHistoricalNC = oldDate <= selectionMaxDate && (
+                                    info.activity.schedule[oldDate] === Status.NaoRealizado ||
+                                    info.activity.schedule[oldDate] === Status.Cancelado
+                                );
+
+                                if (isHistoricalNC) {
+                                    // Keep historical N or C inside selection block
+                                } else {
+                                    scheduleUpdates.push({ date: oldDate, status: null });
+                                    if (info.activity.annotations && info.activity.annotations[oldDate] !== undefined) {
+                                        annotationUpdates.push({ date: oldDate, text: null });
+                                    }
+                                }
+                            }
+
+                            for (const oldDate of info.origPlannedDates) {
+                                const newDate = oldToNewMap.get(oldDate)!;
+                                scheduleUpdates.push({ date: newDate, status: Status.Programado });
+
+                                const isHistoricalNC = oldDate <= selectionMaxDate && (
+                                    info.activity.schedule[oldDate] === Status.NaoRealizado ||
+                                    info.activity.schedule[oldDate] === Status.Cancelado
+                                );
+
+                                if (!isHistoricalNC && info.activity.annotations && info.activity.annotations[oldDate] !== undefined) {
+                                    annotationUpdates.push({ date: newDate, text: info.activity.annotations[oldDate] });
+                                }
+                            }
+
+                            for (const update of scheduleUpdates) {
+                                if (update.status === null) {
+                                    delete info.activity.schedule[update.date];
+                                } else {
+                                    info.activity.schedule[update.date] = update.status;
+                                }
+                            }
+
+                            if (annotationUpdates.length > 0) {
+                                if (!info.activity.annotations) {
+                                    info.activity.annotations = {};
+                                }
+                                for (const update of annotationUpdates) {
+                                    if (update.text === null) {
+                                        delete info.activity.annotations[update.date];
+                                    } else {
+                                        info.activity.annotations[update.date] = update.text;
+                                    }
+                                }
+                                if (Object.keys(info.activity.annotations).length === 0) {
+                                    delete info.activity.annotations;
+                                }
+                            }
                         }
                     }
                 }

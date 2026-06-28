@@ -1,0 +1,2594 @@
+{
+  "liveData": [
+    {
+      "id": "g_enp3xn6mo",
+      "customValues": {
+        "fa": "GRUPO 37 - FABRICAÇÃO DAS QPS [264] Nº FA 57592"
+      },
+      "tarefas": [
+        {
+          "id": "t_84noscv8f",
+          "title": "GRUPO 37 - FABRICAÇÃO DAS QPS [264] Nº FA 57592",
+          "activities": [
+            {
+              "id": "a_j2asr2465",
+              "name": "FABRICAÇÃO DOS CORPOS DE PROVA - CORTE/USINAGEM E PREPARAÇÃO DOS CP, CONFORME PLANO DE ENSAIOS - pendente CP de reteste",
+              "sector": "IPU-F",
+              "schedule": {
+                "2026-06-15": "Ok",
+                "2026-06-16": "Ok",
+                "2026-06-17": "Ok",
+                "2026-06-18": "Ok",
+                "2026-06-19": "Ok",
+                "2026-06-22": "X",
+                "2026-06-23": "X",
+                "2026-06-24": "X"
+              }
+            },
+            {
+              "id": "a_ev6pgrkcr",
+              "name": "ENSAIOS/LAUDO FINAL",
+              "sector": "IQ-LAB",
+              "schedule": {
+                "2026-06-15": "Ok",
+                "2026-06-16": "Ok",
+                "2026-06-17": "Ok",
+                "2026-06-18": "Ok",
+                "2026-06-19": "Ok",
+                "2026-06-22": "X",
+                "2026-06-23": "X",
+                "2026-06-24": "X",
+                "2026-06-25": "X",
+                "2026-06-26": "X",
+                "2026-06-27": "X",
+                "2026-06-28": "X",
+                "2026-07-02": "X",
+                "2026-07-03": "X",
+                "2026-07-04": "X",
+                "2026-07-05": "X",
+                "2026-07-06": "X",
+                "2026-07-08": "X",
+                "2026-07-09": "X",
+                "2026-07-10": "X",
+                "2026-07-11": "X",
+                "2026-07-12": "X"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "g_05x3u86lk",
+      "customValues": {
+        "fa": "GRUPO 37 - FABRICAÇÃO DAS QPS - [299] FA: 57810"
+      },
+      "tarefas": [
+        {
+          "id": "t_2l264hxaw",
+          "title": "GRUPO 37 - FABRICAÇÃO DAS QPS - [299] FA: 57810",
+          "activities": [
+            {
+              "id": "a_te34l5aoj",
+              "name": "CORTE/TRANSFERÊNCIA DE INDICAÇÃO",
+              "sector": "IP-C",
+              "schedule": {
+                "2026-06-15": "Ok",
+                "2026-06-16": "Ok",
+                "2026-06-17": "Ok",
+                "2026-06-18": "Ok",
+                "2026-06-22": "X"
+              }
+            },
+            {
+              "id": "a_az3fmrwlm",
+              "name": "UT DE BORDA (NUCLEO E IBQN) - Pendente UT IBQN",
+              "sector": "IQ-UT",
+              "schedule": {
+                "2026-06-15": "Ok",
+                "2026-06-16": "Ok",
+                "2026-06-17": "Ok",
+                "2026-06-18": "Ok",
+                "2026-06-22": "X"
+              }
+            },
+            {
+              "id": "a_5hw90hwiw",
+              "name": "OXICORTE DO BISEL E PREPARAÇÃO DO BISEL",
+              "sector": "IPC-C",
+              "schedule": {
+                "2026-06-19": "N",
+                "2026-06-23": "X"
+              }
+            },
+            {
+              "id": "a_nc2mx314f",
+              "name": "VT/DT/LP DE BISEL",
+              "sector": "IQ-LP",
+              "schedule": {
+                "2026-06-23": "X"
+              }
+            },
+            {
+              "id": "a_exvrtiwr2",
+              "name": "MONTAGEM/TRAVAMENTO/MONTAGEM DE AQUECIMENTO",
+              "sector": "IPC-M",
+              "schedule": {
+                "2026-06-24": "X"
+              }
+            },
+            {
+              "id": "a_am0zq2ln5",
+              "name": "SOLDAGEM DO SD1",
+              "sector": "IPS-S",
+              "schedule": {
+                "2026-06-25": "X",
+                "2026-06-26": "X",
+                "2026-06-29": "X",
+                "2026-06-30": "X",
+                "2026-07-01": "X",
+                "2026-07-02": "X",
+                "2026-07-03": "X",
+                "2026-07-06": "X",
+                "2026-07-07": "X",
+                "2026-07-08": "X",
+                "2026-07-09": "X",
+                "2026-07-10": "X"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "g_yr04e7fp9",
+      "customValues": {
+        "fa": "GRUPO 37 - FABRICAÇÃO DAS QPS - [300] FA: 57822"
+      },
+      "tarefas": [
+        {
+          "id": "t_5alxxtlht",
+          "title": "GRUPO 37 - FABRICAÇÃO DAS QPS - [300] FA: 57822",
+          "activities": [
+            {
+              "id": "a_wb6zim8hg",
+              "name": "EMISSÃO E APROVAÇÃO DA DOCUMENTAÇÃO DO QPS PELO CTMSP [Em substituição ao QPS 267]",
+              "sector": "IE",
+              "schedule": {
+                "2026-06-15": "Ok",
+                "2026-06-16": "Ok",
+                "2026-06-17": "Ok",
+                "2026-06-18": "Ok",
+                "2026-06-19": "Ok",
+                "2026-06-22": "X",
+                "2026-06-23": "X",
+                "2026-06-24": "X",
+                "2026-06-25": "X",
+                "2026-06-26": "X"
+              }
+            },
+            {
+              "id": "a_coqtyhum2",
+              "name": "RECEPÇÃO DO METAL DE BASE E ADIÇÃO",
+              "sector": "IQ-REC",
+              "schedule": {
+                "2026-06-22": "X",
+                "2026-06-23": "X"
+              }
+            },
+            {
+              "id": "a_52j4qe8k0",
+              "name": "CORTE/TRANSFERÊNCIA DE INDICAÇÃO",
+              "sector": "IPC-C",
+              "schedule": {
+                "2026-06-24": "X",
+                "2026-06-25": "X"
+              }
+            },
+            {
+              "id": "a_ld6c3xel8",
+              "name": "UT DE BORDA",
+              "sector": "IQ-UT",
+              "schedule": {
+                "2026-06-26": "X"
+              }
+            },
+            {
+              "id": "a_hzs51g80z",
+              "name": "OXICORTE DO BISEL E PREPARAÇÃO DO BISEL",
+              "sector": "IPC-C",
+              "schedule": {
+                "2026-06-29": "X"
+              }
+            },
+            {
+              "id": "a_l2vskv0vp",
+              "name": "VT/DT/LP DE BISEL",
+              "sector": "IQ-LP",
+              "schedule": {
+                "2026-06-30": "X"
+              }
+            },
+            {
+              "id": "a_5qpdhy3k3",
+              "name": "MONTAGEM/TRAVAMENTO/MONTAGEM DE AQUECIMENTO",
+              "sector": "IPC-M",
+              "schedule": {
+                "2026-07-01": "X"
+              }
+            },
+            {
+              "id": "a_bkwysysfx",
+              "name": "SOLDAGEM DO SD1",
+              "sector": "IPS-S",
+              "schedule": {
+                "2026-07-02": "X",
+                "2026-07-03": "X",
+                "2026-07-06": "X",
+                "2026-07-07": "X",
+                "2026-07-08": "X",
+                "2026-07-09": "X",
+                "2026-07-10": "X"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "g_s2fnj1l89",
+      "customValues": {
+        "fa": "QPS 272 - GRUPO 24 - FABRICAÇÃO DA QPS 0272 - FA Nº FA 57621"
+      },
+      "tarefas": [
+        {
+          "id": "t_xjquhqgb3",
+          "title": "QPS 272 - GRUPO 24 - FABRICAÇÃO DA QPS 0272 - FA Nº FA 57621",
+          "activities": [
+            {
+              "id": "a_wpt1zgzxg",
+              "name": "FABRICAÇÃO DOS CORPOS DE PROVA - CORTE/USINAGEM E PREPARAÇÃO DOS CP, CONFORME PLANO DE ENSAIOS - pendente CP de reteste",
+              "sector": "IPU-F",
+              "schedule": {
+                "2026-06-15": "Ok",
+                "2026-06-16": "Ok",
+                "2026-06-17": "Ok",
+                "2026-06-18": "Ok",
+                "2026-06-22": "X",
+                "2026-06-23": "X",
+                "2026-06-24": "X"
+              }
+            },
+            {
+              "id": "a_33zrpt20e",
+              "name": "PREPARAÇÃO AND SOLDA PARA CP DE PELINE",
+              "sector": "IPS-S",
+              "schedule": {
+                "2026-06-17": "Ok",
+                "2026-06-18": "Ok"
+              }
+            },
+            {
+              "id": "a_71ygkqwvu",
+              "name": "ENSAIOS/LAUDO FINAL",
+              "sector": "IQ-LAB",
+              "schedule": {
+                "2026-06-15": "Ok",
+                "2026-06-16": "Ok",
+                "2026-06-17": "Ok",
+                "2026-06-18": "Ok",
+                "2026-06-19": "Ok",
+                "2026-06-22": "X",
+                "2026-06-23": "X",
+                "2026-06-24": "X",
+                "2026-06-25": "X",
+                "2026-06-26": "X",
+                "2026-06-27": "X",
+                "2026-06-28": "X",
+                "2026-06-29": "X",
+                "2026-06-30": "X",
+                "2026-07-01": "X",
+                "2026-07-02": "X",
+                "2026-07-03": "X",
+                "2026-07-06": "X"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "g_sjcea9e4e",
+      "customValues": {
+        "fa": "GRUPO 26 - RETRABALHO PREVISTO NA RNC 025/26 E USINAGEM DO CONVÉS DO GV - Nº FA 57534"
+      },
+      "tarefas": [
+        {
+          "id": "t_oip4j5uyu",
+          "title": "GRUPO 26 - RETRABALHO PREVISTO NA RNC 025/26 E USINAGEM DO CONVÉS DO GV - Nº FA 57534",
+          "activities": [
+            {
+              "id": "a_4yeuuhgdp",
+              "name": "CONTROLE DIMENSIONAL PELA CALDEIRARIA (NOVA DISPOSIÇÃO/APROVAÇÃO DA RNC 66/26 - RNC-R-26-030-56",
+              "sector": "IPC-M",
+              "schedule": {
+                "2026-06-15": "Ok",
+                "2026-06-16": "Ok",
+                "2026-06-17": "Ok",
+                "2026-06-18": "Ok",
+                "2026-06-19": "Ok",
+                "2026-06-22": "X",
+                "2026-06-23": "X"
+              }
+            },
+            {
+              "id": "a_ca9wgflzf",
+              "name": "SOLDAGEM SOLDA S-26-030-56, S-26-030-101",
+              "sector": "IPS-S",
+              "schedule": {
+                "2026-06-15": "Ok",
+                "2026-06-16": "Ok",
+                "2026-06-17": "Ok",
+                "2026-06-18": "Ok",
+                "2026-06-19": "C"
+              }
+            },
+            {
+              "id": "a_u1400mgnj",
+              "name": "REALIZAÇÃO DOS ENDS (VT/LP) PÓS SOLDAGEM",
+              "sector": "IQ-LP",
+              "schedule": {
+                "2026-06-25": "X",
+                "2026-06-26": "X"
+              }
+            },
+            {
+              "id": "a_xvsk3fylq",
+              "name": "REMOÇÃO DOS TRAVAMENTOS AUXILIARES",
+              "sector": "IPC-M",
+              "schedule": {
+                "2026-06-25": "X",
+                "2026-06-26": "X"
+              }
+            },
+            {
+              "id": "a_lwzuna090",
+              "name": "INSPEÇÃO DIMENSIONAL",
+              "sector": "IQ-DT",
+              "schedule": {
+                "2026-06-27": "X",
+                "2026-06-29": "X",
+                "2026-06-30": "X",
+                "2026-07-01": "X",
+                "2026-07-02": "X",
+                "2026-07-03": "X",
+                "2026-07-06": "X",
+                "2026-07-07": "X",
+                "2026-07-08": "X",
+                "2026-07-09": "X"
+              }
+            },
+            {
+              "id": "a_e8zhnnv5r",
+              "name": "MOVIMENTAÇÃO P/ USINAGEM",
+              "sector": "IPC-MC",
+              "schedule": {
+                "2026-07-04": "X"
+              }
+            },
+            {
+              "id": "a_yza8c3vqy",
+              "name": "USINAGEM DOS APOIOS DO GV.",
+              "sector": "IPU",
+              "schedule": {
+                "2026-07-11": "X"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "g_d0nr7d5zv",
+      "customValues": {
+        "fa": "GRUPO 26 - VASOS E ESTRUTURAS INTERNAS DO LABGENE, CONVÉS DO GV RNC 041-26 FA 57787"
+      },
+      "tarefas": [
+        {
+          "id": "t_h8ezgcchx",
+          "title": "GRUPO 26 - VASOS E ESTRUTURAS INTERNAS DO LABGENE, CONVÉS DO GV RNC 041-26 FA 57787",
+          "activities": [
+            {
+              "id": "a_lz59l4767",
+              "name": "Traçagem, corte e identificação da POS. 89",
+              "sector": "IPC-C",
+              "schedule": {
+                "2026-06-15": "Ok",
+                "2026-06-16": "Ok"
+              }
+            },
+            {
+              "id": "a_r3brhqp9m",
+              "name": "Traçagem dos Biseis e corte dos Biseis",
+              "sector": "IPC-C",
+              "schedule": {
+                "2026-06-17": "Ok"
+              }
+            },
+            {
+              "id": "a_eywhddegy",
+              "name": "VT/DT de Bisel",
+              "sector": "IQ-LP",
+              "schedule": {
+                "2026-06-18": "N",
+                "2026-06-22": "X"
+              }
+            },
+            {
+              "id": "a_7krd0x29r",
+              "name": "Montagem/Travamento da POS. 89 no Convés",
+              "sector": "IPC-M",
+              "schedule": {
+                "2026-06-19": "N",
+                "2026-06-22": "X"
+              }
+            },
+            {
+              "id": "a_4trupht85",
+              "name": "Tratamento térmico e soldagem",
+              "sector": "IPS-S",
+              "schedule": {
+                "2026-06-24": "X",
+                "2026-06-25": "X"
+              }
+            },
+            {
+              "id": "a_ej2ho8kgx",
+              "name": "Ensaios ENDs FINAIS",
+              "sector": "IQ-VT",
+              "schedule": {
+                "2026-06-26": "X",
+                "2026-06-27": "X"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "g_1khemhhtm",
+      "customValues": {
+        "fa": "GRUPO 38 - TANQUE DE EXPANSÃO - FABRICAÇÃO DA POS 19 E MONTAGEM/SOLDAGEM Nº FA 57714"
+      },
+      "tarefas": [
+        {
+          "id": "t_gjpm6sj1d",
+          "title": "GRUPO 38 - TANQUE DE EXPANSÃO - FABRICAÇÃO DA POS 19 E MONTAGEM/SOLDAGEM Nº FA 57714",
+          "activities": [
+            {
+              "id": "a_z53lql4xk",
+              "name": "MONTAGEM NO CASCO E POS. 13 - SERÁ FEITA APÓS A CONCLUSÃO DA SOLDAGEM 14 + 16",
+              "sector": "IPC-M",
+              "schedule": {
+                "2026-07-01": "X"
+              }
+            },
+            {
+              "id": "a_j15cpk4fz",
+              "name": "SOLDAGEM",
+              "sector": "IPS-S",
+              "schedule": {
+                "2026-07-01": "X",
+                "2026-07-02": "X"
+              }
+            },
+            {
+              "id": "a_6xzgvf9h7",
+              "name": "ENSAIOS",
+              "sector": "IQ-LP",
+              "schedule": {
+                "2026-07-02": "X"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "g_xyfvqdiqa",
+      "customValues": {
+        "fa": "BLOCO 40 - GRUPO 38 - TANQUE DE EXPANSÃO DO TBP - SOLDAGEM DAS POS. 14 + 16 - S-38-026-01@04 Nº FA 57760"
+      },
+      "tarefas": [
+        {
+          "id": "t_kkt7xgyng",
+          "title": "BLOCO 40 - GRUPO 38 - TANQUE DE EXPANSÃO DO TBP - SOLDAGEM DAS POS. 14 + 16 - S-38-026-01@04 Nº FA 57760",
+          "activities": [
+            {
+              "id": "a_t3epyo7tw",
+              "name": "Movimentação/Montagem e Ponteamento as POS. 14 + 16 e travamentos ( 2º Conjunto)",
+              "sector": "",
+              "schedule": {}
+            },
+            {
+              "id": "a_gbouh3u5v",
+              "name": "CONFERÊNCIA DA PERDICULARIDADE PELO CONTROLE DIMENSIONAL",
+              "sector": "IQ-DT",
+              "schedule": {
+                "2026-06-17": "C"
+              }
+            },
+            {
+              "id": "a_w9o1pu5kn",
+              "name": "MONTAGEM DE RESITÊNCIA E SOLDAGEM ( 2º Conjunto)",
+              "sector": "IPS-S",
+              "schedule": {
+                "2026-06-15": "Ok",
+                "2026-06-16": "Ok",
+                "2026-06-17": "Ok",
+                "2026-06-18": "Ok",
+                "2026-06-19": "Ok",
+                "2026-06-22": "X",
+                "2026-06-23": "X",
+                "2026-06-24": "X",
+                "2026-06-25": "X",
+                "2026-06-26": "X",
+                "2026-06-27": "X",
+                "2026-07-01": "X"
+              }
+            },
+            {
+              "id": "a_2fh6d8u6z",
+              "name": "CONTROLE DIMENSIONAL DO CONJUNTO ( 2º Conjunto)",
+              "sector": "IPC-M",
+              "schedule": {
+                "2026-06-15": "Ok",
+                "2026-06-16": "Ok",
+                "2026-06-17": "Ok",
+                "2026-06-18": "Ok",
+                "2026-06-19": "Ok",
+                "2026-06-22": "X",
+                "2026-06-23": "X",
+                "2026-06-24": "X",
+                "2026-06-25": "X",
+                "2026-06-26": "X",
+                "2026-06-27": "X",
+                "2026-07-01": "X"
+              }
+            },
+            {
+              "id": "a_0dddxsiyp",
+              "name": "PREPARAÇÃO E ENDS - (1º E 2º Conjunto)",
+              "sector": "IQ-LP",
+              "schedule": {
+                "2026-07-03": "X",
+                "2026-07-04": "X",
+                "2026-07-07": "X",
+                "2026-07-08": "X",
+                "2026-07-09": "X",
+                "2026-07-10": "X",
+                "2026-07-11": "X"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "g_geri7tn2s",
+      "customValues": {
+        "fa": "BLOCO 40 - GRUPO 15 - CASCO SUPERIOR SETOR 2 - REMOÇÃO/ENSAIOS E RESSOLDAGEM/ENSAIOS DOS OLHAIS DE BASCULAMENTO - DDM-0819A0-022 Nº FA 57893"
+      },
+      "tarefas": [
+        {
+          "id": "t_04j141vic",
+          "title": "BLOCO 40 - GRUPO 15 - CASCO SUPERIOR SETOR 2 - REMOÇÃO/ENSAIOS E RESSOLDAGEM/ENSAIOS DOS OLHAIS DE BASCULAMENTO - DDM-0819A0-022 Nº FA 57893",
+          "activities": [
+            {
+              "id": "a_v0eg09fxa",
+              "name": "MAPEAMENTO DAS OLHAIS QUE SERÃO REMOVIDO COM AUXILIO DO IQ",
+              "sector": "IQ-UT",
+              "schedule": {}
+            },
+            {
+              "id": "a_k87ahznm5",
+              "name": "REMOÇÃO DOS OLHAIS",
+              "sector": "IPS",
+              "schedule": {}
+            },
+            {
+              "id": "a_8bcx9h16i",
+              "name": "PEPRARAÇÃO DA REGIÃO",
+              "sector": "IPC-M",
+              "schedule": {}
+            },
+            {
+              "id": "a_ep96ededr",
+              "name": "ENSAIO DE VT E LP DOS OLHAIS SEREM REMOVIDOS",
+              "sector": "IQ-VT",
+              "schedule": {}
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "g_ma4u2a1wd",
+      "customValues": {
+        "fa": "SETOR 3 - GRUPO 15 - ENDs nas Juntas das RNC S-15-024-84 e (IND. UT 1, 3, 6, 7, 8, 11, 13, 16, 17 e 18) - RNC 079-24 - SETOR 3 (CAVERNA H) Nº FA 56904 Nº FA 56637"
+      },
+      "tarefas": [
+        {
+          "id": "t_z5sc1oxoq",
+          "title": "SETOR 3 - GRUPO 15 - ENDs nas Juntas das RNC S-15-024-84 e (IND. UT 1, 3, 6, 7, 8, 11, 13, 16, 17 e 18) - RNC 079-24 - SETOR 3 (CAVERNA H) Nº FA 56904 Nº FA 56637",
+          "activities": [
+            {
+              "id": "a_x68o4ehl4",
+              "name": "AJUSTE DE ANDAIME",
+              "sector": "",
+              "schedule": {
+                "2026-06-15": "Ok",
+                "2026-06-16": "Ok"
+              }
+            },
+            {
+              "id": "a_6ooeiqdcy",
+              "name": "PREPARAÇÃO PARA UT",
+              "sector": "IPC-M",
+              "schedule": {
+                "2026-06-18": "Ok"
+              }
+            },
+            {
+              "id": "a_lcd8erhpx",
+              "name": "REALIZAR ENSAIO DE UT DOS REPAROS",
+              "sector": "IQ-UT",
+              "schedule": {
+                "2026-06-19": "Ok",
+                "2026-06-20": "Ok",
+                "2026-06-21": "C"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "g_q8qequzgv",
+      "customValues": {
+        "fa": "SETOR 3 - GRUPO 15 - ULTRASSOM NA JUNTA S-15-024-63(IND_UT_1, 2, 5, 8, 9, 10, 11, 13 e 16) - RNC 081-24 - SETOR 3 (CAVERNA G) Nº FA 56639"
+      },
+      "tarefas": [
+        {
+          "id": "t_efuyjx8s1",
+          "title": "SETOR 3 - GRUPO 15 - ULTRASSOM NA JUNTA S-15-024-63(IND_UT_1, 2, 5, 8, 9, 10, 11, 13 e 16) - RNC 081-24 - SETOR 3 (CAVERNA G) Nº FA 56639",
+          "activities": [
+            {
+              "id": "a_27wld5ori",
+              "name": "AJUSTE DE ANDAIME",
+              "sector": "",
+              "schedule": {
+                "2026-06-15": "Ok",
+                "2026-06-16": "Ok"
+              }
+            },
+            {
+              "id": "a_rtb1ruos9",
+              "name": "PREPARAÇÃO PARA UT",
+              "sector": "IPC-M",
+              "schedule": {
+                "2026-06-18": "Ok"
+              }
+            },
+            {
+              "id": "a_wg63zcgi8",
+              "name": "REALIZAR ENSAIO DE UT DOS REPAROS",
+              "sector": "IQ-UT",
+              "schedule": {
+                "2026-06-19": "Ok",
+                "2026-06-20": "Ok",
+                "2026-06-21": "C"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "g_tfybcpc8e",
+      "customValues": {
+        "fa": "QPS 298 - REVESTIMENTO AUSTENÍTICO Nº FA 57763"
+      },
+      "tarefas": [
+        {
+          "id": "t_w2dtczyfp",
+          "title": "QPS 298 - REVESTIMENTO AUSTENÍTICO Nº FA 57763",
+          "activities": [
+            {
+              "id": "a_zzamj07bj",
+              "name": "CORTE/IDENTIFICAÇÃO DAS POS/MONTAGEM DO TRATAMENTO TÉRMICO",
+              "sector": "IPC-C",
+              "schedule": {}
+            },
+            {
+              "id": "a_2pef6himb",
+              "name": "MOVIMENTAÇÃO PARA ÁREA DE SOLDAGEM\\",
+              "sector": "IPC-MC",
+              "schedule": {}
+            },
+            {
+              "id": "a_us61a5wgg",
+              "name": "RESOLUÇÃO DE PENDÊNCIAS NO RECEBIMENTO DE CONSUMÍVEIS (IQ E IES)",
+              "sector": "IQ-REC",
+              "schedule": {
+                "2026-06-15": "Ok",
+                "2026-06-16": "Ok",
+                "2026-06-22": "X",
+                "2026-06-23": "X"
+              }
+            },
+            {
+              "id": "a_6d7vfml1u",
+              "name": "PREPRAÇÃO DA SUPERFÍCIE",
+              "sector": "IPC-M",
+              "schedule": {
+                "2026-06-17": "N",
+                "2026-06-23": "X"
+              }
+            },
+            {
+              "id": "a_x8pghdcgk",
+              "name": "VT/LP DA SUPERFÍCIE A SOLDAR O REVESTIMENTO",
+              "sector": "IQ-LP",
+              "schedule": {
+                "2026-06-17": "N",
+                "2026-06-18": "N",
+                "2026-06-23": "X",
+                "2026-06-24": "X"
+              }
+            },
+            {
+              "id": "a_l5f5npygv",
+              "name": "UT DA SUPERFÍCIE A SOLDAR O REVESTIMENTO",
+              "sector": "IQ-UT",
+              "schedule": {
+                "2026-06-17": "N",
+                "2026-06-24": "X"
+              }
+            },
+            {
+              "id": "a_vh0p3gjvz",
+              "name": "MONTAGEM DE RESISTÊNCIA E SOLDAGEM 1º CAMADA",
+              "sector": "IPS-S",
+              "schedule": {
+                "2026-06-25": "X",
+                "2026-06-29": "X",
+                "2026-06-30": "X",
+                "2026-07-01": "X"
+              }
+            },
+            {
+              "id": "a_3c79dixeg",
+              "name": "LP E UT DO REVESTIMENTO APÓS SOLDAGEM DA PRIMEIRA CAMADA",
+              "sector": "IQ-LP",
+              "schedule": {
+                "2026-07-02": "X",
+                "2026-07-03": "X"
+              }
+            },
+            {
+              "id": "a_b2xbmjjqh",
+              "name": "SOLDAGEM DO REVESTIMENTO",
+              "sector": "IPS-S",
+              "schedule": {
+                "2026-07-06": "X",
+                "2026-07-07": "X",
+                "2026-07-08": "X",
+                "2026-07-09": "X",
+                "2026-07-10": "X"
+              }
+            },
+            {
+              "id": "a_aqjv90j25",
+              "name": "VT, LP, E UT APÓS SOLDAGEM DO REVESTIMENTO",
+              "sector": "IQ-LP",
+              "schedule": {}
+            },
+            {
+              "id": "a_vg3i6w92k",
+              "name": "MOVIMENTAÇÃO PARA O FORNO",
+              "sector": "IPC-MC",
+              "schedule": {}
+            },
+            {
+              "id": "a_xglkamiui",
+              "name": "TRATAMENTO TÉRMICO",
+              "sector": "IPS-TT",
+              "schedule": {}
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "g_hfco2pwfu",
+      "customValues": {
+        "fa": "BLOCO DE CALIBRAÇÃO -153 Nº FA 57700"
+      },
+      "tarefas": [
+        {
+          "id": "t_cwflmwdh5",
+          "title": "BLOCO DE CALIBRAÇÃO -153 Nº FA 57700",
+          "activities": [
+            {
+              "id": "a_mz6g0hkqw",
+              "name": "FABRICAÇÃO BC 153 (TRAÇAGEM, CORTE, USINAGEM)",
+              "sector": "IPU-F",
+              "schedule": {
+                "2026-06-15": "N",
+                "2026-06-16": "N",
+                "2026-06-17": "N",
+                "2026-06-22": "X",
+                "2026-06-23": "X",
+                "2026-06-24": "X"
+              }
+            },
+            {
+              "id": "a_jggmz3hnz",
+              "name": "DIMENSIONAL E REGISTRO",
+              "sector": "IQ-DT",
+              "schedule": {
+                "2026-06-18": "C",
+                "2026-06-19": "C",
+                "2026-06-25": "X",
+                "2026-06-26": "X",
+                "2026-06-29": "X",
+                "2026-06-30": "X",
+                "2026-07-01": "X"
+              }
+            },
+            {
+              "id": "a_byuwalyq7",
+              "name": "DEMONSTRAÇÃO",
+              "sector": "IQ-UT",
+              "schedule": {
+                "2026-07-01": "X",
+                "2026-07-02": "X",
+                "2026-07-03": "X"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "g_849fl699k",
+      "customValues": {
+        "fa": "BLOCO DE CALIBRAÇÃO - 152 Nº FA 57698"
+      },
+      "tarefas": [
+        {
+          "id": "t_gjukl7qxa",
+          "title": "BLOCO DE CALIBRAÇÃO - 152 Nº FA 57698",
+          "activities": [
+            {
+              "id": "a_f2o3nz7a0",
+              "name": "FABRICAÇÃO BC 152 (TRAÇAGEM, CORTE, USINAGEM)",
+              "sector": "IPU-F",
+              "schedule": {
+                "2026-06-15": "N",
+                "2026-06-16": "N",
+                "2026-06-17": "N",
+                "2026-06-22": "X",
+                "2026-06-23": "X",
+                "2026-06-24": "X"
+              }
+            },
+            {
+              "id": "a_l2e02fgbd",
+              "name": "DIMENSIONAL E REGISTRO",
+              "sector": "IQ-DT",
+              "schedule": {
+                "2026-06-18": "C",
+                "2026-06-19": "C",
+                "2026-06-25": "X",
+                "2026-06-26": "X",
+                "2026-06-29": "X",
+                "2026-06-30": "X",
+                "2026-07-01": "X"
+              }
+            },
+            {
+              "id": "a_azaqr99fb",
+              "name": "DEMONSTRAÇÃO",
+              "sector": "IQ-UT",
+              "schedule": {
+                "2026-07-01": "X",
+                "2026-07-02": "X",
+                "2026-07-03": "X"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "g_1l7bs1km5",
+      "customValues": {
+        "fa": "FABRICAÇÃO DAS QPS - [273] Nº FA 57625"
+      },
+      "tarefas": [
+        {
+          "id": "t_l76d4ere5",
+          "title": "FABRICAÇÃO DAS QPS - [273] Nº FA 57625",
+          "activities": [
+            {
+              "id": "a_d6t7e8c21",
+              "name": "UT DE BORDA",
+              "sector": "IQ-UT",
+              "schedule": {}
+            },
+            {
+              "id": "a_mm0b566ta",
+              "name": "TRAÇAGEM, OXICORTE DO BISEL E PREPARAÇÃO DO BISEL",
+              "sector": "IPC-C",
+              "schedule": {
+                "2026-06-17": "N",
+                "2026-06-18": "N",
+                "2026-06-22": "X",
+                "2026-06-23": "X"
+              }
+            },
+            {
+              "id": "a_n48gkkiee",
+              "name": "VT/DT/LP DE BISEL",
+              "sector": "IQ-VT",
+              "schedule": {
+                "2026-06-19": "N",
+                "2026-06-24": "X"
+              }
+            },
+            {
+              "id": "a_g4pyjr8l4",
+              "name": "MOVIMENTAÇÃO PARA O CTT",
+              "sector": "IPC-MC",
+              "schedule": {
+                "2026-06-20": "N",
+                "2026-06-24": "X"
+              }
+            },
+            {
+              "id": "a_a1r6p99dl",
+              "name": "MONTAGEM/TRAVAMENTO/MONTAGEM DE AQUECIMENTO",
+              "sector": "IPC-M",
+              "schedule": {
+                "2026-06-25": "X",
+                "2026-06-29": "X"
+              }
+            },
+            {
+              "id": "a_8j2knukfa",
+              "name": "SOLDAGEM DO SD1",
+              "sector": "IPS-S",
+              "schedule": {
+                "2026-06-26": "X",
+                "2026-06-29": "X",
+                "2026-06-30": "X",
+                "2026-07-01": "X",
+                "2026-07-02": "X",
+                "2026-07-03": "X",
+                "2026-07-06": "X",
+                "2026-07-07": "X",
+                "2026-07-08": "X",
+                "2026-07-09": "X",
+                "2026-07-10": "X"
+              }
+            },
+            {
+              "id": "a_3m0w4yp72",
+              "name": "PREPARAÇÃO E ENSAIOS DA CONTRASOLDA",
+              "sector": "IPS-M",
+              "schedule": {
+                "2026-07-08": "X",
+                "2026-07-09": "X"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "g_cdrqhqwqe",
+      "customValues": {
+        "fa": "GRUPO 36 - CORREDOR - Traçagem/Transferência de identificação e corte das POS: 6 / 7 / 8 / 11 / 11.1 / 11.2 / 12 // 13 // 17.1 // 17.2 // 18.1 // 18.2 // 18.3 // 18.4 // 19.1 // 19.2 // 19.3 // 19.4 // 20.1 // 20.2 // 20.3 // 20.4. Nº FA 57619"
+      },
+      "tarefas": [
+        {
+          "id": "t_lvk968dt8",
+          "title": "GRUPO 36 - CORREDOR - Traçagem/Transferência de identificação e corte das POS: 6 / 7 / 8 / 11 / 11.1 / 11.2 / 12 // 13 // 17.1 // 17.2 // 18.1 // 18.2 // 18.3 // 18.4 // 19.1 // 19.2 // 19.3 // 19.4 // 20.1 // 20.2 // 20.3 // 20.4. Nº FA 57619",
+          "activities": [
+            {
+              "id": "a_i7qxdkp6b",
+              "name": "PREPARAÇÃO PARA UT DE BORDA",
+              "sector": "IPC-M",
+              "schedule": {}
+            },
+            {
+              "id": "a_0llf6tyzl",
+              "name": "UT DE BORDA",
+              "sector": "IQ-UT",
+              "schedule": {
+                "2026-06-15": "N",
+                "2026-06-16": "N",
+                "2026-06-17": "N",
+                "2026-06-18": "N",
+                "2026-07-10": "X",
+                "2026-07-11": "X"
+              }
+            },
+            {
+              "id": "a_vjfoksve3",
+              "name": "Traçagem dos Biseis e corte dos Biseis",
+              "sector": "IPC-C",
+              "schedule": {
+                "2026-06-15": "N",
+                "2026-06-16": "N",
+                "2026-06-17": "N",
+                "2026-06-18": "N",
+                "2026-06-19": "N",
+                "2026-06-24": "X",
+                "2026-06-25": "X",
+                "2026-06-26": "X",
+                "2026-06-27": "X",
+                "2026-06-28": "X",
+                "2026-06-29": "X"
+              }
+            },
+            {
+              "id": "a_fb1tskbep",
+              "name": "Movimentação para área do BLOCO 040",
+              "sector": "IPC-MC",
+              "schedule": {
+                "2026-06-25": "X"
+              }
+            },
+            {
+              "id": "a_gt156s0lx",
+              "name": "PREPARAÇÃO DOS BISEIS",
+              "sector": "IPC-M",
+              "schedule": {}
+            },
+            {
+              "id": "a_gcvj29z3n",
+              "name": "VT/DT de Bisel",
+              "sector": "IQ-VT",
+              "schedule": {
+                "2026-06-30": "X",
+                "2026-07-01": "X",
+                "2026-07-06": "X",
+                "2026-07-07": "X",
+                "2026-07-08": "X",
+                "2026-07-09": "X"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "g_b0jowkbei",
+      "customValues": {
+        "fa": "VIROLA 5 - ENSAIOS FINAIS E [RNC: 020/26 020/26 (ASP -0819-37-030)]"
+      },
+      "tarefas": [
+        {
+          "id": "t_0pkkmlmpb",
+          "title": "VIROLA 5 - ENSAIOS FINAIS E [RNC: 020/26 020/26 (ASP -0819-37-030)]",
+          "activities": [
+            {
+              "id": "a_t2l3q99w3",
+              "name": "PREPARAÇÃO PARA RX - 2ª leva",
+              "sector": "IQ-RX",
+              "schedule": {
+                "2026-06-15": "Ok",
+                "2026-06-16": "Ok",
+                "2026-06-17": "Ok"
+              }
+            },
+            {
+              "id": "a_4xogp8j90",
+              "name": "REALIZAR ENSAIO DE RX - 2ª leva e Laudo",
+              "sector": "IQ-RX",
+              "schedule": {
+                "2026-06-18": "Ok",
+                "2026-06-19": "Ok",
+                "2026-06-22": "X",
+                "2026-06-23": "X"
+              }
+            },
+            {
+              "id": "a_239kzvf98",
+              "name": "MOVIMENTAÇÃO PARA ÁREA DO BLOCO 40",
+              "sector": "IPC-MC",
+              "schedule": {
+                "2026-06-25": "X"
+              }
+            },
+            {
+              "id": "a_4ybv2x270",
+              "name": "VT/DT DE BORDE DO CORPO DE PROVA [RNC: 020/26 (ASP -0819-37-030)]",
+              "sector": "IPC-C",
+              "schedule": {
+                "2026-06-26": "X"
+              }
+            },
+            {
+              "id": "a_6lyq8pngr",
+              "name": "MOVIMENTAÇÃO PARA FERRAMENTARIA",
+              "sector": "IPC-MC",
+              "schedule": {
+                "2026-06-27": "X"
+              }
+            },
+            {
+              "id": "a_3dkoxayod",
+              "name": "FABRICAÇÃO DOS CORPOS DE PROVA - CORTE/USINAGEM E PREPARAÇÃO DOS CP, CONFORME PLANO DE ENSAIOS",
+              "sector": "IPU-F",
+              "schedule": {
+                "2026-06-29": "X",
+                "2026-06-30": "X",
+                "2026-07-01": "X",
+                "2026-07-02": "X",
+                "2026-07-03": "X",
+                "2026-07-06": "X",
+                "2026-07-07": "X",
+                "2026-07-08": "X"
+              }
+            },
+            {
+              "id": "a_qoiix444b",
+              "name": "ENSAIOS/LAUDO FINAL",
+              "sector": "IQ-LAB",
+              "schedule": {
+                "2026-07-06": "X",
+                "2026-07-07": "X",
+                "2026-07-08": "X",
+                "2026-07-09": "X",
+                "2026-07-10": "X"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "g_lf0v9y1v6",
+      "customValues": {
+        "fa": "Grupo 36 - RNC 027-26 e RNC 028-26 Nº FA 57866"
+      },
+      "tarefas": [
+        {
+          "id": "t_69vhdherw",
+          "title": "Grupo 36 - RNC 027-26 e RNC 028-26 Nº FA 57866",
+          "activities": [
+            {
+              "id": "a_sw96gr13n",
+              "name": "AGUARDANDO APROVAÇÃO DA RNC",
+              "sector": "CTMSP",
+              "schedule": {
+                "2026-06-15": "Ok",
+                "2026-06-16": "Ok",
+                "2026-06-17": "Ok"
+              }
+            },
+            {
+              "id": "a_gpm6bf7ps",
+              "name": "EMISSÃO E ELABORAÇÃO DA FA PELA IE",
+              "sector": "IE",
+              "schedule": {
+                "2026-06-15": "Ok",
+                "2026-06-16": "Ok",
+                "2026-06-17": "Ok",
+                "2026-06-18": "Ok"
+              }
+            },
+            {
+              "id": "a_tt1gz4oqv",
+              "name": "Verificação da transferência da marcação de origem e Corte",
+              "sector": "IPC-C",
+              "schedule": {
+                "2026-06-19": "N",
+                "2026-06-20": "N",
+                "2026-06-22": "X",
+                "2026-06-23": "X"
+              }
+            },
+            {
+              "id": "a_bb9ni95bd",
+              "name": "Movimentação para ferramentaria",
+              "sector": "IPC-MC",
+              "schedule": {
+                "2026-06-25": "X"
+              }
+            },
+            {
+              "id": "a_1f6fgjkx4",
+              "name": "Verificação da transferência da marcação, corte e fabricação do corpo de prova",
+              "sector": "IPU-F",
+              "schedule": {
+                "2026-06-25": "X",
+                "2026-06-26": "X",
+                "2026-06-29": "X",
+                "2026-06-30": "X",
+                "2026-07-01": "X"
+              }
+            },
+            {
+              "id": "a_w67m6b65r",
+              "name": "Ensaios destrutivos.",
+              "sector": "IQ-LAB",
+              "schedule": {
+                "2026-07-02": "X",
+                "2026-07-03": "X",
+                "2026-07-06": "X",
+                "2026-07-07": "X",
+                "2026-07-08": "X"
+              }
+            },
+            {
+              "id": "a_eld4nba1s",
+              "name": "Compilação e verificação dos registros e fechamento da RNC",
+              "sector": "IQ",
+              "schedule": {
+                "2026-07-09": "X",
+                "2026-07-10": "X",
+                "2026-07-11": "X"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "g_ry8ihyp05",
+      "customValues": {
+        "fa": "BM ENISA - 001 - AMOSTRA Nº FA 57809"
+      },
+      "tarefas": [
+        {
+          "id": "t_9w86vzoln",
+          "title": "BM ENISA - 001 - AMOSTRA Nº FA 57809",
+          "activities": [
+            {
+              "id": "a_6w2eceuos",
+              "name": "CORTE E FABRICAÇÃO DO CORPO",
+              "sector": "IPU-F",
+              "schedule": {
+                "2026-06-15": "N",
+                "2026-06-16": "N",
+                "2026-06-17": "N",
+                "2026-06-22": "X",
+                "2026-06-23": "X",
+                "2026-06-24": "X"
+              }
+            },
+            {
+              "id": "a_1kmg2cryt",
+              "name": "Ensaios destrutivos.",
+              "sector": "IQ-DT",
+              "schedule": {
+                "2026-06-18": "C",
+                "2026-06-19": "C",
+                "2026-06-25": "X",
+                "2026-06-26": "X"
+              }
+            },
+            {
+              "id": "a_4lz6fn7wk",
+              "name": "Compilação e verificação dos registros",
+              "sector": "IQ-UT",
+              "schedule": {}
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "summaryData": [
+    {
+      "id": "g_enp3xn6mo",
+      "customValues": {
+        "fa": "GRUPO 37 - FABRICAÇÃO DAS QPS [264] Nº FA 57592"
+      },
+      "tarefas": [
+        {
+          "id": "t_84noscv8f",
+          "title": "GRUPO 37 - FABRICAÇÃO DAS QPS [264] Nº FA 57592",
+          "activities": [
+            {
+              "id": "a_j2asr2465",
+              "name": "FABRICAÇÃO DOS CORPOS DE PROVA - CORTE/USINAGEM E PREPARAÇÃO DOS CP, CONFORME PLANO DE ENSAIOS - pendente CP de reteste",
+              "sector": "IPU-F",
+              "schedule": {
+                "2026-06-15": "Ok",
+                "2026-06-16": "Ok",
+                "2026-06-17": "Ok",
+                "2026-06-18": "Ok",
+                "2026-06-19": "Ok",
+                "2026-06-22": "X",
+                "2026-06-23": "X",
+                "2026-06-24": "X"
+              }
+            },
+            {
+              "id": "a_ev6pgrkcr",
+              "name": "ENSAIOS/LAUDO FINAL",
+              "sector": "IQ-LAB",
+              "schedule": {
+                "2026-06-15": "Ok",
+                "2026-06-16": "Ok",
+                "2026-06-17": "Ok",
+                "2026-06-18": "Ok",
+                "2026-06-19": "Ok",
+                "2026-06-22": "X",
+                "2026-06-23": "X",
+                "2026-06-24": "X",
+                "2026-06-25": "X",
+                "2026-06-26": "X",
+                "2026-06-27": "X",
+                "2026-06-28": "X",
+                "2026-07-02": "X",
+                "2026-07-03": "X",
+                "2026-07-04": "X",
+                "2026-07-05": "X",
+                "2026-07-06": "X",
+                "2026-07-08": "X",
+                "2026-07-09": "X",
+                "2026-07-10": "X",
+                "2026-07-11": "X",
+                "2026-07-12": "X"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "g_05x3u86lk",
+      "customValues": {
+        "fa": "GRUPO 37 - FABRICAÇÃO DAS QPS - [299] FA: 57810"
+      },
+      "tarefas": [
+        {
+          "id": "t_2l264hxaw",
+          "title": "GRUPO 37 - FABRICAÇÃO DAS QPS - [299] FA: 57810",
+          "activities": [
+            {
+              "id": "a_te34l5aoj",
+              "name": "CORTE/TRANSFERÊNCIA DE INDICAÇÃO",
+              "sector": "IP-C",
+              "schedule": {
+                "2026-06-15": "Ok",
+                "2026-06-16": "Ok",
+                "2026-06-17": "Ok",
+                "2026-06-18": "Ok",
+                "2026-06-22": "X"
+              }
+            },
+            {
+              "id": "a_az3fmrwlm",
+              "name": "UT DE BORDA (NUCLEO E IBQN) - Pendente UT IBQN",
+              "sector": "IQ-UT",
+              "schedule": {
+                "2026-06-15": "Ok",
+                "2026-06-16": "Ok",
+                "2026-06-17": "Ok",
+                "2026-06-18": "Ok",
+                "2026-06-22": "X"
+              }
+            },
+            {
+              "id": "a_5hw90hwiw",
+              "name": "OXICORTE DO BISEL E PREPARAÇÃO DO BISEL",
+              "sector": "IPC-C",
+              "schedule": {
+                "2026-06-19": "N",
+                "2026-06-23": "X"
+              }
+            },
+            {
+              "id": "a_nc2mx314f",
+              "name": "VT/DT/LP DE BISEL",
+              "sector": "IQ-LP",
+              "schedule": {
+                "2026-06-23": "X"
+              }
+            },
+            {
+              "id": "a_exvrtiwr2",
+              "name": "MONTAGEM/TRAVAMENTO/MONTAGEM DE AQUECIMENTO",
+              "sector": "IPC-M",
+              "schedule": {
+                "2026-06-24": "X"
+              }
+            },
+            {
+              "id": "a_am0zq2ln5",
+              "name": "SOLDAGEM DO SD1",
+              "sector": "IPS-S",
+              "schedule": {
+                "2026-06-25": "X",
+                "2026-06-26": "X",
+                "2026-06-29": "X",
+                "2026-06-30": "X",
+                "2026-07-01": "X",
+                "2026-07-02": "X",
+                "2026-07-03": "X",
+                "2026-07-06": "X",
+                "2026-07-07": "X",
+                "2026-07-08": "X",
+                "2026-07-09": "X",
+                "2026-07-10": "X"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "g_yr04e7fp9",
+      "customValues": {
+        "fa": "GRUPO 37 - FABRICAÇÃO DAS QPS - [300] FA: 57822"
+      },
+      "tarefas": [
+        {
+          "id": "t_5alxxtlht",
+          "title": "GRUPO 37 - FABRICAÇÃO DAS QPS - [300] FA: 57822",
+          "activities": [
+            {
+              "id": "a_wb6zim8hg",
+              "name": "EMISSÃO E APROVAÇÃO DA DOCUMENTAÇÃO DO QPS PELO CTMSP [Em substituição ao QPS 267]",
+              "sector": "IE",
+              "schedule": {
+                "2026-06-15": "Ok",
+                "2026-06-16": "Ok",
+                "2026-06-17": "Ok",
+                "2026-06-18": "Ok",
+                "2026-06-19": "Ok",
+                "2026-06-22": "X",
+                "2026-06-23": "X",
+                "2026-06-24": "X",
+                "2026-06-25": "X",
+                "2026-06-26": "X"
+              }
+            },
+            {
+              "id": "a_coqtyhum2",
+              "name": "RECEPÇÃO DO METAL DE BASE E ADIÇÃO",
+              "sector": "IQ-REC",
+              "schedule": {
+                "2026-06-22": "X",
+                "2026-06-23": "X"
+              }
+            },
+            {
+              "id": "a_52j4qe8k0",
+              "name": "CORTE/TRANSFERÊNCIA DE INDICAÇÃO",
+              "sector": "IPC-C",
+              "schedule": {
+                "2026-06-24": "X",
+                "2026-06-25": "X"
+              }
+            },
+            {
+              "id": "a_ld6c3xel8",
+              "name": "UT DE BORDA",
+              "sector": "IQ-UT",
+              "schedule": {
+                "2026-06-26": "X"
+              }
+            },
+            {
+              "id": "a_hzs51g80z",
+              "name": "OXICORTE DO BISEL E PREPARAÇÃO DO BISEL",
+              "sector": "IPC-C",
+              "schedule": {
+                "2026-06-29": "X"
+              }
+            },
+            {
+              "id": "a_l2vskv0vp",
+              "name": "VT/DT/LP DE BISEL",
+              "sector": "IQ-LP",
+              "schedule": {
+                "2026-06-30": "X"
+              }
+            },
+            {
+              "id": "a_5qpdhy3k3",
+              "name": "MONTAGEM/TRAVAMENTO/MONTAGEM DE AQUECIMENTO",
+              "sector": "IPC-M",
+              "schedule": {
+                "2026-07-01": "X"
+              }
+            },
+            {
+              "id": "a_bkwysysfx",
+              "name": "SOLDAGEM DO SD1",
+              "sector": "IPS-S",
+              "schedule": {
+                "2026-07-02": "X",
+                "2026-07-03": "X",
+                "2026-07-06": "X",
+                "2026-07-07": "X",
+                "2026-07-08": "X",
+                "2026-07-09": "X",
+                "2026-07-10": "X"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "g_s2fnj1l89",
+      "customValues": {
+        "fa": "QPS 272 - GRUPO 24 - FABRICAÇÃO DA QPS 0272 - FA Nº FA 57621"
+      },
+      "tarefas": [
+        {
+          "id": "t_xjquhqgb3",
+          "title": "QPS 272 - GRUPO 24 - FABRICAÇÃO DA QPS 0272 - FA Nº FA 57621",
+          "activities": [
+            {
+              "id": "a_wpt1zgzxg",
+              "name": "FABRICAÇÃO DOS CORPOS DE PROVA - CORTE/USINAGEM E PREPARAÇÃO DOS CP, CONFORME PLANO DE ENSAIOS - pendente CP de reteste",
+              "sector": "IPU-F",
+              "schedule": {
+                "2026-06-15": "Ok",
+                "2026-06-16": "Ok",
+                "2026-06-17": "Ok",
+                "2026-06-18": "Ok",
+                "2026-06-22": "X",
+                "2026-06-23": "X",
+                "2026-06-24": "X"
+              }
+            },
+            {
+              "id": "a_33zrpt20e",
+              "name": "PREPARAÇÃO AND SOLDA PARA CP DE PELINE",
+              "sector": "IPS-S",
+              "schedule": {
+                "2026-06-17": "Ok",
+                "2026-06-18": "Ok"
+              }
+            },
+            {
+              "id": "a_71ygkqwvu",
+              "name": "ENSAIOS/LAUDO FINAL",
+              "sector": "IQ-LAB",
+              "schedule": {
+                "2026-06-15": "Ok",
+                "2026-06-16": "Ok",
+                "2026-06-17": "Ok",
+                "2026-06-18": "Ok",
+                "2026-06-19": "Ok",
+                "2026-06-22": "X",
+                "2026-06-23": "X",
+                "2026-06-24": "X",
+                "2026-06-25": "X",
+                "2026-06-26": "X",
+                "2026-06-27": "X",
+                "2026-06-28": "X",
+                "2026-06-29": "X",
+                "2026-06-30": "X",
+                "2026-07-01": "X",
+                "2026-07-02": "X",
+                "2026-07-03": "X",
+                "2026-07-06": "X"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "g_sjcea9e4e",
+      "customValues": {
+        "fa": "GRUPO 26 - RETRABALHO PREVISTO NA RNC 025/26 E USINAGEM DO CONVÉS DO GV - Nº FA 57534"
+      },
+      "tarefas": [
+        {
+          "id": "t_oip4j5uyu",
+          "title": "GRUPO 26 - RETRABALHO PREVISTO NA RNC 025/26 E USINAGEM DO CONVÉS DO GV - Nº FA 57534",
+          "activities": [
+            {
+              "id": "a_4yeuuhgdp",
+              "name": "CONTROLE DIMENSIONAL PELA CALDEIRARIA (NOVA DISPOSIÇÃO/APROVAÇÃO DA RNC 66/26 - RNC-R-26-030-56",
+              "sector": "IPC-M",
+              "schedule": {
+                "2026-06-15": "Ok",
+                "2026-06-16": "Ok",
+                "2026-06-17": "Ok",
+                "2026-06-18": "Ok",
+                "2026-06-19": "Ok",
+                "2026-06-22": "X",
+                "2026-06-23": "X"
+              }
+            },
+            {
+              "id": "a_ca9wgflzf",
+              "name": "SOLDAGEM SOLDA S-26-030-56, S-26-030-101",
+              "sector": "IPS-S",
+              "schedule": {
+                "2026-06-15": "Ok",
+                "2026-06-16": "Ok",
+                "2026-06-17": "Ok",
+                "2026-06-18": "Ok",
+                "2026-06-19": "C"
+              }
+            },
+            {
+              "id": "a_u1400mgnj",
+              "name": "REALIZAÇÃO DOS ENDS (VT/LP) PÓS SOLDAGEM",
+              "sector": "IQ-LP",
+              "schedule": {
+                "2026-06-25": "X",
+                "2026-06-26": "X"
+              }
+            },
+            {
+              "id": "a_xvsk3fylq",
+              "name": "REMOÇÃO DOS TRAVAMENTOS AUXILIARES",
+              "sector": "IPC-M",
+              "schedule": {
+                "2026-06-25": "X",
+                "2026-06-26": "X"
+              }
+            },
+            {
+              "id": "a_lwzuna090",
+              "name": "INSPEÇÃO DIMENSIONAL",
+              "sector": "IQ-DT",
+              "schedule": {
+                "2026-06-27": "X",
+                "2026-06-29": "X",
+                "2026-06-30": "X",
+                "2026-07-01": "X",
+                "2026-07-02": "X",
+                "2026-07-03": "X",
+                "2026-07-06": "X",
+                "2026-07-07": "X",
+                "2026-07-08": "X",
+                "2026-07-09": "X"
+              }
+            },
+            {
+              "id": "a_e8zhnnv5r",
+              "name": "MOVIMENTAÇÃO P/ USINAGEM",
+              "sector": "IPC-MC",
+              "schedule": {
+                "2026-07-04": "X"
+              }
+            },
+            {
+              "id": "a_yza8c3vqy",
+              "name": "USINAGEM DOS APOIOS DO GV.",
+              "sector": "IPU",
+              "schedule": {
+                "2026-07-11": "X"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "g_d0nr7d5zv",
+      "customValues": {
+        "fa": "GRUPO 26 - VASOS E ESTRUTURAS INTERNAS DO LABGENE, CONVÉS DO GV RNC 041-26 FA 57787"
+      },
+      "tarefas": [
+        {
+          "id": "t_h8ezgcchx",
+          "title": "GRUPO 26 - VASOS E ESTRUTURAS INTERNAS DO LABGENE, CONVÉS DO GV RNC 041-26 FA 57787",
+          "activities": [
+            {
+              "id": "a_lz59l4767",
+              "name": "Traçagem, corte e identificação da POS. 89",
+              "sector": "IPC-C",
+              "schedule": {
+                "2026-06-15": "Ok",
+                "2026-06-16": "Ok"
+              }
+            },
+            {
+              "id": "a_r3brhqp9m",
+              "name": "Traçagem dos Biseis e corte dos Biseis",
+              "sector": "IPC-C",
+              "schedule": {
+                "2026-06-17": "Ok"
+              }
+            },
+            {
+              "id": "a_eywhddegy",
+              "name": "VT/DT de Bisel",
+              "sector": "IQ-LP",
+              "schedule": {
+                "2026-06-18": "N",
+                "2026-06-22": "X"
+              }
+            },
+            {
+              "id": "a_7krd0x29r",
+              "name": "Montagem/Travamento da POS. 89 no Convés",
+              "sector": "IPC-M",
+              "schedule": {
+                "2026-06-19": "N",
+                "2026-06-22": "X"
+              }
+            },
+            {
+              "id": "a_4trupht85",
+              "name": "Tratamento térmico e soldagem",
+              "sector": "IPS-S",
+              "schedule": {
+                "2026-06-24": "X",
+                "2026-06-25": "X"
+              }
+            },
+            {
+              "id": "a_ej2ho8kgx",
+              "name": "Ensaios ENDs FINAIS",
+              "sector": "IQ-VT",
+              "schedule": {
+                "2026-06-26": "X",
+                "2026-06-27": "X"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "g_1khemhhtm",
+      "customValues": {
+        "fa": "GRUPO 38 - TANQUE DE EXPANSÃO - FABRICAÇÃO DA POS 19 E MONTAGEM/SOLDAGEM Nº FA 57714"
+      },
+      "tarefas": [
+        {
+          "id": "t_gjpm6sj1d",
+          "title": "GRUPO 38 - TANQUE DE EXPANSÃO - FABRICAÇÃO DA POS 19 E MONTAGEM/SOLDAGEM Nº FA 57714",
+          "activities": [
+            {
+              "id": "a_z53lql4xk",
+              "name": "MONTAGEM NO CASCO E POS. 13 - SERÁ FEITA APÓS A CONCLUSÃO DA SOLDAGEM 14 + 16",
+              "sector": "IPC-M",
+              "schedule": {
+                "2026-07-01": "X"
+              }
+            },
+            {
+              "id": "a_j15cpk4fz",
+              "name": "SOLDAGEM",
+              "sector": "IPS-S",
+              "schedule": {
+                "2026-07-01": "X",
+                "2026-07-02": "X"
+              }
+            },
+            {
+              "id": "a_6xzgvf9h7",
+              "name": "ENSAIOS",
+              "sector": "IQ-LP",
+              "schedule": {
+                "2026-07-02": "X"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "g_xyfvqdiqa",
+      "customValues": {
+        "fa": "BLOCO 40 - GRUPO 38 - TANQUE DE EXPANSÃO DO TBP - SOLDAGEM DAS POS. 14 + 16 - S-38-026-01@04 Nº FA 57760"
+      },
+      "tarefas": [
+        {
+          "id": "t_kkt7xgyng",
+          "title": "BLOCO 40 - GRUPO 38 - TANQUE DE EXPANSÃO DO TBP - SOLDAGEM DAS POS. 14 + 16 - S-38-026-01@04 Nº FA 57760",
+          "activities": [
+            {
+              "id": "a_t3epyo7tw",
+              "name": "Movimentação/Montagem e Ponteamento as POS. 14 + 16 e travamentos ( 2º Conjunto)",
+              "sector": "",
+              "schedule": {}
+            },
+            {
+              "id": "a_gbouh3u5v",
+              "name": "CONFERÊNCIA DA PERDICULARIDADE PELO CONTROLE DIMENSIONAL",
+              "sector": "IQ-DT",
+              "schedule": {
+                "2026-06-17": "C"
+              }
+            },
+            {
+              "id": "a_w9o1pu5kn",
+              "name": "MONTAGEM DE RESITÊNCIA E SOLDAGEM ( 2º Conjunto)",
+              "sector": "IPS-S",
+              "schedule": {
+                "2026-06-15": "Ok",
+                "2026-06-16": "Ok",
+                "2026-06-17": "Ok",
+                "2026-06-18": "Ok",
+                "2026-06-19": "Ok",
+                "2026-06-22": "X",
+                "2026-06-23": "X",
+                "2026-06-24": "X",
+                "2026-06-25": "X",
+                "2026-06-26": "X",
+                "2026-06-27": "X",
+                "2026-07-01": "X"
+              }
+            },
+            {
+              "id": "a_2fh6d8u6z",
+              "name": "CONTROLE DIMENSIONAL DO CONJUNTO ( 2º Conjunto)",
+              "sector": "IPC-M",
+              "schedule": {
+                "2026-06-15": "Ok",
+                "2026-06-16": "Ok",
+                "2026-06-17": "Ok",
+                "2026-06-18": "Ok",
+                "2026-06-19": "Ok",
+                "2026-06-22": "X",
+                "2026-06-23": "X",
+                "2026-06-24": "X",
+                "2026-06-25": "X",
+                "2026-06-26": "X",
+                "2026-06-27": "X",
+                "2026-07-01": "X"
+              }
+            },
+            {
+              "id": "a_0dddxsiyp",
+              "name": "PREPARAÇÃO E ENDS - (1º E 2º Conjunto)",
+              "sector": "IQ-LP",
+              "schedule": {
+                "2026-07-03": "X",
+                "2026-07-04": "X",
+                "2026-07-07": "X",
+                "2026-07-08": "X",
+                "2026-07-09": "X",
+                "2026-07-10": "X",
+                "2026-07-11": "X"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "g_geri7tn2s",
+      "customValues": {
+        "fa": "BLOCO 40 - GRUPO 15 - CASCO SUPERIOR SETOR 2 - REMOÇÃO/ENSAIOS E RESSOLDAGEM/ENSAIOS DOS OLHAIS DE BASCULAMENTO - DDM-0819A0-022 Nº FA 57893"
+      },
+      "tarefas": [
+        {
+          "id": "t_04j141vic",
+          "title": "BLOCO 40 - GRUPO 15 - CASCO SUPERIOR SETOR 2 - REMOÇÃO/ENSAIOS E RESSOLDAGEM/ENSAIOS DOS OLHAIS DE BASCULAMENTO - DDM-0819A0-022 Nº FA 57893",
+          "activities": [
+            {
+              "id": "a_v0eg09fxa",
+              "name": "MAPEAMENTO DAS OLHAIS QUE SERÃO REMOVIDO COM AUXILIO DO IQ",
+              "sector": "IQ-UT",
+              "schedule": {}
+            },
+            {
+              "id": "a_k87ahznm5",
+              "name": "REMOÇÃO DOS OLHAIS",
+              "sector": "IPS",
+              "schedule": {}
+            },
+            {
+              "id": "a_8bcx9h16i",
+              "name": "PEPRARAÇÃO DA REGIÃO",
+              "sector": "IPC-M",
+              "schedule": {}
+            },
+            {
+              "id": "a_ep96ededr",
+              "name": "ENSAIO DE VT E LP DOS OLHAIS SEREM REMOVIDOS",
+              "sector": "IQ-VT",
+              "schedule": {}
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "g_ma4u2a1wd",
+      "customValues": {
+        "fa": "SETOR 3 - GRUPO 15 - ENDs nas Juntas das RNC S-15-024-84 e (IND. UT 1, 3, 6, 7, 8, 11, 13, 16, 17 e 18) - RNC 079-24 - SETOR 3 (CAVERNA H) Nº FA 56904 Nº FA 56637"
+      },
+      "tarefas": [
+        {
+          "id": "t_z5sc1oxoq",
+          "title": "SETOR 3 - GRUPO 15 - ENDs nas Juntas das RNC S-15-024-84 e (IND. UT 1, 3, 6, 7, 8, 11, 13, 16, 17 e 18) - RNC 079-24 - SETOR 3 (CAVERNA H) Nº FA 56904 Nº FA 56637",
+          "activities": [
+            {
+              "id": "a_x68o4ehl4",
+              "name": "AJUSTE DE ANDAIME",
+              "sector": "",
+              "schedule": {
+                "2026-06-15": "Ok",
+                "2026-06-16": "Ok"
+              }
+            },
+            {
+              "id": "a_6ooeiqdcy",
+              "name": "PREPARAÇÃO PARA UT",
+              "sector": "IPC-M",
+              "schedule": {
+                "2026-06-18": "Ok"
+              }
+            },
+            {
+              "id": "a_lcd8erhpx",
+              "name": "REALIZAR ENSAIO DE UT DOS REPAROS",
+              "sector": "IQ-UT",
+              "schedule": {
+                "2026-06-19": "Ok",
+                "2026-06-20": "Ok",
+                "2026-06-21": "C"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "g_q8qequzgv",
+      "customValues": {
+        "fa": "SETOR 3 - GRUPO 15 - ULTRASSOM NA JUNTA S-15-024-63(IND_UT_1, 2, 5, 8, 9, 10, 11, 13 e 16) - RNC 081-24 - SETOR 3 (CAVERNA G) Nº FA 56639"
+      },
+      "tarefas": [
+        {
+          "id": "t_efuyjx8s1",
+          "title": "SETOR 3 - GRUPO 15 - ULTRASSOM NA JUNTA S-15-024-63(IND_UT_1, 2, 5, 8, 9, 10, 11, 13 e 16) - RNC 081-24 - SETOR 3 (CAVERNA G) Nº FA 56639",
+          "activities": [
+            {
+              "id": "a_27wld5ori",
+              "name": "AJUSTE DE ANDAIME",
+              "sector": "",
+              "schedule": {
+                "2026-06-15": "Ok",
+                "2026-06-16": "Ok"
+              }
+            },
+            {
+              "id": "a_rtb1ruos9",
+              "name": "PREPARAÇÃO PARA UT",
+              "sector": "IPC-M",
+              "schedule": {
+                "2026-06-18": "Ok"
+              }
+            },
+            {
+              "id": "a_wg63zcgi8",
+              "name": "REALIZAR ENSAIO DE UT DOS REPAROS",
+              "sector": "IQ-UT",
+              "schedule": {
+                "2026-06-19": "Ok",
+                "2026-06-20": "Ok",
+                "2026-06-21": "C"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "g_tfybcpc8e",
+      "customValues": {
+        "fa": "QPS 298 - REVESTIMENTO AUSTENÍTICO Nº FA 57763"
+      },
+      "tarefas": [
+        {
+          "id": "t_w2dtczyfp",
+          "title": "QPS 298 - REVESTIMENTO AUSTENÍTICO Nº FA 57763",
+          "activities": [
+            {
+              "id": "a_zzamj07bj",
+              "name": "CORTE/IDENTIFICAÇÃO DAS POS/MONTAGEM DO TRATAMENTO TÉRMICO",
+              "sector": "IPC-C",
+              "schedule": {}
+            },
+            {
+              "id": "a_2pef6himb",
+              "name": "MOVIMENTAÇÃO PARA ÁREA DE SOLDAGEM\\",
+              "sector": "IPC-MC",
+              "schedule": {}
+            },
+            {
+              "id": "a_us61a5wgg",
+              "name": "RESOLUÇÃO DE PENDÊNCIAS NO RECEBIMENTO DE CONSUMÍVEIS (IQ E IES)",
+              "sector": "IQ-REC",
+              "schedule": {
+                "2026-06-15": "Ok",
+                "2026-06-16": "Ok",
+                "2026-06-22": "X",
+                "2026-06-23": "X"
+              }
+            },
+            {
+              "id": "a_6d7vfml1u",
+              "name": "PREPRAÇÃO DA SUPERFÍCIE",
+              "sector": "IPC-M",
+              "schedule": {
+                "2026-06-17": "N",
+                "2026-06-23": "X"
+              }
+            },
+            {
+              "id": "a_x8pghdcgk",
+              "name": "VT/LP DA SUPERFÍCIE A SOLDAR O REVESTIMENTO",
+              "sector": "IQ-LP",
+              "schedule": {
+                "2026-06-17": "N",
+                "2026-06-18": "N",
+                "2026-06-23": "X",
+                "2026-06-24": "X"
+              }
+            },
+            {
+              "id": "a_l5f5npygv",
+              "name": "UT DA SUPERFÍCIE A SOLDAR O REVESTIMENTO",
+              "sector": "IQ-UT",
+              "schedule": {
+                "2026-06-17": "N",
+                "2026-06-24": "X"
+              }
+            },
+            {
+              "id": "a_vh0p3gjvz",
+              "name": "MONTAGEM DE RESISTÊNCIA E SOLDAGEM 1º CAMADA",
+              "sector": "IPS-S",
+              "schedule": {
+                "2026-06-25": "X",
+                "2026-06-29": "X",
+                "2026-06-30": "X",
+                "2026-07-01": "X"
+              }
+            },
+            {
+              "id": "a_3c79dixeg",
+              "name": "LP E UT DO REVESTIMENTO APÓS SOLDAGEM DA PRIMEIRA CAMADA",
+              "sector": "IQ-LP",
+              "schedule": {
+                "2026-07-02": "X",
+                "2026-07-03": "X"
+              }
+            },
+            {
+              "id": "a_b2xbmjjqh",
+              "name": "SOLDAGEM DO REVESTIMENTO",
+              "sector": "IPS-S",
+              "schedule": {
+                "2026-07-06": "X",
+                "2026-07-07": "X",
+                "2026-07-08": "X",
+                "2026-07-09": "X",
+                "2026-07-10": "X"
+              }
+            },
+            {
+              "id": "a_aqjv90j25",
+              "name": "VT, LP, E UT APÓS SOLDAGEM DO REVESTIMENTO",
+              "sector": "IQ-LP",
+              "schedule": {}
+            },
+            {
+              "id": "a_vg3i6w92k",
+              "name": "MOVIMENTAÇÃO PARA O FORNO",
+              "sector": "IPC-MC",
+              "schedule": {}
+            },
+            {
+              "id": "a_xglkamiui",
+              "name": "TRATAMENTO TÉRMICO",
+              "sector": "IPS-TT",
+              "schedule": {}
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "g_hfco2pwfu",
+      "customValues": {
+        "fa": "BLOCO DE CALIBRAÇÃO -153 Nº FA 57700"
+      },
+      "tarefas": [
+        {
+          "id": "t_cwflmwdh5",
+          "title": "BLOCO DE CALIBRAÇÃO -153 Nº FA 57700",
+          "activities": [
+            {
+              "id": "a_mz6g0hkqw",
+              "name": "FABRICAÇÃO BC 153 (TRAÇAGEM, CORTE, USINAGEM)",
+              "sector": "IPU-F",
+              "schedule": {
+                "2026-06-15": "N",
+                "2026-06-16": "N",
+                "2026-06-17": "N",
+                "2026-06-22": "X",
+                "2026-06-23": "X",
+                "2026-06-24": "X"
+              }
+            },
+            {
+              "id": "a_jggmz3hnz",
+              "name": "DIMENSIONAL E REGISTRO",
+              "sector": "IQ-DT",
+              "schedule": {
+                "2026-06-18": "C",
+                "2026-06-19": "C",
+                "2026-06-25": "X",
+                "2026-06-26": "X",
+                "2026-06-29": "X",
+                "2026-06-30": "X",
+                "2026-07-01": "X"
+              }
+            },
+            {
+              "id": "a_byuwalyq7",
+              "name": "DEMONSTRAÇÃO",
+              "sector": "IQ-UT",
+              "schedule": {
+                "2026-07-01": "X",
+                "2026-07-02": "X",
+                "2026-07-03": "X"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "g_849fl699k",
+      "customValues": {
+        "fa": "BLOCO DE CALIBRAÇÃO - 152 Nº FA 57698"
+      },
+      "tarefas": [
+        {
+          "id": "t_gjukl7qxa",
+          "title": "BLOCO DE CALIBRAÇÃO - 152 Nº FA 57698",
+          "activities": [
+            {
+              "id": "a_f2o3nz7a0",
+              "name": "FABRICAÇÃO BC 152 (TRAÇAGEM, CORTE, USINAGEM)",
+              "sector": "IPU-F",
+              "schedule": {
+                "2026-06-15": "N",
+                "2026-06-16": "N",
+                "2026-06-17": "N",
+                "2026-06-22": "X",
+                "2026-06-23": "X",
+                "2026-06-24": "X"
+              }
+            },
+            {
+              "id": "a_l2e02fgbd",
+              "name": "DIMENSIONAL E REGISTRO",
+              "sector": "IQ-DT",
+              "schedule": {
+                "2026-06-18": "C",
+                "2026-06-19": "C",
+                "2026-06-25": "X",
+                "2026-06-26": "X",
+                "2026-06-29": "X",
+                "2026-06-30": "X",
+                "2026-07-01": "X"
+              }
+            },
+            {
+              "id": "a_azaqr99fb",
+              "name": "DEMONSTRAÇÃO",
+              "sector": "IQ-UT",
+              "schedule": {
+                "2026-07-01": "X",
+                "2026-07-02": "X",
+                "2026-07-03": "X"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "g_1l7bs1km5",
+      "customValues": {
+        "fa": "FABRICAÇÃO DAS QPS - [273] Nº FA 57625"
+      },
+      "tarefas": [
+        {
+          "id": "t_l76d4ere5",
+          "title": "FABRICAÇÃO DAS QPS - [273] Nº FA 57625",
+          "activities": [
+            {
+              "id": "a_d6t7e8c21",
+              "name": "UT DE BORDA",
+              "sector": "IQ-UT",
+              "schedule": {}
+            },
+            {
+              "id": "a_mm0b566ta",
+              "name": "TRAÇAGEM, OXICORTE DO BISEL E PREPARAÇÃO DO BISEL",
+              "sector": "IPC-C",
+              "schedule": {
+                "2026-06-17": "N",
+                "2026-06-18": "N",
+                "2026-06-22": "X",
+                "2026-06-23": "X"
+              }
+            },
+            {
+              "id": "a_n48gkkiee",
+              "name": "VT/DT/LP DE BISEL",
+              "sector": "IQ-VT",
+              "schedule": {
+                "2026-06-19": "N",
+                "2026-06-24": "X"
+              }
+            },
+            {
+              "id": "a_g4pyjr8l4",
+              "name": "MOVIMENTAÇÃO PARA O CTT",
+              "sector": "IPC-MC",
+              "schedule": {
+                "2026-06-20": "N",
+                "2026-06-24": "X"
+              }
+            },
+            {
+              "id": "a_a1r6p99dl",
+              "name": "MONTAGEM/TRAVAMENTO/MONTAGEM DE AQUECIMENTO",
+              "sector": "IPC-M",
+              "schedule": {
+                "2026-06-25": "X",
+                "2026-06-29": "X"
+              }
+            },
+            {
+              "id": "a_8j2knukfa",
+              "name": "SOLDAGEM DO SD1",
+              "sector": "IPS-S",
+              "schedule": {
+                "2026-06-26": "X",
+                "2026-06-29": "X",
+                "2026-06-30": "X",
+                "2026-07-01": "X",
+                "2026-07-02": "X",
+                "2026-07-03": "X",
+                "2026-07-06": "X",
+                "2026-07-07": "X",
+                "2026-07-08": "X",
+                "2026-07-09": "X",
+                "2026-07-10": "X"
+              }
+            },
+            {
+              "id": "a_3m0w4yp72",
+              "name": "PREPARAÇÃO E ENSAIOS DA CONTRASOLDA",
+              "sector": "IPS-M",
+              "schedule": {
+                "2026-07-08": "X",
+                "2026-07-09": "X"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "g_cdrqhqwqe",
+      "customValues": {
+        "fa": "GRUPO 36 - CORREDOR - Traçagem/Transferência de identificação e corte das POS: 6 / 7 / 8 / 11 / 11.1 / 11.2 / 12 // 13 // 17.1 // 17.2 // 18.1 // 18.2 // 18.3 // 18.4 // 19.1 // 19.2 // 19.3 // 19.4 // 20.1 // 20.2 // 20.3 // 20.4. Nº FA 57619"
+      },
+      "tarefas": [
+        {
+          "id": "t_lvk968dt8",
+          "title": "GRUPO 36 - CORREDOR - Traçagem/Transferência de identificação e corte das POS: 6 / 7 / 8 / 11 / 11.1 / 11.2 / 12 // 13 // 17.1 // 17.2 // 18.1 // 18.2 // 18.3 // 18.4 // 19.1 // 19.2 // 19.3 // 19.4 // 20.1 // 20.2 // 20.3 // 20.4. Nº FA 57619",
+          "activities": [
+            {
+              "id": "a_i7qxdkp6b",
+              "name": "PREPARAÇÃO PARA UT DE BORDA",
+              "sector": "IPC-M",
+              "schedule": {}
+            },
+            {
+              "id": "a_0llf6tyzl",
+              "name": "UT DE BORDA",
+              "sector": "IQ-UT",
+              "schedule": {
+                "2026-06-15": "N",
+                "2026-06-16": "N",
+                "2026-06-17": "N",
+                "2026-06-18": "N",
+                "2026-07-10": "X",
+                "2026-07-11": "X"
+              }
+            },
+            {
+              "id": "a_vjfoksve3",
+              "name": "Traçagem dos Biseis e corte dos Biseis",
+              "sector": "IPC-C",
+              "schedule": {
+                "2026-06-15": "N",
+                "2026-06-16": "N",
+                "2026-06-17": "N",
+                "2026-06-18": "N",
+                "2026-06-19": "N",
+                "2026-06-24": "X",
+                "2026-06-25": "X",
+                "2026-06-26": "X",
+                "2026-06-27": "X",
+                "2026-06-28": "X",
+                "2026-06-29": "X"
+              }
+            },
+            {
+              "id": "a_fb1tskbep",
+              "name": "Movimentação para área do BLOCO 040",
+              "sector": "IPC-MC",
+              "schedule": {
+                "2026-06-25": "X"
+              }
+            },
+            {
+              "id": "a_gt156s0lx",
+              "name": "PREPARAÇÃO DOS BISEIS",
+              "sector": "IPC-M",
+              "schedule": {}
+            },
+            {
+              "id": "a_gcvj29z3n",
+              "name": "VT/DT de Bisel",
+              "sector": "IQ-VT",
+              "schedule": {
+                "2026-06-30": "X",
+                "2026-07-01": "X",
+                "2026-07-06": "X",
+                "2026-07-07": "X",
+                "2026-07-08": "X",
+                "2026-07-09": "X"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "g_b0jowkbei",
+      "customValues": {
+        "fa": "VIROLA 5 - ENSAIOS FINAIS E [RNC: 020/26 020/26 (ASP -0819-37-030)]"
+      },
+      "tarefas": [
+        {
+          "id": "t_0pkkmlmpb",
+          "title": "VIROLA 5 - ENSAIOS FINAIS E [RNC: 020/26 020/26 (ASP -0819-37-030)]",
+          "activities": [
+            {
+              "id": "a_t2l3q99w3",
+              "name": "PREPARAÇÃO PARA RX - 2ª leva",
+              "sector": "IQ-RX",
+              "schedule": {
+                "2026-06-15": "Ok",
+                "2026-06-16": "Ok",
+                "2026-06-17": "Ok"
+              }
+            },
+            {
+              "id": "a_4xogp8j90",
+              "name": "REALIZAR ENSAIO DE RX - 2ª leva e Laudo",
+              "sector": "IQ-RX",
+              "schedule": {
+                "2026-06-18": "Ok",
+                "2026-06-19": "Ok",
+                "2026-06-22": "X",
+                "2026-06-23": "X"
+              }
+            },
+            {
+              "id": "a_239kzvf98",
+              "name": "MOVIMENTAÇÃO PARA ÁREA DO BLOCO 40",
+              "sector": "IPC-MC",
+              "schedule": {
+                "2026-06-25": "X"
+              }
+            },
+            {
+              "id": "a_4ybv2x270",
+              "name": "VT/DT DE BORDE DO CORPO DE PROVA [RNC: 020/26 (ASP -0819-37-030)]",
+              "sector": "IPC-C",
+              "schedule": {
+                "2026-06-26": "X"
+              }
+            },
+            {
+              "id": "a_6lyq8pngr",
+              "name": "MOVIMENTAÇÃO PARA FERRAMENTARIA",
+              "sector": "IPC-MC",
+              "schedule": {
+                "2026-06-27": "X"
+              }
+            },
+            {
+              "id": "a_3dkoxayod",
+              "name": "FABRICAÇÃO DOS CORPOS DE PROVA - CORTE/USINAGEM E PREPARAÇÃO DOS CP, CONFORME PLANO DE ENSAIOS",
+              "sector": "IPU-F",
+              "schedule": {
+                "2026-06-29": "X",
+                "2026-06-30": "X",
+                "2026-07-01": "X",
+                "2026-07-02": "X",
+                "2026-07-03": "X",
+                "2026-07-06": "X",
+                "2026-07-07": "X",
+                "2026-07-08": "X"
+              }
+            },
+            {
+              "id": "a_qoiix444b",
+              "name": "ENSAIOS/LAUDO FINAL",
+              "sector": "IQ-LAB",
+              "schedule": {
+                "2026-07-06": "X",
+                "2026-07-07": "X",
+                "2026-07-08": "X",
+                "2026-07-09": "X",
+                "2026-07-10": "X"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "g_lf0v9y1v6",
+      "customValues": {
+        "fa": "Grupo 36 - RNC 027-26 e RNC 028-26 Nº FA 57866"
+      },
+      "tarefas": [
+        {
+          "id": "t_69vhdherw",
+          "title": "Grupo 36 - RNC 027-26 e RNC 028-26 Nº FA 57866",
+          "activities": [
+            {
+              "id": "a_sw96gr13n",
+              "name": "AGUARDANDO APROVAÇÃO DA RNC",
+              "sector": "CTMSP",
+              "schedule": {
+                "2026-06-15": "Ok",
+                "2026-06-16": "Ok",
+                "2026-06-17": "Ok"
+              }
+            },
+            {
+              "id": "a_gpm6bf7ps",
+              "name": "EMISSÃO E ELABORAÇÃO DA FA PELA IE",
+              "sector": "IE",
+              "schedule": {
+                "2026-06-15": "Ok",
+                "2026-06-16": "Ok",
+                "2026-06-17": "Ok",
+                "2026-06-18": "Ok"
+              }
+            },
+            {
+              "id": "a_tt1gz4oqv",
+              "name": "Verificação da transferência da marcação de origem e Corte",
+              "sector": "IPC-C",
+              "schedule": {
+                "2026-06-19": "N",
+                "2026-06-20": "N",
+                "2026-06-22": "X",
+                "2026-06-23": "X"
+              }
+            },
+            {
+              "id": "a_bb9ni95bd",
+              "name": "Movimentação para ferramentaria",
+              "sector": "IPC-MC",
+              "schedule": {
+                "2026-06-25": "X"
+              }
+            },
+            {
+              "id": "a_1f6fgjkx4",
+              "name": "Verificação da transferência da marcação, corte e fabricação do corpo de prova",
+              "sector": "IPU-F",
+              "schedule": {
+                "2026-06-25": "X",
+                "2026-06-26": "X",
+                "2026-06-29": "X",
+                "2026-06-30": "X",
+                "2026-07-01": "X"
+              }
+            },
+            {
+              "id": "a_w67m6b65r",
+              "name": "Ensaios destrutivos.",
+              "sector": "IQ-LAB",
+              "schedule": {
+                "2026-07-02": "X",
+                "2026-07-03": "X",
+                "2026-07-06": "X",
+                "2026-07-07": "X",
+                "2026-07-08": "X"
+              }
+            },
+            {
+              "id": "a_eld4nba1s",
+              "name": "Compilação e verificação dos registros e fechamento da RNC",
+              "sector": "IQ",
+              "schedule": {
+                "2026-07-09": "X",
+                "2026-07-10": "X",
+                "2026-07-11": "X"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "g_ry8ihyp05",
+      "customValues": {
+        "fa": "BM ENISA - 001 - AMOSTRA Nº FA 57809"
+      },
+      "tarefas": [
+        {
+          "id": "t_9w86vzoln",
+          "title": "BM ENISA - 001 - AMOSTRA Nº FA 57809",
+          "activities": [
+            {
+              "id": "a_6w2eceuos",
+              "name": "CORTE E FABRICAÇÃO DO CORPO",
+              "sector": "IPU-F",
+              "schedule": {
+                "2026-06-15": "N",
+                "2026-06-16": "N",
+                "2026-06-17": "N",
+                "2026-06-22": "X",
+                "2026-06-23": "X",
+                "2026-06-24": "X"
+              }
+            },
+            {
+              "id": "a_1kmg2cryt",
+              "name": "Ensaios destrutivos.",
+              "sector": "IQ-DT",
+              "schedule": {
+                "2026-06-18": "C",
+                "2026-06-19": "C",
+                "2026-06-25": "X",
+                "2026-06-26": "X"
+              }
+            },
+            {
+              "id": "a_4lz6fn7wk",
+              "name": "Compilação e verificação dos registros",
+              "sector": "IQ-UT",
+              "schedule": {}
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "startDate": "2026-06-15",
+  "name": "Nova Programação Semanal 25@28"
+}

@@ -14,21 +14,23 @@ export const DashboardView: React.FC<{ data: ScheduleData, title: string, progra
 
     const breakdownCol = useMemo(() => {
         // Use the first dynamic column available for categorization (usually 'Fase/Agrupador')
-        return dynamicColumns[0];
+        return (dynamicColumns || [])[0];
     }, [dynamicColumns]);
 
     const [allWeeks, availableWeeks] = useMemo(() => {
         const weekMap = new Map<number, Date>();
-        data.forEach(group => {
-            group.tarefas.forEach(task => {
-                task.activities.forEach(activity => {
-                    Object.keys(activity.schedule).forEach(dateStr => {
-                        const date = new Date(dateStr + 'T00:00:00Z');
-                        const w = getWeek(date);
-                        if (!weekMap.has(w)) {
-                            weekMap.set(w, date);
-                        }
-                    });
+        (data || []).forEach(group => {
+            (group.tarefas || []).forEach(task => {
+                (task.activities || []).forEach(activity => {
+                    if (activity && activity.schedule) {
+                        Object.keys(activity.schedule).forEach(dateStr => {
+                            const date = new Date(dateStr + 'T00:00:00Z');
+                            const w = getWeek(date);
+                            if (!weekMap.has(w)) {
+                                weekMap.set(w, date);
+                            }
+                        });
+                    }
                 });
             });
         });
@@ -42,12 +44,14 @@ export const DashboardView: React.FC<{ data: ScheduleData, title: string, progra
         let filteredData = data;
         if (selectedWeek !== 'all') {
             filteredData = JSON.parse(JSON.stringify(data)); // Deep clone to avoid modifying original data
-            filteredData.forEach(group => {
-                group.tarefas.forEach(task => {
-                    task.activities.forEach(activity => {
-                        activity.schedule = Object.entries(activity.schedule)
-                            .filter(([dateStr]) => getWeek(new Date(dateStr)) === selectedWeek)
-                            .reduce((acc, [dateStr, status]) => ({ ...acc, [dateStr]: status }), {});
+            (filteredData || []).forEach(group => {
+                (group.tarefas || []).forEach(task => {
+                    (task.activities || []).forEach(activity => {
+                        if (activity && activity.schedule) {
+                            activity.schedule = Object.entries(activity.schedule)
+                                .filter(([dateStr]) => getWeek(new Date(dateStr)) === selectedWeek)
+                                .reduce((acc, [dateStr, status]) => ({ ...acc, [dateStr]: status }), {});
+                        }
                     });
                 });
             });
@@ -61,35 +65,37 @@ export const DashboardView: React.FC<{ data: ScheduleData, title: string, progra
         const tasksPerComponent = new Map<string, number>();
         const currentWeek = getWeek(new Date());
 
-        filteredData.forEach(group => {
+        (filteredData || []).forEach(group => {
             const componentName = breakdownCol ? (group.customValues?.[breakdownCol.id] || 'Outros') : 'Sem Agrupador';
             let componentTaskCount = tasksPerComponent.get(componentName) || 0;
-            group.tarefas.forEach(task => {
-                task.activities.forEach(activity => {
-                    Object.entries(activity.schedule).forEach(([dateStr, status]) => {
-                        const date = new Date(dateStr + 'T00:00:00Z');
-                        const w = getWeek(date);
-                        const isPastWeek = w < currentWeek;
+            (group.tarefas || []).forEach(task => {
+                (task.activities || []).forEach(activity => {
+                    if (activity && activity.schedule) {
+                        Object.entries(activity.schedule).forEach(([dateStr, status]) => {
+                            const date = new Date(dateStr + 'T00:00:00Z');
+                            const w = getWeek(date);
+                            const isPastWeek = w < currentWeek;
 
-                        componentTaskCount++;
+                            componentTaskCount++;
 
-                        if (status === Status.Realizado) totalRealizado++;
-                        else if (status === Status.Cancelado) totalCancelado++;
-                        else if (status === Status.NaoRealizado) totalNaoRealizado++;
-                        else if (status === Status.Programado) {
-                            if (isPastWeek) {
-                                // Activities left as 'Programado' in past weeks are functionally 'Não Realizado'
-                                totalNaoRealizado++;
-                            } else {
-                                totalProgramado++;
+                            if (status === Status.Realizado) totalRealizado++;
+                            else if (status === Status.Cancelado) totalCancelado++;
+                            else if (status === Status.NaoRealizado) totalNaoRealizado++;
+                            else if (status === Status.Programado) {
+                                if (isPastWeek) {
+                                    // Activities left as 'Programado' in past weeks are functionally 'Não Realizado'
+                                    totalNaoRealizado++;
+                                } else {
+                                    totalProgramado++;
+                                }
                             }
-                        }
 
-                        if (isPastWeek) {
-                            // "o TOTAL DE ATIVIDADES PROGRAMADAS, PARA SEMANAS QUE JA PASSARAM DEVE SER O TOTAL ENTRE ATVIDADES REALZIADAS, NAO REALIZADAS E CANCELADAS"
-                            totalProgramadoPast++;
-                        }
-                    });
+                            if (isPastWeek) {
+                                // "o TOTAL DE ATIVIDADES PROGRAMADAS, PARA SEMANAS QUE JA PASSARAM DEVE SER O TOTAL ENTRE ATVIDADES REALZIADAS, NAO REALIZADAS E CANCELADAS"
+                                totalProgramadoPast++;
+                            }
+                        });
+                    }
                 });
             });
             tasksPerComponent.set(componentName, componentTaskCount);

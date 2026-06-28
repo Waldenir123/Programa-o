@@ -1,0 +1,99 @@
+TAREFA PRINCIPAL	ATIVIDADE	SETOR	15/06/2026	16/06/2026	17/06/2026	18/06/2026	19/06/2026	20/06/2026	21/06/2026	22/06/2026	23/06/2026	24/06/2026	25/06/2026	26/06/2026	27/06/2026	28/06/2026	29/06/2026	30/06/2026	01/07/2026	02/07/2026	03/07/2026	04/07/2026	05/07/2026	06/07/2026	07/07/2026	08/07/2026	09/07/2026	10/07/2026	11/07/2026	12/07/2026
+GRUPO 37 - FABRICAÇÃO DAS QPS [264] Nº FA 57592	FABRICAÇÃO DOS CORPOS DE PROVA - CORTE/USINAGEM E PREPARAÇÃO DOS CP, CONFORME PLANO DE ENSAIOS - pendente CP de reteste	IPU-F	Ok	Ok	Ok	Ok	Ok							X	X	X																													
+GRUPO 37 - FABRICAÇÃO DAS QPS [264] Nº FA 57592	ENSAIOS/LAUDO FINAL	IQ-LAB																X	X	X					X	X	X	X	X			X	X	X	X	X		
+GRUPO 37 - FABRICAÇÃO DAS QPS - [299] FA: 57810	CORTE/TRANSFERÊNCIA DE INDICAÇÃO	IP-C	Ok	Ok	Ok	Ok								X																																
+GRUPO 37 - FABRICAÇÃO DAS QPS - [299] FA: 57810	UT DE BORDA (NUCLEO E IBQN) - Pendente UT IBQN	IQ-UT	Ok	Ok	Ok	Ok								X																																
+GRUPO 37 - FABRICAÇÃO DAS QPS - [299] FA: 57810	OXICORTE DO BISEL E PREPARAÇÃO DO BISEL	IPC-C					N											X																															
+GRUPO 37 - FABRICAÇÃO DAS QPS - [299] FA: 57810	VT/DT/LP DE BISEL	IQ-LP																	X																															
+GRUPO 37 - FABRICAÇÃO DAS QPS - [299] FA: 57810	MONTAGEM/TRAVAMENTO/MONTAGEM DE AQUECIMENTO	IPC-M																				X																												
+GRUPO 37 - FABRICAÇÃO DAS QPS - [299] FA: 57810	SOLDAGEM DO SD1	IPS-S																					X	X	X	X	X	X	X	X			X	X	X	X	X		
+GRUPO 37 - FABRICAÇÃO DAS QPS - [300] FA: 57822	EMISSÃO E APROVAÇÃO DA DOCUMENTAÇÃO DO QPS PELO CTMSP [Em substituição ao QPS 267]	IE	Ok	Ok	Ok	Ok	Ok							X	X	X																													
+GRUPO 37 - FABRICAÇÃO DAS QPS - [300] FA: 57822	RECEPÇÃO DO METAL DE BASE E ADIÇÃO	IQ-REC	Ok	Ok	Ok									X	X	X																													
+GRUPO 37 - FABRICAÇÃO DAS QPS - [300] FA: 57822	CORTE/TRANSFERÊNCIA DE INDICAÇÃO	IPC-C																		X	X																												
+GRUPO 37 - FABRICAÇÃO DAS QPS - [300] FA: 57822	UT DE BORDA	IQ-UT																					X																												
+GRUPO 37 - FABRICAÇÃO DAS QPS - [300] FA: 57822	OXICORTE DO BISEL E PREPARAÇÃO DO BISEL	IPC-C																							X																								
+GRUPO 37 - FABRICAÇÃO DAS QPS - [300] FA: 57822	VT/DT/LP DE BISEL	IQ-LP																								X																							
+GRUPO 37 - FABRICAÇÃO DAS QPS - [300] FA: 57822	MONTAGEM/TRAVAMENTO/MONTAGEM DE AQUECIMENTO	IPC-M																									X																						
+GRUPO 37 - FABRICAÇÃO DAS QPS - [300] FA: 57822	SOLDAGEM DO SD1	IPS-S																										X	X	X	X	X	X	X			
+QPS 272 - GRUPO 24 - FABRICAÇÃO DA QPS 0272 - FA Nº FA 57621	FABRICAÇÃO DOS CORPOS DE PROVA - CORTE/USINAGEM E PREPARAÇÃO DOS CP, CONFORME PLANO DE ENSAIOS - pendente CP de reteste	IPU-F	Ok	Ok	Ok		Ok							X	X	X																													
+QPS 272 - GRUPO 24 - FABRICAÇÃO DA QPS 0272 - FA Nº FA 57621	PREPARAÇÃO E SOLDA PARA CP DE PELINE	IPS-S			Ok	Ok																																		
+QPS 272 - GRUPO 24 - FABRICAÇÃO DA QPS 0272 - FA Nº FA 57621	ENSAIOS/LAUDO FINAL	IQ-LAB	Ok	Ok	Ok	Ok								X	X	X					X	X	X	X	X			X	X	X				
+GRUPO 26 - RETRABALHO PREVISTO NA RNC 025/26 E USINAGEM DO CONVÉS DO GV - Nº FA 57534	CONTROLE DIMENSIONAL PELA CALDEIRARIA (NOVA DISPOSIÇÃO/APROVAÇÃO DA RNC 66/26 - RNC-R-26-030-56	IPC-M			Ok	Ok																																		
+GRUPO 26 - RETRABALHO PREVISTO NA RNC 025/26 E USINAGEM DO CONVÉS DO GV - Nº FA 57534	SOLDAGEM SOLDA S-26-030-56, S-26-030-101	IPS-S																				X	X																												
+GRUPO 26 - RETRABALHO PREVISTO NA RNC 025/26 E USINAGEM DO CONVÉS DO GV - Nº FA 57534	REALIZAÇÃO DOS ENDS (VT/LP) PÓS SOLDAGEM	IQ-LP																				X	X																												
+GRUPO 26 - RETRABALHO PREVISTO NA RNC 025/26 E USINAGEM DO CONVÉS DO GV - Nº FA 57534	REMOÇÃO DOS TRAVAMENTOS AUXILIARES	IPC-M																					X																												
+GRUPO 26 - RETRABALHO PREVISTO NA RNC 025/26 E USINAGEM DO CONVÉS DO GV - Nº FA 57534	INSPEÇÃO DIMENSIONAL	IQ-DT																						X	X	X	X	X			X	X	X	X			
+GRUPO 26 - RETRABALHO PREVISTO NA RNC 025/26 E USINAGEM DO CONVÉS DO GV - Nº FA 57534	MOVIMENTAÇÃO P/ USINAGEM	IPC-MC																									X							
+GRUPO 26 - RETRABALHO PREVISTO NA RNC 025/26 E USINAGEM DO CONVÉS DO GV - Nº FA 57534	USINAGEM DOS APOIOS DO GV	IPU																																	
+GRUPO 26 - VASOS E ESTRUTURAS INTERNAS DO LABGENE, CONVÉS DO GV RNC 041-26 FA 57787	Traçagem, corte e identificação da POS. 89	IPC-C	Ok	Ok																																		
+GRUPO 26 - VASOS E ESTRUTURAS INTERNAS DO LABGENE, CONVÉS DO GV RNC 041-26 FA 57787	Traçagem dos Biseis e corte dos Biseis	IPC-C			Ok																																
+GRUPO 26 - VASOS E ESTRUTURAS INTERNAS DO LABGENE, CONVÉS DO GV RNC 041-26 FA 57787	VT/DT/LP de Bisel	IQ-LP				N				X																																
+GRUPO 26 - VASOS E ESTRUTURAS INTERNAS DO LABGENE, CONVÉS DO GV RNC 041-26 FA 57787	Montagem/Travamento da POS. 89 no Convés	IPC-M					N																																	
+GRUPO 26 - VASOS E ESTRUTURAS INTERNAS DO LABGENE, CONVÉS DO GV RNC 041-26 FA 57787	Tratamento térmico e soldagem	IPS-S										X	X																															
+GRUPO 26 - VASOS E ESTRUTURAS INTERNAS DO LABGENE, CONVÉS DO GV RNC 041-26 FA 57787	Ensaios ENDs FINAIS	IQ-VT											X	X																															
+GRUPO 38 - TANQUE DE EXPANSÃO - FABRICAÇÃO DA POS 19 E MONTAGEM/SOLDAGEM Nº FA 57714	MONTAGEM NO CASCO E POS. 13 - SERÁ FEITA APÓS A CONCLUSÃO DA SOLDAGEM 14 + 16	IPC-M																							X																								
+GRUPO 38 - TANQUE DE EXPANSÃO - FABRICAÇÃO DA POS 19 E MONTAGEM/SOLDAGEM Nº FA 57714	SOLDAGEM	IPS-S																							X	X																							
+GRUPO 38 - TANQUE DE EXPANSÃO - FABRICAÇÃO DA POS 19 E MONTAGEM/SOLDAGEM Nº FA 57714	ENSAIOS	IQ-LP																							X																							
+BLOCO 40 - GRUPO 38 - TANQUE DE EXPANSÃO DO TBP - SOLDAGEM DAS POS. 14 + 16 - S-38-026-01@04 Nº FA 57760	Movimentação/Montagem e Ponteamento as POS. 14 + 16 e travamentos ( 2º Conjunto)																																				
+BLOCO 40 - GRUPO 38 - TANQUE DE EXPANSÃO DO TBP - SOLDAGEM DAS POS. 14 + 16 - S-38-026-01@04 Nº FA 57760	CONFERÊNCIA DA PERDICULARIDADE PELO CONTROLE DIMENSIONAL	IQ-DT			C																																
+BLOCO 40 - GRUPO 38 - TANQUE DE EXPANSÃO DO TBP - SOLDAGEM DAS POS. 14 + 16 - S-38-026-01@04 Nº FA 57760	MONTAGEM DE RESITÊNCIA E SOLDAGEM ( 2º Conjunto)	IPS-S	Ok	Ok	Ok	Ok	Ok							X	X	X	X	X					X																					
+BLOCO 40 - GRUPO 38 - TANQUE DE EXPANSÃO DO TBP - SOLDAGEM DAS POS. 14 + 16 - S-38-026-01@04 Nº FA 57760	CONTROLE DIMENSIONAL DO CONJUNTO ( 2º Conjunto)	IPC-M	Ok	Ok	Ok	Ok	Ok							X	X	X	X	X					X																					
+BLOCO 40 - GRUPO 38 - TANQUE DE EXPANSÃO DO TBP - SOLDAGEM DAS POS. 14 + 16 - S-38-026-01@04 Nº FA 57760	PREPARAÇÃO E ENDS - (1º E 2º Conjunto)	IQ-LP																								X	X			X	X	X	X	X		
+BLOCO 40 - GRUPO 15 - CASCO SUPERIOR SETOR 2 - REMOÇÃO/ENSAIOS E RESSOLDAGEM/ENSAIOS DOS OLHAIS DE BASCULAMENTO - DDM-0819A0-022 Nº FA 57893	MAPEAMENTO DAS OLHAIS QUE SERÃO REMOVIDO COM AUXILIO DO IQ	IQ-UT																																	
+BLOCO 40 - GRUPO 15 - CASCO SUPERIOR SETOR 2 - REMOÇÃO/ENSAIOS E RESSOLDAGEM/ENSAIOS DOS OLHAIS DE BASCULAMENTO - DDM-0819A0-022 Nº FA 57893	REMOÇÃO DOS OLHAIS	IPS																																	
+BLOCO 40 - GRUPO 15 - CASCO SUPERIOR SETOR 2 - REMOÇÃO/ENSAIOS E RESSOLDAGEM/ENSAIOS DOS OLHAIS DE BASCULAMENTO - DDM-0819A0-022 Nº FA 57893	PEPRARAÇÃO DA REGIÃO	IPC-M																																	
+BLOCO 40 - GRUPO 15 - CASCO SUPERIOR SETOR 2 - REMOÇÃO/ENSAIOS E RESSOLDAGEM/ENSAIOS DOS OLHAIS DE BASCULAMENTO - DDM-0819A0-022 Nº FA 57893	ENSAIO DE VT E LP DOS OLHAIS SEREM REMOVIDOS	IQ-VT																																	
+SETOR 3 - GRUPO 15 - ENDs nas Juntas das RNC S-15-024-84 e (IND. UT 1, 3, 6, 7, 8, 11, 13, 16, 17 e 18) - RNC 079-24 - SETOR 3 (CAVERNA H) Nº FA 56904 Nº FA 56637	AJUSTE DE ANDAIME		Ok	Ok																																		
+SETOR 3 - GRUPO 15 - ENDs nas Juntas das RNC S-15-024-84 e (IND. UT 1, 3, 6, 7, 8, 11, 13, 16, 17 e 18) - RNC 079-24 - SETOR 3 (CAVERNA H) Nº FA 56904 Nº FA 56637	PREPARAÇÃO PARA UT	IPC-M				Ok																																
+SETOR 3 - GRUPO 15 - ENDs nas Juntas das RNC S-15-024-84 e (IND. UT 1, 3, 6, 7, 8, 11, 13, 16, 17 e 18) - RNC 079-24 - SETOR 3 (CAVERNA H) Nº FA 56904 Nº FA 56637	REALIZAR ENSAIO DE UT DOS REPAROS	IQ-UT					Ok							Ok	C																															
+SETOR 3 - GRUPO 15 - ULTRASSOM NA JUNTA S-15-024-63(IND_UT_1, 2, 5, 8, 9, 10, 11, 13 e 16) - RNC 081-24 - SETOR 3 (CAVERNA G) Nº FA 56639	AJUSTE DE ANDAIME		Ok	Ok																																		
+SETOR 3 - GRUPO 15 - ULTRASSOM NA JUNTA S-15-024-63(IND_UT_1, 2, 5, 8, 9, 10, 11, 13 e 16) - RNC 081-24 - SETOR 3 (CAVERNA G) Nº FA 56639	PREPARAÇÃO PARA UT	IPC-M				Ok																																
+SETOR 3 - GRUPO 15 - ULTRASSOM NA JUNTA S-15-024-63(IND_UT_1, 2, 5, 8, 9, 10, 11, 13 e 16) - RNC 081-24 - SETOR 3 (CAVERNA G) Nº FA 56639	REALIZAR ENSAIO DE UT DOS REPAROS	IQ-UT					Ok							Ok	C																															
+QPS 298 - REVESTIMENTO AUSTENÍTICO Nº FA 57763	CORTE/IDENTIFICAÇÃO DAS POS/MONTAGEM DO TRATAMENTO TÉRMICO	IPC-C																																	
+QPS 298 - REVESTIMENTO AUSTENÍTICO Nº FA 57763	MOVIMENTAÇÃO PARA ÁREA DE SOLDAGEM\	IPC-MC																																	
+QPS 298 - REVESTIMENTO AUSTENÍTICO Nº FA 57763	RESOLUÇÃO DE PENDÊNCIAS NO RECEBIMENTO DE CONSUMÍVEIS (IQ E IES)	IQ-REC			Ok	Ok								X	X																													
+QPS 298 - REVESTIMENTO AUSTENÍTICO Nº FA 57763	PREPARAÇÃO DA SUPERFÍCIE	IPC-M				N											X																								
+QPS 298 - REVESTIMENTO AUSTENÍTICO Nº FA 57763	VT/LP DA SUPERFÍCIE A SOLDAR O REVESTIMENTO	IQ-LP					N	N										X																								
+QPS 298 - REVESTIMENTO AUSTENÍTICO Nº FA 57763	UT DA SUPERFÍCIE A SOLDAR O REVESTIMENTO	IQ-UT						N											X																							
+QPS 298 - REVESTIMENTO AUSTENÍTICO Nº FA 57763	MONTAGEM DE RESISTÊNCIA E SOLDAGEM 1º CAMADA	IPS-S																					X	X	X					X	X	X	X	X		
+QPS 298 - REVESTIMENTO AUSTENÍTICO Nº FA 57763	LP E UT DO REVESTIMENTO APÓS SOLDAGEM DA PRIMEIRA CAMADA	IQ-LP																							X	X																							
+QPS 298 - REVESTIMENTO AUSTENÍTICO Nº FA 57763	PREPARAÇÃO DA SUPERFÍCIE	IPS-S																					X	X	X	X	X		
+QPS 298 - REVESTIMENTO AUSTENÍTICO Nº FA 57763	VT, LP, E UT APÓS SOLDAGEM DO REVESTIMENTO	IQ-LP																																	
+QPS 298 - REVESTIMENTO AUSTENÍTICO Nº FA 57763	MOVIMENTAÇÃO PARA O FORNO	IPC-MC																																	
+QPS 298 - REVESTIMENTO AUSTENÍTICO Nº FA 57763	TRATAMENTO TÉRMICO	IPS-TT																																	
+BLOCO DE CALIBRAÇÃO -153 Nº FA 57700	FABRICAÇÃO BC 153 (TRAÇAGEM, CORTE, USINAGEM)	IPU-F	N	N	N									X	X	X																													
+BLOCO DE CALIBRAÇÃO -153 Nº FA 57700	DIMENSIONAL E REGISTRO	IQ-DT			C	C										X	X			X	X	X																			
+BLOCO DE CALIBRAÇÃO -153 Nº FA 57700	DEMONSTRAÇÃO	IQ-UT																							X	X	X																							
+BLOCO DE CALIBRAÇÃO - 152 Nº FA 57698	FABRICAÇÃO BC 152 (TRAÇAGEM, CORTE, USINAGEM)	IPU-F	N	N	N									X	X	X																													
+BLOCO DE CALIBRAÇÃO - 152 Nº FA 57698	DIMENSIONAL E REGISTRO	IQ-DT			C	C										X	X			X	X	X																			
+BLOCO DE CALIBRAÇÃO - 152 Nº FA 57698	DEMONSTRAÇÃO	IQ-UT																							X	X	X																							
+FABRICAÇÃO DAS QPS - [273] Nº FA 57625	UT DE BORDA	IQ-UT																																	
+FABRICAÇÃO DAS QPS - [273] Nº FA 57625	TRAÇAGEM, OXICORTE DO BISEL E PREPARAÇÃO DO BISEL	IPC-C			N	N								X																																
+FABRICAÇÃO DAS QPS - [273] Nº FA 57625	VT/DT/LP DE BISEL	IQ-VT				N											X																												
+FABRICAÇÃO DAS QPS - [273] Nº FA 57625	MOVIMENTAÇÃO PARA O CTT	IPC-MC					N											X																												
+FABRICAÇÃO DAS QPS - [273] Nº FA 57625	MONTAGEM/TRAVAMENTO/MONTAGEM DE AQUECIMENTO	IPC-M																				X																												
+FABRICAÇÃO DAS QPS - [273] Nº FA 57625	SOLDAGEM DO SD1	IPS-S																					X	X	X	X			X	X	X	X	X		
+FABRICAÇÃO DAS QPS - [273] Nº FA 57625	PREPARAÇÃO E ENSAIOS DA CONTRASOLDA	IPS-M																										X	X						
+GRUPO 36 - CORREDOR - Traçagem/Transferência de identificação e corte das POS: 6 / 7 / 8 / 11 / 11.1 / 11.2 / 12 // 13 // 17.1 // 17.2 // 18.1 // 18.2 // 18.3 // 18.4 // 19.1 // 19.2 // 19.3 // 19.4 // 20.1 // 20.2 // 20.3 // 20.4. Nº FA 57619	PREPARAÇÃO PARA UT DE BORDA	IPC-M																																	
+GRUPO 36 - CORREDOR - Traçagem/Transferência de identificação e corte das POS: 6 / 7 / 8 / 11 / 11.1 / 11.2 / 12 // 13 // 17.1 // 17.2 // 18.1 // 18.2 // 18.3 // 18.4 // 19.1 // 19.2 // 19.3 // 19.4 // 20.1 // 20.2 // 20.3 // 20.4. Nº FA 57619	UT DE BORDA	IQ-UT	N	N	N	N																																X	X
+GRUPO 36 - CORREDOR - Traçagem/Transferência de identificação e corte das POS: 6 / 7 / 8 / 11 / 11.1 / 11.2 / 12 // 13 // 17.1 // 17.2 // 18.1 // 18.2 // 18.3 // 18.4 // 19.1 // 19.2 // 19.3 // 19.4 // 20.1 // 20.2 // 20.3 // 20.4. Nº FA 57619	Traçagem dos Biseis e corte dos Biseis	IPC-C	N	N	N	N	N							X	X	X	X	X			X																						
+GRUPO 36 - CORREDOR - Traçagem/Transferência de identificação e corte das POS: 6 / 7 / 8 / 11 / 11.1 / 11.2 / 12 // 13 // 17.1 // 17.2 // 18.1 // 18.2 // 18.3 // 18.4 // 19.1 // 19.2 // 19.3 // 19.4 // 20.1 // 20.2 // 20.3 // 20.4. Nº FA 57619	Movimentação para área do BLOCO 040	IPC-MC																				X																												
+GRUPO 36 - CORREDOR - Traçagem/Transferência de identificação e corte das POS: 6 / 7 / 8 / 11 / 11.1 / 11.2 / 12 // 13 // 17.1 // 17.2 // 18.1 // 18.2 // 18.3 // 18.4 // 19.1 // 19.2 // 19.3 // 19.4 // 20.1 // 20.2 // 20.3 // 20.4. Nº FA 57619	PREPARAÇÃO DOS BISEIS	IPC-M																																	
+GRUPO 36 - CORREDOR - Traçagem/Transferência de identificação e corte das POS: 6 / 7 / 8 / 11 / 11.1 / 11.2 / 12 // 13 // 17.1 // 17.2 // 18.1 // 18.2 // 18.3 // 18.4 // 19.1 // 19.2 // 19.3 // 19.4 // 20.1 // 20.2 // 20.3 // 20.4. Nº FA 57619	VT/DT de Bisel	IQ-VT																								X	X			X	X	X	X			
+VIROLA 5 - ENSAIOS FINAIS E [RNC: 020/26 020/26 (ASP -0819-37-030)]	PREPARAÇÃO PARA RX - 2ª leva	IQ-RX	Ok	Ok	Ok																																		
+VIROLA 5 - ENSAIOS FINAIS E [RNC: 020/26 020/26 (ASP -0819-37-030)]	REALIZAR ENSAIO DE RX - 2ª leva e Laudo	IQ-RX			Ok	Ok								X	X																													
+VIROLA 5 - ENSAIOS FINAIS E [RNC: 020/26 020/26 (ASP -0819-37-030)]	MOVIMENTAÇÃO PARA ÁREA DO BLOCO 40	IPC-MC																				X																												
+VIROLA 5 - ENSAIOS FINAIS E [RNC: 020/26 020/26 (ASP -0819-37-030)]	VT/DT DE BORDE DO CORPO DE PROVA [RNC: 020/26 (ASP -0819-37-030)]	IPC-C																					X																												
+VIROLA 5 - ENSAIOS FINAIS E [RNC: 020/26 020/26 (ASP -0819-37-030)]	MOVIMENTAÇÃO PARA FERRAMENTARIA	IPC-MC																						X																										
+VIROLA 5 - ENSAIOS FINAIS E [RNC: 020/26 020/26 (ASP -0819-37-030)]	FABRICAÇÃO DOS CORPOS DE PROVA - CORTE/USINAGEM E PREPARAÇÃO DOS CP, CONFORME PLANO DE ENSAIOS	IPU-F																						X	X	X	X	X			X	X	X				
+VIROLA 5 - ENSAIOS FINAIS E [RNC: 020/26 020/26 (ASP -0819-37-030)]	ENSAIOS/LAUDO FINAL	IQ-LAB																									X	X	X	X	X		
+Grupo 36 - RNC 027-26 e RNC 028-26 Nº FA 57866	AGUARDANDO APROVAÇÃO DA RNC	CTMSP	Ok	Ok	Ok																																		
+Grupo 36 - RNC 027-26 e RNC 028-26 Nº FA 57866	EMISSÃO E ELABORAÇÃO DA FA PELA IE	IE	Ok	Ok	Ok	Ok																																	
+Grupo 36 - RNC 027-26 e RNC 028-26 Nº FA 57866	Verificação da transferência da marcação de origem e Corte	IPC-C					N	N								X	X																													
+Grupo 36 - RNC 027-26 e RNC 028-26 Nº FA 57866	Movimentação para ferramentaria	IPC-MC																				X																												
+Grupo 36 - RNC 027-26 e RNC 028-26 Nº FA 57866	Verificação da transferência da marcação, corte e fabricação do corpo de prova	IPU-F																				X	X			X	X	X																			
+Grupo 36 - RNC 027-26 e RNC 028-26 Nº FA 57866	Ensaios destrutivos.	IQ-LAB																									X	X			X	X	X						
+Grupo 36 - RNC 027-26 e RNC 028-26 Nº FA 57866	Compilação e verificação dos registros e fechamento da RNC	IQ																											X	X	X			
+BM ENISA - 001 - AMOSTRA Nº FA 57809	CORTE E FABRICAÇÃO DO CORPO	IPU-F	N	N	N									X	X	X																													
+BM ENISA - 001 - AMOSTRA Nº FA 57809	Ensaios destrutivos.	IQ-DT			C	C										X	X																											
+BM ENISA - 001 - AMOSTRA Nº FA 57809	Compilação e verificação dos registros	IQ-UT																																	

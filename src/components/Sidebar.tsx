@@ -33,6 +33,9 @@ interface SidebarProps {
     onCloseMobile?: () => void;
     handleIntelligentReschedule?: () => void;
     hasSelection?: boolean;
+    handleShiftHoliday?: (holidayDateStr: string, skipWeekends: boolean) => void;
+    activeCell?: { activityId: string; date: string } | null;
+    handleSaveAndExit?: () => void;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -45,8 +48,27 @@ export const Sidebar: React.FC<SidebarProps> = ({
     selectedItems, handleDeleteSelectedItems, handleClearAll,
     handleQuickImportClick, onImportExcelClick,
     visibleColumns, toggleColumnVisibility,
-    onCloseMobile, handleIntelligentReschedule, hasSelection
+    onCloseMobile, handleIntelligentReschedule, hasSelection,
+    handleShiftHoliday,
+    activeCell,
+    handleSaveAndExit
 }) => {
+    const [holidayDate, setHolidayDate] = React.useState<string>(formatDate(new Date()));
+    const [skipWeekends, setSkipWeekends] = React.useState<boolean>(true);
+
+    React.useEffect(() => {
+        if (activeCell?.date) {
+            setHolidayDate(activeCell.date);
+        }
+    }, [activeCell?.date]);
+
+    const onShiftClick = () => {
+        if (!holidayDate) return;
+        if (handleShiftHoliday) {
+            handleShiftHoliday(holidayDate, skipWeekends);
+        }
+    };
+
     const typeLabels: Record<string, string> = {
         group: 'Grupo',
         task: 'Tarefa Principal',
@@ -66,7 +88,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 <h3>Ações Rápidas</h3>
                 <button className="control-button" onClick={handleUndo} disabled={historyIndex <= 0}><span className="material-icons" aria-hidden="true">undo</span> Desfazer</button>
                 <button className="control-button" onClick={handleRedo} disabled={historyIndex >= historyLength - 1}><span className="material-icons" aria-hidden="true">redo</span> Refazer</button>
-                <button className="control-button" onClick={onImportTxtClick}><span className="material-icons" aria-hidden="true">data_object</span>Importar TXT (Perfeito)</button>
+                <button className="control-button" onClick={onImportTxtClick}><span className="material-icons" aria-hidden="true">data_object</span>Importar TXT / JSON (Backup)</button>
                 <button className="control-button" onClick={onImportExcelClick}><span className="material-icons" aria-hidden="true">grid_on</span>Importar Excel</button>
                 <button className="control-button" onClick={handleQuickImportClick}><span className="material-icons" aria-hidden="true">file_upload</span>Importar PDF/Imagem (IA)</button>
                 <button className="control-button" onClick={() => setImportModalOpen(true)}><span className="material-icons" aria-hidden="true">input</span>Importação Avançada (IA)</button>
@@ -87,8 +109,59 @@ export const Sidebar: React.FC<SidebarProps> = ({
             </div>
 
             <div className="control-section">
+                <h3>Reprogramar por Feriado</h3>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    <p style={{ fontSize: '0.75rem', color: '#64748b', margin: 0, lineHeight: '1.25' }}>
+                        Selecione o dia decretado como feriado para deslocar a programação deste dia e subsequentes para a frente.
+                    </p>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                        <label htmlFor="holiday-date" style={{ fontSize: '0.75rem', fontWeight: 'bold', color: '#334155' }}>Dia do Feriado:</label>
+                        <input 
+                            id="holiday-date" 
+                            type="date" 
+                            value={holidayDate} 
+                            onChange={e => setHolidayDate(e.target.value)}
+                            style={{ 
+                                padding: '6px 8px', 
+                                border: '1px solid #cbd5e1', 
+                                borderRadius: '4px', 
+                                fontSize: '0.85rem' 
+                            }} 
+                        />
+                    </div>
+                    <label htmlFor="holiday-skip-weekends" style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.75rem', cursor: 'pointer', userSelect: 'none', color: '#334155' }}>
+                        <input 
+                            id="holiday-skip-weekends"
+                            type="checkbox" 
+                            checked={skipWeekends} 
+                            onChange={e => setSkipWeekends(e.target.checked)} 
+                        />
+                        Não reprogramar para sáb/dom (padrão)
+                    </label>
+                    <button 
+                        id="holiday-shift-button"
+                        onClick={onShiftClick}
+                        className="control-button" 
+                        style={{ 
+                            backgroundColor: '#10b981', 
+                            color: 'white', 
+                            borderColor: '#059669', 
+                            marginTop: '4px' 
+                        }}
+                    >
+                        <span className="material-icons" aria-hidden="true">today</span> Deslocar Programação
+                    </button>
+                </div>
+            </div>
+
+            <div className="control-section">
                 <h3>Gerenciar Projeto</h3>
                 <button className="submit-button" onClick={handleSaveProject}><span className="material-icons" aria-hidden="true">save</span> Salvar Alterações</button>
+                {handleSaveAndExit && (
+                    <button className="control-button" onClick={handleSaveAndExit} style={{ backgroundColor: '#10b981', color: '#ffffff', borderColor: '#059669', fontWeight: 'bold' }}>
+                        <span className="material-icons" aria-hidden="true">exit_to_app</span> Salvar e Sair
+                    </button>
+                )}
                 <button className="control-button" onClick={handleSavePlan} title="Salva o cronograma atual como o 'Planejado' para comparações futuras."><span className="material-icons" aria-hidden="true">bookmark_add</span> Definir como Base</button>
                 <button className="control-button" onClick={() => setSaveModalOpen(true)}><span className="material-icons" aria-hidden="true">create_new_folder</span> Novo Projeto</button>
                 <button className="control-button" onClick={() => setLoadModalOpen(true)}><span className="material-icons" aria-hidden="true">folder_open</span> Carregar Projeto</button>

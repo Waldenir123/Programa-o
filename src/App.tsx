@@ -57,9 +57,10 @@ import { useScheduleInteraction } from './hooks/useScheduleInteraction';
 
 // Utils
 import { formatDate, getWeek, generateId, deepClone, flattenData, safeJsonParse } from './utils/dataUtils';
-import { parseTabularData } from './utils/parsers';
+import { parseTabularData, parseTxtToRows } from './utils/parsers';
 import { exportToExcelAgent, exportToPdfAgent } from './utils/exportAgents';
 import { APP_VERSION } from './version';
+import * as XLSX from 'xlsx';
 
 // AI Agents
 import { parseScheduleWithAI, parseFADetailWithAI, analyzeDeletionImpactWithAI, aiDeletionAgent } from './ai/aiAgents';
@@ -203,8 +204,14 @@ const createDemoProject = (userId: string): Project => {
 export const App = () => {
   // --- STATE MANAGEMENT ---
   const [projects, setProjects] = useState<Record<string, Project>>({});
-  const [currentUser, setCurrentUser] = useState<User | null>(null);
-  const [isAuthReady, setIsAuthReady] = useState(false);
+  const [currentUser, setCurrentUser] = useState<User | null>({
+    uid: 'public-user',
+    email: 'public@example.com',
+    displayName: 'Planejador Geral',
+    emailVerified: true,
+    isAnonymous: true,
+  } as any);
+  const [isAuthReady, setIsAuthReady] = useState(true);
   const [activeProject, setActiveProject] = useState<Project | null>(null);
   const [lastSavedTime, setLastSavedTime] = useState<number | null>(null);
   const [isAutoSaveEnabled, setIsAutoSaveEnabled] = useState(false);
@@ -310,7 +317,8 @@ export const App = () => {
     const projectData = {
         name: activeProject.name,
         obra: activeProject.obra,
-        data: summaryState.liveData,
+        data: liveData, // Actual detailed live schedule data!
+        summaryData: summaryData, // Daily summary data!
         startDate: activeProject.startDate,
     };
     const jsonString = JSON.stringify(projectData, null, 2);
@@ -328,29 +336,6 @@ export const App = () => {
   const handleImportTxtClick = () => {
       txtImportInputRef.current?.click();
   };
-
-  const handleImportTxtFile = useCallback(async (event: React.ChangeEvent<HTMLInputElement>) => {
-      const file = event.target.files?.[0];
-      if (!file) return;
-      
-      try {
-          const text = await file.text();
-          const parsed = JSON.parse(text);
-          if (parsed && Array.isArray(parsed.data)) {
-               dispatch({ type: 'SET_DATA', payload: parsed.data });
-               if (parsed.startDate) {
-                   setCurrentStartDate(new Date(parsed.startDate + 'T00:00:00Z'));
-               }
-               addToast("Cronograma TXT importado com sucesso!", "success");
-          } else {
-               addToast("O arquivo TXT não possui um formato estruturado válido.", "error");
-          }
-      } catch(e) {
-          addToast("Falha ao ler o arquivo TXT estruturado.", "error");
-      } finally {
-          if (event.target) event.target.value = '';
-      }
-  }, [addToast, dispatch]);
 
   const excelImportInputRef = useRef<HTMLInputElement>(null);
   const txtImportInputRef = useRef<HTMLInputElement>(null);
@@ -445,17 +430,17 @@ export const App = () => {
     }
 
     let finalGroups = groupsFiltered.map(group => {
-        const _tarefas = group.tarefas.filter(task => {
-            const originalTask = liveData.find(g => g.id === group.id)?.tarefas.find(t => t.id === task.id);
-            if (originalTask && originalTask.activities.length > 0 && task.activities.length === 0) {
+        const _tarefas = (group.tarefas || []).filter(task => {
+            const originalTask = (liveData || []).find(g => g.id === group.id)?.tarefas?.find(t => t.id === task.id);
+            if (originalTask && (originalTask.activities || []).length > 0 && (task.activities || []).length === 0) {
                 return false; // Hide task if all its activities were filtered out
             }
             return true;
         });
         return { ...group, tarefas: _tarefas };
     }).filter(group => {
-        const originalGroup = liveData.find(g => g.id === group.id);
-        if (originalGroup && originalGroup.tarefas.length > 0 && group.tarefas.length === 0) {
+        const originalGroup = (liveData || []).find(g => g.id === group.id);
+        if (originalGroup && (originalGroup.tarefas || []).length > 0 && (group.tarefas || []).length === 0) {
             return false; // Hide group if all its tasks were filtered out
         }
         return true;
@@ -499,9 +484,39 @@ export const App = () => {
   }, [currentStartDate]);
 
   // --- AUTH & PROJECT MANAGEMENT ---
+  const activeProjectRef = useRef(activeProject);
+  useEffect(() => {
+    activeProjectRef.current = activeProject;
+  }, [activeProject]);
+
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
-      setCurrentUser(user);
+      if (user) {
+        setCurrentUser(user);
+        localStorage.setItem('pcp-auth-pref', 'google');
+      } else {
+        const authPref = localStorage.getItem('pcp-auth-pref');
+        if (authPref === 'guest') {
+          setCurrentUser({
+            uid: 'guest-user',
+            email: 'guest@example.com',
+            displayName: 'Usuário de Teste (Convidado)',
+            emailVerified: true,
+            isAnonymous: true,
+          } as any);
+        } else if (authPref === 'logged-out') {
+          setCurrentUser(null);
+        } else {
+          // Default fallback to public-user for zero-friction iframe viewing
+          setCurrentUser({
+            uid: 'public-user',
+            email: 'public@example.com',
+            displayName: 'Planejador Geral',
+            emailVerified: true,
+            isAnonymous: true,
+          } as any);
+        }
+      }
       setIsAuthReady(true);
     });
     return unsubscribe;
@@ -514,6 +529,7 @@ export const App = () => {
     }
 
     if (currentUser.uid === 'guest-user') {
+       if (activeProjectRef.current) return;
        let localProjects: Record<string, Project> = {};
        const localProjectsRaw = localStorage.getItem('pcp-local-projects');
        if (localProjectsRaw) {
@@ -597,7 +613,7 @@ export const App = () => {
            return newProjects;
         });
         
-        if (needsInitialLoad && !activeProject) {
+        if (needsInitialLoad && !activeProjectRef.current) {
             const lastActiveId = localStorage.getItem(`pcp-lastActive-${currentUser.uid}`);
             const projectToLoad = newProjects[lastActiveId!];
             if (projectToLoad) {
@@ -612,7 +628,7 @@ export const App = () => {
         handleFirestoreError(error, OperationType.LIST, 'projects');
     });
     return unsubscribe;
-  }, [currentUser, isAuthReady, activeProject]);
+  }, [currentUser, isAuthReady]);
 
   const handleGuestLogin = () => {
     const guestUser = {
@@ -622,18 +638,21 @@ export const App = () => {
       emailVerified: true,
       isAnonymous: true,
     } as any;
+    localStorage.setItem('pcp-auth-pref', 'guest');
     setCurrentUser(guestUser);
     setIsAuthReady(true);
   };
 
   const handleLogout = async () => {
-    if (currentUser?.uid === 'guest-user') {
-      setCurrentUser(null);
-      setActiveProject(null);
-      return;
+    localStorage.setItem('pcp-auth-pref', 'logged-out');
+    try {
+      await signOut(auth);
+    } catch (err) {
+      console.error("Erro ao deslogar do Firebase:", err);
     }
-    await signOut(auth);
+    setCurrentUser(null);
     setActiveProject(null);
+    addToast('Sessão encerrada com sucesso.', 'success');
   };
 
   const persistProjectToFirebase = async (project: Project) => {
@@ -712,6 +731,13 @@ export const App = () => {
       addToast(`Projeto '${projectToSave.name}' salvo!`, 'success');
     }
   }, [currentUser, activeProject, liveData, addToast, visibleColumns, activeFilters]);
+
+  const handleSaveAndExit = useCallback(async () => {
+    if (!activeProject) return;
+    await handleSaveProject(true);
+    addToast(`Projeto '${activeProject.name}' salvo com sucesso!`, 'success');
+    setActiveProject(null);
+  }, [activeProject, handleSaveProject, addToast]);
 
   useEffect(() => {
     if (!isAutoSaveEnabled) return;
@@ -1165,10 +1191,9 @@ export const App = () => {
             const isExcel = file.name.match(/\.(xlsx|xls|csv)$/i);
             if (isExcel) {
                 const data = await file.arrayBuffer();
-                const { read, utils } = await import("xlsx");
-                const workbook = read(data, { cellDates: true });
+                const workbook = XLSX.read(data, { cellDates: true });
                 const worksheet = workbook.Sheets[workbook.SheetNames[0]];
-                const csvData = utils.sheet_to_csv(worksheet);
+                const csvData = XLSX.utils.sheet_to_csv(worksheet);
                 finalContent = (finalContent ? finalContent + "\n\n" : "") + csvData;
             } else {
                 fileData = await new Promise((resolve, reject) => {
@@ -1185,12 +1210,21 @@ export const App = () => {
         }
         const importedData = await parseScheduleWithAI(ai, finalContent, fileData);
         dispatch({ type: 'SET_DATA', payload: importedData });
+        if (activeProject) {
+            const updatedProject: Project = {
+                ...activeProject,
+                liveData: importedData,
+                lastModified: Date.now()
+            };
+            setActiveProject(updatedProject);
+            await persistProjectToFirebase(updatedProject);
+        }
         setImportModalOpen(false);
         addToast("Cronograma importado com sucesso!", "success");
     } catch (error) {
         addToast(`Falha ao importar: ${error instanceof Error ? error.message : String(error)}`, "error");
     }
-  }, [ai, addToast, dispatch]);
+  }, [ai, addToast, dispatch, activeProject, persistProjectToFirebase]);
 
   const handleQuickImport = useCallback(async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -1210,10 +1244,9 @@ export const App = () => {
         const isExcel = file.name.match(/\.(xlsx|xls|csv)$/i);
         if (isExcel) {
             const data = await file.arrayBuffer();
-            const { read, utils } = await import("xlsx");
-            const workbook = read(data, { cellDates: true });
+            const workbook = XLSX.read(data, { cellDates: true });
             const worksheet = workbook.Sheets[workbook.SheetNames[0]];
-            finalContent = utils.sheet_to_csv(worksheet);
+            finalContent = XLSX.utils.sheet_to_csv(worksheet);
         } else {
             fileData = await new Promise<{ mimeType: string, data: string }>((resolve, reject) => {
                 const reader = new FileReader();
@@ -1229,6 +1262,15 @@ export const App = () => {
 
         const importedData = await parseScheduleWithAI(ai, finalContent, fileData); // Pass empty text if no finalContent
         dispatch({ type: 'SET_DATA', payload: importedData });
+        if (activeProject) {
+            const updatedProject: Project = {
+                ...activeProject,
+                liveData: importedData,
+                lastModified: Date.now()
+            };
+            setActiveProject(updatedProject);
+            await persistProjectToFirebase(updatedProject);
+        }
         addToast("Cronograma importado com sucesso!", "success");
     } catch (error) {
         addToast(`Falha ao importar: ${error instanceof Error ? error.message : String(error)}`, "error");
@@ -1237,7 +1279,7 @@ export const App = () => {
             event.target.value = '';
         }
     }
-  }, [ai, addToast, dispatch]);
+  }, [ai, addToast, dispatch, activeProject, persistProjectToFirebase]);
 
   const handleImportExcelFile = useCallback(async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -1252,22 +1294,194 @@ export const App = () => {
     
     try {
         const data = await file.arrayBuffer();
-        const { read } = await import("xlsx");
-        const workbook = read(data, { cellDates: true });
+        const workbook = XLSX.read(data, { cellDates: true });
         const worksheet = workbook.Sheets[workbook.SheetNames[0]];
-        const { utils } = await import("xlsx");
-        const jsonData: any[][] = utils.sheet_to_json(worksheet, { header: 1 });
+        const jsonData: any[][] = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
         
-        const importedData = parseTabularData(jsonData); 
+        const projectStartDateStr = activeProject?.startDate || '2026-06-15';
+        const importedData = parseTabularData(jsonData, projectStartDateStr); 
         
+        // Extract earliest date to shift calendar view automatically
+        let minDateStr = '';
+        importedData.forEach(group => {
+            group.tarefas.forEach(task => {
+                task.activities.forEach(activity => {
+                    if (activity.schedule) {
+                        Object.keys(activity.schedule).forEach(dateKey => {
+                            if (!minDateStr || dateKey < minDateStr) {
+                                minDateStr = dateKey;
+                            }
+                        });
+                    }
+                });
+            });
+        });
+
         dispatch({ type: 'SET_DATA', payload: importedData });
+        if (activeProject) {
+            const updatedProject: Project = {
+                ...activeProject,
+                liveData: importedData,
+                ...(minDateStr ? { startDate: minDateStr } : {}),
+                lastModified: Date.now()
+            };
+            setActiveProject(updatedProject);
+            if (minDateStr) {
+                setCurrentStartDate(new Date(minDateStr + 'T00:00:00Z'));
+            }
+            await persistProjectToFirebase(updatedProject);
+        }
         addToast("Cronograma importado do Excel com sucesso!", "success");
     } catch (error) {
         addToast(`Falha ao importar do Excel: ${error instanceof Error ? error.message : String(error)}`, "error");
     } finally {
         if (event.target) event.target.value = '';
     }
-  }, [addToast]);
+  }, [addToast, dispatch, activeProject, persistProjectToFirebase]);
+
+  const handleImportTxtFile = useCallback(async (event: React.ChangeEvent<HTMLInputElement>) => {
+      const file = event.target.files?.[0];
+      if (!file) return;
+      
+      try {
+          // Decode file content as ArrayBuffer with Windows-1252 fallback for legacy Portuguese files
+          let text = '';
+          const buffer = await file.arrayBuffer();
+          const utf8Decoder = new TextDecoder('utf-8', { fatal: true });
+          try {
+              text = utf8Decoder.decode(buffer);
+          } catch (e) {
+              const winDecoder = new TextDecoder('windows-1252');
+              text = winDecoder.decode(buffer);
+          }
+          // Remove BOM and trim
+          const cleanText = text.replace(/^\uFEFF/, '');
+          const trimmedText = cleanText.trim();
+          
+          if (trimmedText.startsWith('{') || trimmedText.startsWith('[')) {
+              const parsed = JSON.parse(trimmedText);
+              let importedData: any = null;
+              let importedSummaryData: any = null;
+              let startDateToSet: Date | null = null;
+              
+              if (parsed && Array.isArray(parsed.data)) {
+                   importedData = parsed.data;
+                   if (parsed.summaryData) {
+                       importedSummaryData = parsed.summaryData;
+                   }
+                   if (parsed.startDate) {
+                       startDateToSet = new Date(parsed.startDate + 'T00:00:00Z');
+                   }
+              } else if (parsed && Array.isArray(parsed.liveData)) {
+                   // Handle fully structured backup object direct from state representation
+                   importedData = parsed.liveData;
+                   if (parsed.summaryData) {
+                       importedSummaryData = parsed.summaryData;
+                   }
+                   if (parsed.startDate) {
+                       startDateToSet = new Date(parsed.startDate + 'T00:00:00Z');
+                   }
+              } else if (Array.isArray(parsed)) {
+                   importedData = parsed;
+              }
+
+              if (importedData) {
+                   dispatch({ type: 'SET_DATA', payload: importedData });
+                   if (importedSummaryData) {
+                       dispatchSummary({ type: 'LOAD_DATA', payload: importedSummaryData });
+                   } else {
+                       dispatchSummary({ type: 'LOAD_DATA', payload: importedData });
+                   }
+                   
+                   if (startDateToSet) {
+                       setCurrentStartDate(startDateToSet);
+                   }
+                   
+                   let projectToSet = activeProject;
+                   if (!projectToSet && currentUser) {
+                       const name = parsed.name || `Projeto Importado ${new Date().toLocaleDateString()}`;
+                       const obra = parsed.obra || 'Geral';
+                       projectToSet = createNewProject(name, obra);
+                       projectToSet.ownerId = currentUser.uid;
+                   }
+                   
+                   if (projectToSet) {
+                       const updatedProject: Project = {
+                           ...projectToSet,
+                           name: parsed.name || projectToSet.name,
+                           obra: parsed.obra || projectToSet.obra,
+                           liveData: importedData,
+                           summaryData: importedSummaryData || importedData,
+                           ...(parsed.startDate ? { startDate: parsed.startDate } : {}),
+                           lastModified: Date.now()
+                       };
+                       setActiveProject(updatedProject);
+                       await persistProjectToFirebase(updatedProject);
+                   }
+                   addToast("Cronograma TXT / JSON (Backup) importado com sucesso!", "success");
+              } else {
+                   addToast("O arquivo de backup não possui um formato estruturado válido.", "error");
+              }
+          } else {
+              if (activeProject && !window.confirm("Isto substituirá o cronograma atual. Deseja continuar?")) {
+                   if (event.target) event.target.value = '';
+                   return;
+              }
+              const rows = parseTxtToRows(cleanText);
+              const projectStartDateStr = activeProject?.startDate || '2026-06-15';
+              const importedData = parseTabularData(rows, projectStartDateStr);
+              
+              // Extract earliest date to shift calendar view automatically
+              let minDateStr = '';
+              importedData.forEach(group => {
+                  group.tarefas.forEach(task => {
+                      task.activities.forEach(activity => {
+                          if (activity.schedule) {
+                              Object.keys(activity.schedule).forEach(dateKey => {
+                                  if (!minDateStr || dateKey < minDateStr) {
+                                      minDateStr = dateKey;
+                                  }
+                              });
+                          }
+                      });
+                  });
+              });
+
+              dispatch({ type: 'SET_DATA', payload: importedData });
+              dispatchSummary({ type: 'LOAD_DATA', payload: importedData });
+              
+              let projectToSet = activeProject;
+              if (!projectToSet && currentUser) {
+                  const name = `Projeto Importado ${new Date().toLocaleDateString()}`;
+                  const obra = 'Geral';
+                  projectToSet = createNewProject(name, obra);
+                  projectToSet.ownerId = currentUser.uid;
+              }
+
+              if (projectToSet) {
+                  const updatedProject: Project = {
+                      ...projectToSet,
+                      liveData: importedData,
+                      summaryData: importedData,
+                      ...(minDateStr ? { startDate: minDateStr } : (projectStartDateStr ? { startDate: projectStartDateStr } : {})),
+                      lastModified: Date.now()
+                  };
+                  setActiveProject(updatedProject);
+                  if (minDateStr) {
+                      setCurrentStartDate(new Date(minDateStr + 'T00:00:00Z'));
+                  } else if (projectStartDateStr) {
+                      setCurrentStartDate(new Date(projectStartDateStr + 'T00:00:00Z'));
+                  }
+                  await persistProjectToFirebase(updatedProject);
+              }
+              addToast("Cronograma importado do arquivo de texto (TXT) com sucesso!", "success");
+          }
+      } catch(e) {
+          addToast(`Falha ao ler o arquivo TXT/JSON: ${e instanceof Error ? e.message : String(e)}`, "error");
+      } finally {
+          if (event.target) event.target.value = '';
+      }
+  }, [addToast, dispatch, dispatchSummary, activeProject, currentUser, createNewProject, persistProjectToFirebase]);
 
   const handleImportFA = useCallback(async (text: string, file: File | null) => {
     if (!ai) {
@@ -1374,18 +1588,18 @@ export const App = () => {
         options[col.id] = [];
     });
 
-    liveData.forEach(group => {
-        activeProject.dynamicColumns.forEach(col => {
+    (liveData || []).forEach(group => {
+        (activeProject.dynamicColumns || []).forEach(col => {
             const val = group.customValues?.[col.id];
             if (val && !options[col.id].includes(val)) {
                 options[col.id].push(val);
             }
         });
-        group.tarefas.forEach(task => {
+        (group.tarefas || []).forEach(task => {
             if (task.title && !options.tarefaPrincipal.includes(task.title)) {
                 options.tarefaPrincipal.push(task.title);
             }
-            task.activities.forEach(act => {
+            (task.activities || []).forEach(act => {
                 if (act.name && !options.atividade.includes(act.name)) {
                     options.atividade.push(act.name);
                 }
@@ -1915,6 +2129,12 @@ export const App = () => {
     }
   }, [selectionBlock, renderableRows, dates, dispatch, addToast]);
 
+  const handleShiftHoliday = useCallback((holidayDateStr: string, skipWeekends: boolean) => {
+    dispatch({ type: 'SHIFT_HOLIDAY', payload: { holidayDateStr, skipWeekends } });
+    const formatted = holidayDateStr.split('-').reverse().join('/');
+    addToast(`Programação e anotações a partir de ${formatted} deslocadas para o próximo dia útil!`, 'success');
+  }, [dispatch, addToast]);
+
   if (!isAuthReady) {
     return <div style={{display:'flex',justifyContent:'center',alignItems:'center',height:'100vh',fontSize:'1.2rem',color:'#64748b'}}>Carregando...</div>;
   }
@@ -1927,7 +2147,7 @@ export const App = () => {
       <ToastContainer toasts={toasts} setToasts={setToasts} />
       <input type="file" ref={quickImportInputRef} onChange={handleQuickImport} style={{ display: 'none' }} accept="image/*,application/pdf,.xlsx,.csv" />
       <input type="file" ref={excelImportInputRef} onChange={handleImportExcelFile} style={{ display: 'none' }} accept=".xlsx, .xls" />
-      <input type="file" ref={txtImportInputRef} onChange={handleImportTxtFile} style={{ display: 'none' }} accept=".txt" />
+      <input type="file" ref={txtImportInputRef} onChange={handleImportTxtFile} style={{ display: 'none' }} accept=".txt, .json, .csv, .tsv" />
       {isImportModalOpen && <ImportModal isOpen={isImportModalOpen} onClose={() => setImportModalOpen(false)} onImportSchedule={handleImportSchedule} onImportFA={handleImportFA} />}
       {isLoadModalOpen && (
           <LoadModal 
@@ -1954,17 +2174,44 @@ export const App = () => {
                <h1 style={{ color: '#334155', marginBottom: '8px' }}>Nenhum projeto selecionado</h1>
                <div style={{ fontSize: '0.9rem', color: '#64748b', marginBottom: '16px', fontWeight: 500 }}>Versão: {APP_VERSION}</div>
                <p style={{ color: '#64748b', marginBottom: '24px' }}>Crie um novo planejamento ou abra um projeto existente para começar.</p>
-               <div style={{ display: 'flex', gap: '16px' }}>
+               <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap', justifyContent: 'center' }}>
                     <button className="submit-button" onClick={() => setisSaveModalOpen(true)} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '12px 24px', fontSize: '1rem' }}>
                         <span className="material-icons">add_box</span> Novo Projeto
                     </button>
                     <button className="control-button" onClick={() => setLoadModalOpen(true)} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '12px 24px', fontSize: '1rem', backgroundColor: '#fbbf24', border: 'none', color: '#1e293b', fontWeight: 'bold' }}>
                         <span className="material-icons">folder_open</span> Abrir Projeto
                     </button>
+                    <button className="control-button" onClick={handleImportTxtClick} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '12px 24px', fontSize: '1rem', backgroundColor: '#e2e8f0', border: '1px solid #cbd5e1', color: '#334155', fontWeight: 'bold' }}>
+                        <span className="material-icons">data_object</span> Importar Backup TXT / JSON
+                    </button>
                </div>
-               <button className="control-button" onClick={handleLogout} style={{ marginTop: '48px' }}>
-                    <span className="material-icons" style={{ fontSize: '16px' }}>logout</span> Sair da Conta
-               </button>
+               <div style={{ marginTop: '48px', padding: '16px 24px', border: '1px solid #e2e8f0', borderRadius: '12px', backgroundColor: '#ffffff', display: 'flex', alignItems: 'center', gap: '16px', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
+                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                       <span className="material-icons" style={{ color: '#64748b' }}>account_circle</span>
+                       <span style={{ fontSize: '0.9rem', color: '#475569', fontWeight: 500 }}>
+                           {currentUser?.displayName || currentUser?.email || 'Usuário'}
+                       </span>
+                   </div>
+                   <div style={{ width: '1px', height: '24px', backgroundColor: '#e2e8f0' }}></div>
+                   <button 
+                       onClick={handleLogout} 
+                       className="control-button" 
+                       style={{ 
+                           display: 'flex', 
+                           alignItems: 'center', 
+                           gap: '6px', 
+                           padding: '8px 16px', 
+                           fontSize: '0.875rem', 
+                           backgroundColor: '#fee2e2', 
+                           border: '1px solid #fca5a5', 
+                           color: '#ef4444', 
+                           fontWeight: 'bold',
+                           cursor: 'pointer'
+                       }}
+                   >
+                       <span className="material-icons" style={{ fontSize: '18px' }}>logout</span> Sair do App
+                   </button>
+               </div>
           </div>
       ) : (
       <div className="app-content">
@@ -1980,6 +2227,23 @@ export const App = () => {
             <nav className="header-nav">
                 <button className={`nav-tab`} style={{ backgroundColor: '#fbbf24', color: '#1e293b', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '4px', marginRight: '8px' }} onClick={() => setLoadModalOpen(true)}>
                     <span className="material-icons" style={{ fontSize: '18px' }}>folder_open</span> Abrir Projeto
+                </button>
+                <button 
+                  className="nav-tab" 
+                  style={{ 
+                    backgroundColor: '#10b981', 
+                    color: '#ffffff', 
+                    fontWeight: 'bold', 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    gap: '4px', 
+                    marginRight: '8px',
+                    border: 'none',
+                    cursor: 'pointer'
+                  }} 
+                  onClick={handleSaveAndExit}
+                >
+                    <span className="material-icons" style={{ fontSize: '18px' }}>exit_to_app</span> Salvar e Sair
                 </button>
                 <button className={`nav-tab ${currentPage === 'schedule' ? 'active' : ''}`} onClick={() => setCurrentPage('schedule')}>Programação</button>
                 <button className={`nav-tab ${currentPage === 'dailySummary' ? 'active' : ''}`} onClick={() => setCurrentPage('dailySummary')}>Resumo Diário</button>
@@ -2011,11 +2275,35 @@ export const App = () => {
                     <span className="label">Responsável:</span>
                     <span className="editable-field" contentEditable suppressContentEditableWarning onBlur={e => handleTextUpdate('', 'programmerName', e.currentTarget.textContent || '')}>{activeProject?.programmerName}</span>
                 </div>
-                <div className="user-info">
-                    <span className="material-icons">account_circle</span>
-                    <span>{currentUser.displayName || currentUser.email}</span>
+                <div className="user-info" style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '4px 10px', backgroundColor: '#f1f5f9', borderRadius: '20px', border: '1px solid #e2e8f0' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        <span className="material-icons" style={{ color: '#475569', fontSize: '18px' }}>account_circle</span>
+                        <span style={{ fontSize: '0.8rem', fontWeight: 500, color: '#334155', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '120px' }} title={currentUser?.displayName || currentUser?.email || 'Usuário'}>
+                            {currentUser?.displayName || currentUser?.email || 'Usuário'}
+                        </span>
+                    </div>
+                    <button 
+                        onClick={handleLogout} 
+                        style={{ 
+                            background: 'none', 
+                            border: 'none', 
+                            padding: '2px 6px', 
+                            cursor: 'pointer', 
+                            display: 'flex', 
+                            alignItems: 'center', 
+                            gap: '3px', 
+                            borderRadius: '10px', 
+                            backgroundColor: '#fee2e2', 
+                            color: '#ef4444', 
+                            fontSize: '0.7rem', 
+                            fontWeight: 'bold',
+                            transition: 'all 0.2s',
+                        }}
+                        title="Sair do aplicativo"
+                    >
+                        <span className="material-icons" style={{ fontSize: '12px' }}>logout</span> Sair
+                    </button>
                 </div>
-                <button className="control-button" onClick={handleLogout} aria-label="Sair"><span className="material-icons">logout</span></button>
             </div>
         </div>
         <div className="app-container">
@@ -2039,6 +2327,9 @@ export const App = () => {
                 onCloseMobile={() => setIsMobileNavVisible(false)}
                 handleIntelligentReschedule={handleIntelligentReschedule}
                 hasSelection={!!selectionBlock}
+                handleShiftHoliday={handleShiftHoliday}
+                activeCell={activeCell}
+                handleSaveAndExit={handleSaveAndExit}
               />
             )}
             <main className="main-content" ref={gridRef}>
