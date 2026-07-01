@@ -490,36 +490,16 @@ export const App = () => {
   }, [activeProject]);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      if (user) {
-        setCurrentUser(user);
-        localStorage.setItem('pcp-auth-pref', 'google');
-      } else {
-        const authPref = localStorage.getItem('pcp-auth-pref');
-        if (authPref === 'guest') {
-          setCurrentUser({
-            uid: 'guest-user',
-            email: 'guest@example.com',
-            displayName: 'Usuário de Teste (Convidado)',
-            emailVerified: true,
-            isAnonymous: true,
-          } as any);
-        } else if (authPref === 'logged-out') {
-          setCurrentUser(null);
-        } else {
-          // Default fallback to public-user for zero-friction iframe viewing
-          setCurrentUser({
-            uid: 'public-user',
-            email: 'public@example.com',
-            displayName: 'Planejador Geral',
-            emailVerified: true,
-            isAnonymous: true,
-          } as any);
-        }
-      }
-      setIsAuthReady(true);
-    });
-    return unsubscribe;
+    // Para contornar bloqueios de iframe/cookies de terceiros no navegador,
+    // configuramos por padrão o perfil 'public-user' para acessar o Firestore diretamente sem barreiras de login.
+    setCurrentUser({
+      uid: 'public-user',
+      email: 'public@example.com',
+      displayName: 'Planejador Geral',
+      emailVerified: true,
+      isAnonymous: true,
+    } as any);
+    setIsAuthReady(true);
   }, []);
 
   useEffect(() => {
@@ -644,15 +624,11 @@ export const App = () => {
   };
 
   const handleLogout = async () => {
-    localStorage.setItem('pcp-auth-pref', 'logged-out');
-    try {
-      await signOut(auth);
-    } catch (err) {
-      console.error("Erro ao deslogar do Firebase:", err);
+    if (activeProject) {
+      await persistProjectToFirebase(activeProject);
     }
-    setCurrentUser(null);
     setActiveProject(null);
-    addToast('Sessão encerrada com sucesso.', 'success');
+    addToast('Projeto salvo e fechado com sucesso!', 'success');
   };
 
   const persistProjectToFirebase = async (project: Project) => {
@@ -2185,32 +2161,11 @@ export const App = () => {
                         <span className="material-icons">data_object</span> Importar Backup TXT / JSON
                     </button>
                </div>
-               <div style={{ marginTop: '48px', padding: '16px 24px', border: '1px solid #e2e8f0', borderRadius: '12px', backgroundColor: '#ffffff', display: 'flex', alignItems: 'center', gap: '16px', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
-                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                       <span className="material-icons" style={{ color: '#64748b' }}>account_circle</span>
-                       <span style={{ fontSize: '0.9rem', color: '#475569', fontWeight: 500 }}>
-                           {currentUser?.displayName || currentUser?.email || 'Usuário'}
-                       </span>
-                   </div>
-                   <div style={{ width: '1px', height: '24px', backgroundColor: '#e2e8f0' }}></div>
-                   <button 
-                       onClick={handleLogout} 
-                       className="control-button" 
-                       style={{ 
-                           display: 'flex', 
-                           alignItems: 'center', 
-                           gap: '6px', 
-                           padding: '8px 16px', 
-                           fontSize: '0.875rem', 
-                           backgroundColor: '#fee2e2', 
-                           border: '1px solid #fca5a5', 
-                           color: '#ef4444', 
-                           fontWeight: 'bold',
-                           cursor: 'pointer'
-                       }}
-                   >
-                       <span className="material-icons" style={{ fontSize: '18px' }}>logout</span> Sair do App
-                   </button>
+               <div style={{ marginTop: '48px', padding: '8px 16px', border: '1px solid #e2e8f0', borderRadius: '20px', backgroundColor: '#f1f5f9', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                   <span className="material-icons" style={{ color: '#64748b', fontSize: '18px' }}>account_circle</span>
+                   <span style={{ fontSize: '0.8rem', color: '#475569', fontWeight: 500 }}>
+                       Acesso Livre ({currentUser?.displayName || 'Planejador Geral'})
+                   </span>
                </div>
           </div>
       ) : (

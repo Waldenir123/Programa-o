@@ -131,7 +131,7 @@ export const useScheduleInteraction = (
                             if (targetActivity) {
                                 const ghostActivityId = targetActivity.id;
                                 const ghostDateStr = formatDate(dates[targetCol]);
-                                newGhostCells.add(`${ghostActivityId}-${ghostDateStr}`);
+                                newGhostCells.add(`${ghostActivityId}|${ghostDateStr}`);
                             }
                         }
                     }
@@ -176,7 +176,7 @@ export const useScheduleInteraction = (
             
             let minGhostRow = Infinity, minGhostCol = Infinity;
             currentRef.ghostBlockCells.forEach(cellId => {
-                const [actId, dateStr] = cellId.split(/(?<=id_\d+_\w+)-/);
+                const [actId, dateStr] = cellId.split('|');
                 const r = activityIdToRowIndex.get(actId);
                 const c = dateToColIndex.get(dateStr);
                 if (r !== undefined && r < minGhostRow) minGhostRow = r;

@@ -639,7 +639,7 @@ const ScheduleRow = memo((props: ScheduleRowProps) => {
                         isSelected={isSelectedInBlock}
                         isCut={activity ? isCellInBlock(activity.id, dateStr, cutSelectionBlock) : false}
                         isMoving={isMovingBlock && isSelectedInBlock}
-                        isGhost={activity ? ghostBlockCells.has(`${activity.id}-${dateStr}`) : false}
+                        isGhost={activity ? ghostBlockCells.has(`${activity.id}|${dateStr}`) : false}
                         onMouseDown={onCellMouseDown}
                         onMouseEnter={onCellMouseEnter}
                         onRightClick={onCellRightClick}
@@ -681,8 +681,8 @@ const areScheduleRowEqual = (prevProps: ScheduleRowProps, nextProps: ScheduleRow
         
         if (prevProps.ghostBlockCells !== nextProps.ghostBlockCells) {
             let oldGhost = false, newGhost = false;
-            for (const val of prevProps.ghostBlockCells) { if (val.startsWith(activityId + '-')) { oldGhost = true; break; } }
-            for (const val of nextProps.ghostBlockCells) { if (val.startsWith(activityId + '-')) { newGhost = true; break; } }
+            for (const val of prevProps.ghostBlockCells) { if (val.startsWith(activityId + '|')) { oldGhost = true; break; } }
+            for (const val of nextProps.ghostBlockCells) { if (val.startsWith(activityId + '|')) { newGhost = true; break; } }
             if (oldGhost || newGhost) return false;
         }
     }
