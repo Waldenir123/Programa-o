@@ -242,6 +242,13 @@ export const exportToExcelAgent = async (
                     
                     const sectorColNumber = (showID ? 1 : 0) + visibleDynamicColsMapping.length + (showTask ? 1 : 0) + (showActivity ? 1 : 0) + 1;
                     if (showSector && colNumber === sectorColNumber) {
+                        // Apply drop-down list validation for choice of sector
+                        cell.dataValidation = {
+                            type: 'list',
+                            allowBlank: true,
+                            formulae: ['"CTMSP,IE,IEI,IEP,IE-TS,IPC-C,IPC-M,IPC-MC,IPC-T,IPS,IPS-S,IPS-TT,IPU,IPU-F,IPU-U,IQ,IQ-DT,IQ-LAB,IQ-LP,IQ-REC,IQ-RT,IQ-RX,IQ-SOLDA,IQ-UT,IQ-VT"']
+                        };
+
                         const sectorText = cell.value?.toString().trim().toUpperCase() || '';
                         if (sectorText) {
                             let argbFill = 'FFF1F5F9';
@@ -289,6 +296,125 @@ export const exportToExcelAgent = async (
             }
         });
     });
+
+    // Add conditional formatting so styling is preserved when edited in Excel
+    if (currentRow > 6) {
+        const getColLetter = (col: number): string => {
+            let letter = '';
+            while (col > 0) {
+                let temp = (col - 1) % 26;
+                letter = String.fromCharCode(65 + temp) + letter;
+                col = Math.floor((col - temp) / 26);
+            }
+            return letter;
+        };
+
+        // Dates grid status conditional formatting
+        if (dates.length > 0) {
+            const startColLetter = getColLetter(baseCols + 1);
+            const endColLetter = getColLetter(baseCols + dates.length);
+            const range = `${startColLetter}6:${endColLetter}${currentRow - 1}`;
+
+            worksheet.addConditionalFormatting({
+                ref: range,
+                rules: [
+                    {
+                        priority: 1,
+                        type: 'cellIs',
+                        operator: 'equal',
+                        formulae: ['"X"'],
+                        style: {
+                            fill: { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFEF08A' }, bgColor: { argb: 'FFFEF08A' } }
+                        }
+                    },
+                    {
+                        priority: 2,
+                        type: 'cellIs',
+                        operator: 'equal',
+                        formulae: ['"Ok"'],
+                        style: {
+                            fill: { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFBBF7D0' }, bgColor: { argb: 'FFBBF7D0' } }
+                        }
+                    },
+                    {
+                        priority: 3,
+                        type: 'cellIs',
+                        operator: 'equal',
+                        formulae: ['"N"'],
+                        style: {
+                            fill: { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFECACA' }, bgColor: { argb: 'FFFECACA' } }
+                        }
+                    },
+                    {
+                        priority: 4,
+                        type: 'cellIs',
+                        operator: 'equal',
+                        formulae: ['"C"'],
+                        style: {
+                            fill: { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFBFDBFE' }, bgColor: { argb: 'FFBFDBFE' } }
+                        }
+                    }
+                ]
+            });
+        }
+
+        // Sectors conditional formatting
+        if (showSector) {
+            const sectorColNumber = (showID ? 1 : 0) + visibleDynamicColsMapping.length + (showTask ? 1 : 0) + (showActivity ? 1 : 0) + 1;
+            const sectorColLetter = getColLetter(sectorColNumber);
+            const sectorRange = `${sectorColLetter}6:${sectorColLetter}${currentRow - 1}`;
+
+            const PREDEFINED_SECTORS = [
+              'CTMSP', 'IE', 'IEI', 'IEP', 'IE-TS', 'IPC-C', 'IPC-M', 'IPC-MC', 'IPC-T', 
+              'IPS', 'IPS-S', 'IPS-TT', 'IPU', 'IPU-F', 'IPU-U', 'IQ', 'IQ-DT', 'IQ-LAB', 
+              'IQ-LP', 'IQ-REC', 'IQ-RT', 'IQ-RX', 'IQ-SOLDA', 'IQ-UT', 'IQ-VT'
+            ];
+
+            const sectorRules: any[] = [];
+            let priority = 10; // Start priority after dates grid
+            PREDEFINED_SECTORS.forEach(sec => {
+                const s = sec.toUpperCase();
+                let argbFill = 'FFF1F5F9';
+                let argbText = 'FF475569';
+                
+                if (s === 'CTMSP' || s.startsWith('IE')) {
+                    argbFill = 'FFD9D9D9';
+                    argbText = 'FF000000';
+                } else if (s === 'IPC-C' || s === 'IPC-T') {
+                    argbFill = 'FFFF3B30';
+                    argbText = 'FFFFFFFF';
+                } else if (s.startsWith('IPC')) {
+                    argbFill = 'FF92D050';
+                    argbText = 'FF000000';
+                } else if (s.startsWith('IPS')) {
+                    argbFill = 'FFFFFF00';
+                    argbText = 'FF000000';
+                } else if (s.startsWith('IPU')) {
+                    argbFill = 'FFC6E0B4';
+                    argbText = 'FF000000';
+                } else if (s.startsWith('IQ')) {
+                    argbFill = 'FF00B0F0';
+                    argbText = 'FFFFFFFF';
+                }
+
+                sectorRules.push({
+                    priority: priority++,
+                    type: 'cellIs',
+                    operator: 'equal',
+                    formulae: [`"${sec}"`],
+                    style: {
+                        fill: { type: 'pattern', pattern: 'solid', fgColor: { argb: argbFill }, bgColor: { argb: argbFill } },
+                        font: { name: 'Arial', size: 9, bold: true, color: { argb: argbText } }
+                    }
+                });
+            });
+
+            worksheet.addConditionalFormatting({
+                ref: sectorRange,
+                rules: sectorRules
+            });
+        }
+    }
 
     const buffer = await workbook.xlsx.writeBuffer();
     saveAs(new Blob([buffer]), `${title.replace(/ /g, '_')}.xlsx`);
