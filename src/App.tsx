@@ -56,7 +56,7 @@ import {
 import { useScheduleInteraction } from './hooks/useScheduleInteraction';
 
 // Utils
-import { formatDate, getWeek, generateId, deepClone, flattenData, safeJsonParse, migrateProject } from './utils/dataUtils';
+import { formatDate, getWeek, generateId, deepClone, flattenData, safeJsonParse, migrateProject, shiftScheduleKeys } from './utils/dataUtils';
 import { parseTabularData, parseTxtToRows } from './utils/parsers';
 import { exportToExcelAgent, exportToPdfAgent } from './utils/exportAgents';
 import { APP_VERSION } from './version';
@@ -569,6 +569,9 @@ export const App = () => {
             if (projectToLoad) {
                 setLastSavedTime(projectToLoad.lastModified);
                 setActiveProject(projectToLoad);
+            if (projectToLoad.startDate) {
+                setCurrentStartDate(new Date(projectToLoad.startDate + 'T00:00:00Z'));
+            }
                 dispatch({ type: 'LOAD_DATA', payload: projectToLoad.liveData });
             } else if (Object.keys(newProjects).length > 0) {
                  setLoadModalOpen(true);
@@ -665,6 +668,7 @@ export const App = () => {
     const projectToSave = { 
         ...activeProject, 
         liveData, 
+        summaryData,
         lastModified: Date.now(),
         displaySettings: {
             visibleColumns,
@@ -676,7 +680,7 @@ export const App = () => {
     if (silent !== true) {
       addToast(`Projeto '${projectToSave.name}' salvo!`, 'success');
     }
-  }, [currentUser, activeProject, liveData, addToast, visibleColumns, activeFilters]);
+  }, [currentUser, activeProject, liveData, summaryData, addToast, visibleColumns, activeFilters]);
 
   const handleSaveAndExit = useCallback(async () => {
     if (!activeProject) return;
@@ -1559,11 +1563,92 @@ export const App = () => {
         addToast("Data de início inválida.", "error");
         return;
     }
+
+    const oldDateStr = activeProject?.startDate || '2026-04-13';
+    const oldDate = new Date(oldDateStr + 'T00:00:00Z');
+    const diffTime = newDate.getTime() - oldDate.getTime();
+    const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
+
     setCurrentStartDate(newDate);
-    if(activeProject){
-        setActiveProject(p => p ? { ...p, startDate: newDateStr } : null);
+
+    if (activeProject) {
+        let updatedLiveData = liveData;
+        let updatedSummaryData = summaryData;
+        let updatedDailyManpower = activeProject.dailyManpowerAllocation || {};
+        let updatedDailyMachine = activeProject.dailyMachineAllocation || {};
+
+        if (diffDays !== 0) {
+            // Shift liveData keys
+            updatedLiveData = liveData.map(group => ({
+                ...group,
+                tarefas: group.tarefas.map(task => ({
+                    ...task,
+                    activities: task.activities.map(activity => ({
+                        ...activity,
+                        schedule: shiftScheduleKeys(activity.schedule || {}, diffDays),
+                        annotations: shiftScheduleKeys(activity.annotations || {}, diffDays)
+                    }))
+                }))
+            }));
+
+            // Shift summaryData keys
+            if (summaryData) {
+                updatedSummaryData = summaryData.map(group => ({
+                    ...group,
+                    tarefas: group.tarefas.map(task => ({
+                        ...task,
+                        activities: task.activities.map(activity => ({
+                            ...activity,
+                            schedule: shiftScheduleKeys(activity.schedule || {}, diffDays),
+                            annotations: shiftScheduleKeys(activity.annotations || {}, diffDays)
+                        }))
+                    }))
+                }));
+            }
+
+            // Shift daily manpower allocations
+            const newDailyManpower: Record<string, any> = {};
+            Object.entries(updatedDailyManpower).forEach(([dateStr, val]) => {
+                const d = new Date(dateStr + 'T00:00:00Z');
+                if (!isNaN(d.getTime())) {
+                    d.setUTCDate(d.getUTCDate() + diffDays);
+                    newDailyManpower[d.toISOString().split('T')[0]] = val;
+                } else {
+                    newDailyManpower[dateStr] = val;
+                }
+            });
+            updatedDailyManpower = newDailyManpower;
+
+            // Shift daily machine allocations
+            const newDailyMachine: Record<string, any> = {};
+            Object.entries(updatedDailyMachine).forEach(([dateStr, val]) => {
+                const d = new Date(dateStr + 'T00:00:00Z');
+                if (!isNaN(d.getTime())) {
+                    d.setUTCDate(d.getUTCDate() + diffDays);
+                    newDailyMachine[d.toISOString().split('T')[0]] = val;
+                } else {
+                    newDailyMachine[dateStr] = val;
+                }
+            });
+            updatedDailyMachine = newDailyMachine;
+
+            dispatch({ type: 'LOAD_DATA', payload: updatedLiveData });
+            dispatchSummary({ type: 'LOAD_DATA', payload: updatedSummaryData || updatedLiveData });
+
+            addToast(`Datas reprogramadas e deslocadas em ${diffDays} dias!`, 'info');
+        }
+
+        setActiveProject(p => p ? {
+            ...p,
+            startDate: newDateStr,
+            liveData: updatedLiveData,
+            summaryData: updatedSummaryData,
+            dailyManpowerAllocation: updatedDailyManpower,
+            dailyMachineAllocation: updatedDailyMachine,
+            lastModified: Date.now()
+        } : null);
     }
-  }, [activeProject, addToast]);
+  }, [activeProject, liveData, summaryData, addToast]);
 
   const handleExportExcel = () => {
     if (!activeProject) return;

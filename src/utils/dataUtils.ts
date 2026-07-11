@@ -240,6 +240,21 @@ export const flattenData = (data: ScheduleData): RenderableRow[] => {
     return rows;
 };
 
+export function shiftScheduleKeys(schedule: Record<string, any>, days: number): Record<string, any> {
+    const newSchedule: Record<string, any> = {};
+    Object.entries(schedule || {}).forEach(([dateStr, val]) => {
+        const d = new Date(dateStr + 'T00:00:00Z');
+        if (!isNaN(d.getTime())) {
+            d.setUTCDate(d.getUTCDate() + days);
+            const newDateStr = d.toISOString().split('T')[0];
+            newSchedule[newDateStr] = val;
+        } else {
+            newSchedule[dateStr] = val;
+        }
+    });
+    return newSchedule;
+}
+
 export function migrateProject(p: any): Project {
     if (!p) return p;
 
@@ -256,8 +271,78 @@ export function migrateProject(p: any): Project {
 
     // 2. Normalize default startDate from 2025-07-14 to 2026-04-13
     let startDate = p.startDate || '2026-04-13';
+    let needsShift = false;
+    let daysToShift = 0;
     if (startDate === '2025-07-14') {
         startDate = '2026-04-13';
+        needsShift = true;
+        daysToShift = 273; // April 13, 2026 is July 14, 2025 + 273 days
+    }
+
+    if (needsShift && daysToShift !== 0) {
+        liveData = (liveData || []).map((g: any) => ({
+            ...g,
+            tarefas: (g.tarefas || []).map((t: any) => ({
+                ...t,
+                activities: (t.activities || []).map((a: any) => ({
+                    ...a,
+                    schedule: shiftScheduleKeys(a.schedule || {}, daysToShift),
+                    annotations: shiftScheduleKeys(a.annotations || {}, daysToShift)
+                }))
+            }))
+        }));
+
+        if (savedPlan) {
+            savedPlan = (savedPlan || []).map((g: any) => ({
+                ...g,
+                tarefas: (g.tarefas || []).map((t: any) => ({
+                    ...t,
+                    activities: (t.activities || []).map((a: any) => ({
+                        ...a,
+                        schedule: shiftScheduleKeys(a.schedule || {}, daysToShift),
+                        annotations: shiftScheduleKeys(a.annotations || {}, daysToShift)
+                    }))
+                }))
+            }));
+        }
+
+        if (summaryData) {
+            summaryData = (summaryData || []).map((g: any) => ({
+                ...g,
+                tarefas: (g.tarefas || []).map((t: any) => ({
+                    ...t,
+                    activities: (t.activities || []).map((a: any) => ({
+                        ...a,
+                        schedule: shiftScheduleKeys(a.schedule || {}, daysToShift),
+                        annotations: shiftScheduleKeys(a.annotations || {}, daysToShift)
+                    }))
+                }))
+            }));
+        }
+
+        const newDailyManpower: Record<string, any> = {};
+        Object.entries(dailyManpowerAllocation || {}).forEach(([dateStr, val]) => {
+            const d = new Date(dateStr + 'T00:00:00Z');
+            if (!isNaN(d.getTime())) {
+                d.setUTCDate(d.getUTCDate() + daysToShift);
+                newDailyManpower[d.toISOString().split('T')[0]] = val;
+            } else {
+                newDailyManpower[dateStr] = val;
+            }
+        });
+        dailyManpowerAllocation = newDailyManpower;
+
+        const newDailyMachine: Record<string, any> = {};
+        Object.entries(dailyMachineAllocation || {}).forEach(([dateStr, val]) => {
+            const d = new Date(dateStr + 'T00:00:00Z');
+            if (!isNaN(d.getTime())) {
+                d.setUTCDate(d.getUTCDate() + daysToShift);
+                newDailyMachine[d.toISOString().split('T')[0]] = val;
+            } else {
+                newDailyMachine[dateStr] = val;
+            }
+        });
+        dailyMachineAllocation = newDailyMachine;
     }
 
     // 3. Normalize dynamicColumns: ensure Fase/Agrupador is present if no columns exist, and filter out obsolete COMPONENTE and SETOR columns
