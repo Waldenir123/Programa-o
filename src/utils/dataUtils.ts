@@ -1,4 +1,4 @@
-import { Status, Atividade, ScheduleData, RenderableRow } from '../state/types';
+import { Status, Atividade, ScheduleData, RenderableRow, Project, PREDEFINED_MANPOWER_ROLES } from '../state/types';
 
 // --- UTILITY FUNCTIONS ---
 export const generateId = () => `id_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
@@ -239,3 +239,103 @@ export const flattenData = (data: ScheduleData): RenderableRow[] => {
     });
     return rows;
 };
+
+export function migrateProject(p: any): Project {
+    if (!p) return p;
+
+    // 1. Parse string fields if they are stringified
+    let liveData = typeof p.liveData === 'string' ? safeJsonParse(p.liveData, []) : (p.liveData || []);
+    let dynamicColumns = typeof p.dynamicColumns === 'string' ? safeJsonParse(p.dynamicColumns, []) : (p.dynamicColumns || []);
+    let savedPlan = typeof p.savedPlan === 'string' ? safeJsonParse(p.savedPlan, null) : (p.savedPlan || null);
+    let summaryData = typeof p.summaryData === 'string' ? safeJsonParse(p.summaryData, null) : (p.summaryData || null);
+    let manpowerAllocation = typeof p.manpowerAllocation === 'string' ? safeJsonParse(p.manpowerAllocation, null) : (p.manpowerAllocation || null);
+    let dailyManpowerAllocation = typeof p.dailyManpowerAllocation === 'string' ? safeJsonParse(p.dailyManpowerAllocation, {}) : (p.dailyManpowerAllocation || {});
+    let machines = typeof p.machines === 'string' ? safeJsonParse(p.machines, []) : (p.machines || []);
+    let dailyMachineAllocation = typeof p.dailyMachineAllocation === 'string' ? safeJsonParse(p.dailyMachineAllocation, {}) : (p.dailyMachineAllocation || {});
+    let displaySettings = typeof p.displaySettings === 'string' ? safeJsonParse(p.displaySettings, undefined) : p.displaySettings;
+
+    // 2. Normalize default startDate from 2025-07-14 to 2026-04-13
+    let startDate = p.startDate || '2026-04-13';
+    if (startDate === '2025-07-14') {
+        startDate = '2026-04-13';
+    }
+
+    // 3. Normalize dynamicColumns: ensure Fase/Agrupador is present if no columns exist, and filter out obsolete COMPONENTE and SETOR columns
+    if (!dynamicColumns || dynamicColumns.length === 0) {
+        dynamicColumns = [
+            { id: 'fa', name: 'Fase/Agrupador', width: 120 }
+        ];
+    } else {
+        dynamicColumns = dynamicColumns.filter((c: any) => 
+            c && c.name &&
+            !c.name.toUpperCase().includes('COMPONENTE') && 
+            !c.name.toUpperCase().includes('SETOR')
+        );
+    }
+
+    // 4. Migrate Grupo structure customValues
+    liveData = (liveData || []).map((g: any) => {
+        if (!g.customValues) {
+            const customValues: Record<string, string> = {};
+            if (g.fa) customValues['fa'] = g.fa;
+            return { ...g, customValues, fa: undefined };
+        }
+        return g;
+    });
+
+    if (savedPlan) {
+        savedPlan = (savedPlan || []).map((g: any) => {
+            if (!g.customValues) {
+                const customValues: Record<string, string> = {};
+                if (g.fa) customValues['fa'] = g.fa;
+                return { ...g, customValues, fa: undefined };
+            }
+            return g;
+        });
+    }
+
+    // 5. Migrate manpowerAllocation schema
+    if (!manpowerAllocation) {
+        manpowerAllocation = {
+            roles: [...PREDEFINED_MANPOWER_ROLES],
+            hasSecondShift: false,
+            data: {
+                adm: {},
+                shift2: {}
+            }
+        };
+    } else {
+        // Ensure roles exists
+        if (!manpowerAllocation.roles) {
+            manpowerAllocation.roles = [...PREDEFINED_MANPOWER_ROLES];
+        }
+        // Ensure hasSecondShift and data with adm and shift2 exists
+        if (!manpowerAllocation.data || !(manpowerAllocation.data as any).adm) {
+            const oldData = manpowerAllocation.data || {};
+            manpowerAllocation.data = {
+                adm: oldData,
+                shift2: {}
+            };
+            manpowerAllocation.hasSecondShift = manpowerAllocation.hasSecondShift ?? false;
+        }
+    }
+
+    // 6. Ensure summaryData falls back to liveData if missing
+    if (!summaryData || summaryData.length === 0) {
+        summaryData = liveData;
+    }
+
+    return {
+        ...p,
+        startDate,
+        liveData,
+        dynamicColumns,
+        savedPlan,
+        summaryData,
+        manpowerAllocation,
+        dailyManpowerAllocation,
+        machines,
+        dailyMachineAllocation,
+        displaySettings
+    } as Project;
+}

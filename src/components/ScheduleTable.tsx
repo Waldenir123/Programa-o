@@ -177,7 +177,7 @@ const SectorCell: React.FC<SectorCellProps> = ({
     const style = getSectorStyle(currentSector);
 
     const handleSelectOption = (val: string) => {
-        onTextUpdate(activity.id, 'sector', val);
+        onTextUpdate(activity.id, 'sector', val.trim().toUpperCase());
         setIsOpen(false);
     };
 

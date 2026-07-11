@@ -56,7 +56,7 @@ import {
 import { useScheduleInteraction } from './hooks/useScheduleInteraction';
 
 // Utils
-import { formatDate, getWeek, generateId, deepClone, flattenData, safeJsonParse } from './utils/dataUtils';
+import { formatDate, getWeek, generateId, deepClone, flattenData, safeJsonParse, migrateProject } from './utils/dataUtils';
 import { parseTabularData, parseTxtToRows } from './utils/parsers';
 import { exportToExcelAgent, exportToPdfAgent } from './utils/exportAgents';
 import { APP_VERSION } from './version';
@@ -514,14 +514,17 @@ export const App = () => {
        const localProjectsRaw = localStorage.getItem('pcp-local-projects');
        if (localProjectsRaw) {
            try {
-               localProjects = JSON.parse(localProjectsRaw);
+               const parsed = JSON.parse(localProjectsRaw);
+               Object.keys(parsed).forEach(id => {
+                   localProjects[id] = migrateProject(parsed[id]);
+               });
            } catch (e) {
                console.error("Local projects parse error:", e);
            }
        }
        
        if (Object.keys(localProjects).length === 0) {
-           const demo = createDemoProject('guest-user');
+           const demo = migrateProject(createDemoProject('guest-user'));
            localProjects[demo.id] = demo;
            localStorage.setItem('pcp-local-projects', JSON.stringify(localProjects));
        }
@@ -529,7 +532,7 @@ export const App = () => {
        setProjects(localProjects);
        
        const lastActiveId = localStorage.getItem(`pcp-lastActive-guest-user`);
-       const projectToLoad = localProjects[lastActiveId!] || Object.values(localProjects)[0];
+       const projectToLoad = migrateProject(localProjects[lastActiveId!] || Object.values(localProjects)[0]);
        if (projectToLoad) {
            setLastSavedTime(projectToLoad.lastModified);
            setActiveProject(projectToLoad);
@@ -553,40 +556,7 @@ export const App = () => {
                setDoc(doc(db, 'projects', docSnap.id), { startDate: '2026-04-13' }, { merge: true }).catch(err => console.error(err));
            }
 
-            // Data Migration for Dynamic Columns
-            let liveData = safeJsonParse(data.liveData, []);
-            let dynamicColumns = safeJsonParse(data.dynamicColumns, [
-                { id: 'fa', name: 'Fase/Agrupador', width: 120 }
-            ]);
-            
-            // Remove obsolete columns if they exist
-            dynamicColumns = dynamicColumns.filter((c: any) => 
-                !c.name.toUpperCase().includes('COMPONENTE') && 
-                !c.name.toUpperCase().includes('SETOR')
-            );
-
-            // Migrate Grupo structure if needed
-            liveData = (liveData || []).map((g: any) => {
-                if (!g.customValues) {
-                    const customValues: Record<string, string> = {};
-                    if (g.fa) customValues['fa'] = g.fa;
-                    return { ...g, customValues, fa: undefined };
-                }
-                return g;
-            });
-
-           newProjects[docSnap.id] = {
-               ...data,
-               liveData: liveData,
-               dynamicColumns: dynamicColumns,
-               savedPlan: safeJsonParse(data.savedPlan, null),
-               summaryData: safeJsonParse(data.summaryData, null),
-               manpowerAllocation: safeJsonParse(data.manpowerAllocation, { roles: PREDEFINED_MANPOWER_ROLES, hasSecondShift: false, data: { adm: {}, shift2: {} } }),
-               dailyManpowerAllocation: safeJsonParse(data.dailyManpowerAllocation, {}),
-               machines: safeJsonParse(data.machines, []),
-               dailyMachineAllocation: safeJsonParse(data.dailyMachineAllocation, {}),
-               displaySettings: safeJsonParse(data.displaySettings, undefined)
-           } as Project;
+           newProjects[docSnap.id] = migrateProject({ id: docSnap.id, ...data });
         });
         setProjects((prev) => {
            if (Object.keys(prev).length === 0 && Object.keys(newProjects).length > 0) needsInitialLoad = true;
@@ -728,20 +698,9 @@ export const App = () => {
 
   const handleLoadProject = useCallback((projectId: string) => {
     if (!currentUser) return;
-    const projectToLoad = projects[projectId];
-    if (projectToLoad) {
-        if (projectToLoad.manpowerAllocation && !(projectToLoad.manpowerAllocation.data as any)?.adm) {
-            const oldData = projectToLoad.manpowerAllocation.data as unknown as any;
-            projectToLoad.manpowerAllocation.data = {
-                adm: oldData || {},
-                shift2: {}
-            };
-            projectToLoad.manpowerAllocation.hasSecondShift = false;
-        }
-
-        if (!projectToLoad.dailyManpowerAllocation) {
-            projectToLoad.dailyManpowerAllocation = {};
-        }
+    const rawProject = projects[projectId];
+    if (rawProject) {
+        const projectToLoad = migrateProject(rawProject);
         setLastSavedTime(projectToLoad.lastModified);
         setActiveProject(projectToLoad);
         if (projectToLoad.startDate) {
