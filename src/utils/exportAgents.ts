@@ -114,14 +114,18 @@ export const exportToExcelAgent = async (
         const colIndex = baseCols + 1 + i;
         if (h.week !== currentWeek) {
             if (currentWeek) {
-                worksheet.mergeCells(3, weekColStart, 3, colIndex - 1);
+                if (weekColStart < colIndex - 1) {
+                    worksheet.mergeCells(3, weekColStart, 3, colIndex - 1);
+                }
             }
             currentWeek = h.week;
             weekColStart = colIndex;
         }
     });
     if (currentWeek) {
-        worksheet.mergeCells(3, weekColStart, 3, baseCols + dateHeaders.length);
+        if (weekColStart < baseCols + dateHeaders.length) {
+            worksheet.mergeCells(3, weekColStart, 3, baseCols + dateHeaders.length);
+        }
     }
 
     // Merge Fixed Columns Vertically
@@ -231,12 +235,18 @@ export const exportToExcelAgent = async (
         [rowPctC]: '% Cancelado (C)'
     };
 
-    Object.entries(rowLabels).forEach(([rowNumStr, label]) => {
-        const rowNum = parseInt(rowNumStr);
+    // Sort labels explicitly by row number to guarantee correct order of row appending
+    const sortedLabels = Object.entries(rowLabels)
+        .map(([rowNumStr, label]) => ({ rowNum: parseInt(rowNumStr), label }))
+        .sort((a, b) => a.rowNum - b.rowNum);
+
+    sortedLabels.forEach(({ rowNum, label }) => {
         const rData = Array(baseCols + dates.length).fill('');
         rData[0] = label;
         worksheet.addRow(rData);
-        worksheet.mergeCells(rowNum, 1, rowNum, baseCols);
+        if (baseCols > 1) {
+            worksheet.mergeCells(rowNum, 1, rowNum, baseCols);
+        }
     });
 
     const getColLetter = (col: number): string => {
@@ -249,15 +259,37 @@ export const exportToExcelAgent = async (
         return letter;
     };
 
+    // Pre-calculate daily counts on the JS side to populate cached results for Excel formulas
+    const dailyCounts = dates.map(date => {
+        const dateStr = formatDate(date);
+        let x = 0;
+        let ok = 0;
+        let n = 0;
+        let c = 0;
+        filteredData.forEach(group => {
+            group.tarefas.forEach(task => {
+                task.activities.forEach(activity => {
+                    const status = activity.schedule[dateStr];
+                    if (status === Status.Programado) x++;
+                    else if (status === Status.Realizado) ok++;
+                    else if (status === Status.NaoRealizado) n++;
+                    else if (status === Status.Cancelado) c++;
+                });
+            });
+        });
+        return { x, ok, n, c };
+    });
+
     // Populate formulas for each schedule column (from baseCols + 1 to baseCols + dates.length)
     for (let col = baseCols + 1; col <= baseCols + dates.length; col++) {
         const colLetter = getColLetter(col);
+        const counts = dailyCounts[col - baseCols - 1];
         
-        // Count formulas
-        worksheet.getCell(rowX, col).value = { formula: `COUNTIF(${colLetter}$6:${colLetter}$${lastDataRow}, "X")` };
-        worksheet.getCell(rowOk, col).value = { formula: `COUNTIF(${colLetter}$6:${colLetter}$${lastDataRow}, "Ok")` };
-        worksheet.getCell(rowN, col).value = { formula: `COUNTIF(${colLetter}$6:${colLetter}$${lastDataRow}, "N")` };
-        worksheet.getCell(rowC, col).value = { formula: `COUNTIF(${colLetter}$6:${colLetter}$${lastDataRow}, "C")` };
+        // Count formulas with accurate pre-calculated results
+        worksheet.getCell(rowX, col).value = { formula: `COUNTIF(${colLetter}$6:${colLetter}$${lastDataRow}, "X")`, result: counts.x };
+        worksheet.getCell(rowOk, col).value = { formula: `COUNTIF(${colLetter}$6:${colLetter}$${lastDataRow}, "Ok")`, result: counts.ok };
+        worksheet.getCell(rowN, col).value = { formula: `COUNTIF(${colLetter}$6:${colLetter}$${lastDataRow}, "N")`, result: counts.n };
+        worksheet.getCell(rowC, col).value = { formula: `COUNTIF(${colLetter}$6:${colLetter}$${lastDataRow}, "C")`, result: counts.c };
     }
 
     if (dates.length > 0) {
@@ -287,22 +319,47 @@ export const exportToExcelAgent = async (
         weekSegments.forEach(segment => {
             const startColLetter = getColLetter(segment.startCol);
             const endColLetter = getColLetter(segment.endCol);
+            const shouldMerge = segment.startCol < segment.endCol;
 
-            // Merge total and percentage rows across this week's dates/schedule columns
-            worksheet.mergeCells(rowTotal, segment.startCol, rowTotal, segment.endCol);
-            worksheet.getCell(rowTotal, segment.startCol).value = { formula: `SUM(${startColLetter}${rowX}:${endColLetter}${rowC})` };
+            // Calculate segment-wide totals for the week segment
+            let segmentX = 0;
+            let segmentOk = 0;
+            let segmentN = 0;
+            let segmentC = 0;
+            for (let c = segment.startCol; c <= segment.endCol; c++) {
+                const counts = dailyCounts[c - baseCols - 1];
+                segmentX += counts.x;
+                segmentOk += counts.ok;
+                segmentN += counts.n;
+                segmentC += counts.c;
+            }
+            const segmentTotal = segmentX + segmentOk + segmentN + segmentC;
 
-            worksheet.mergeCells(rowPctX, segment.startCol, rowPctX, segment.endCol);
-            worksheet.getCell(rowPctX, segment.startCol).value = { formula: `IFERROR(SUM(${startColLetter}${rowX}:${endColLetter}${rowX})/${startColLetter}${rowTotal}, 0)` };
+            // Merge total and percentage rows across this week's dates/schedule columns if week has multiple days
+            if (shouldMerge) {
+                worksheet.mergeCells(rowTotal, segment.startCol, rowTotal, segment.endCol);
+            }
+            worksheet.getCell(rowTotal, segment.startCol).value = { formula: `SUM(${startColLetter}${rowX}:${endColLetter}${rowC})`, result: segmentTotal };
 
-            worksheet.mergeCells(rowPctOk, segment.startCol, rowPctOk, segment.endCol);
-            worksheet.getCell(rowPctOk, segment.startCol).value = { formula: `IFERROR(SUM(${startColLetter}${rowOk}:${endColLetter}${rowOk})/${startColLetter}${rowTotal}, 0)` };
+            if (shouldMerge) {
+                worksheet.mergeCells(rowPctX, segment.startCol, rowPctX, segment.endCol);
+            }
+            worksheet.getCell(rowPctX, segment.startCol).value = { formula: `IFERROR(SUM(${startColLetter}${rowX}:${endColLetter}${rowX})/${startColLetter}${rowTotal}, 0)`, result: segmentTotal > 0 ? segmentX / segmentTotal : 0 };
 
-            worksheet.mergeCells(rowPctN, segment.startCol, rowPctN, segment.endCol);
-            worksheet.getCell(rowPctN, segment.startCol).value = { formula: `IFERROR(SUM(${startColLetter}${rowN}:${endColLetter}${rowN})/${startColLetter}${rowTotal}, 0)` };
+            if (shouldMerge) {
+                worksheet.mergeCells(rowPctOk, segment.startCol, rowPctOk, segment.endCol);
+            }
+            worksheet.getCell(rowPctOk, segment.startCol).value = { formula: `IFERROR(SUM(${startColLetter}${rowOk}:${endColLetter}${rowOk})/${startColLetter}${rowTotal}, 0)`, result: segmentTotal > 0 ? segmentOk / segmentTotal : 0 };
 
-            worksheet.mergeCells(rowPctC, segment.startCol, rowPctC, segment.endCol);
-            worksheet.getCell(rowPctC, segment.startCol).value = { formula: `IFERROR(SUM(${startColLetter}${rowC}:${endColLetter}${rowC})/${startColLetter}${rowTotal}, 0)` };
+            if (shouldMerge) {
+                worksheet.mergeCells(rowPctN, segment.startCol, rowPctN, segment.endCol);
+            }
+            worksheet.getCell(rowPctN, segment.startCol).value = { formula: `IFERROR(SUM(${startColLetter}${rowN}:${endColLetter}${rowN})/${startColLetter}${rowTotal}, 0)`, result: segmentTotal > 0 ? segmentN / segmentTotal : 0 };
+
+            if (shouldMerge) {
+                worksheet.mergeCells(rowPctC, segment.startCol, rowPctC, segment.endCol);
+            }
+            worksheet.getCell(rowPctC, segment.startCol).value = { formula: `IFERROR(SUM(${startColLetter}${rowC}:${endColLetter}${rowC})/${startColLetter}${rowTotal}, 0)`, result: segmentTotal > 0 ? segmentC / segmentTotal : 0 };
         });
     }
 

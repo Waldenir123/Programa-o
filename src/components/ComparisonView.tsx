@@ -81,6 +81,20 @@ export const ComparisonView: React.FC<{
             </div>
             <div className="table-wrapper">
                  <table className="schedule-table" style={{ width: columnWidths.reduce((a, b) => a + b, 0) }}>
+                    <colgroup>
+                        {columnWidths.map((width, idx) => {
+                          const isVisible = width > 0;
+                          return (
+                            <col 
+                              key={idx} 
+                              style={{ 
+                                width: isVisible ? `${width}px` : '0px',
+                                display: isVisible ? 'table-column' : 'none'
+                              }} 
+                            />
+                          );
+                        })}
+                    </colgroup>
                     <thead>
                         <tr>
                             {headerNames.map((header, index) => {

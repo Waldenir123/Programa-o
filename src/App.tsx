@@ -2470,6 +2470,20 @@ export const App = () => {
                       </div>
                       <div className="table-wrapper">
                         <table className="schedule-table" style={{ width: scheduleTableColumnWidths.reduce((a, b) => a + b, 0) }}>
+                          <colgroup>
+                            {scheduleTableColumnWidths.map((width, idx) => {
+                              const isVisible = width > 0;
+                              return (
+                                <col 
+                                  key={idx} 
+                                  style={{ 
+                                    width: isVisible ? `${width}px` : '0px',
+                                    display: isVisible ? 'table-column' : 'none'
+                                  }} 
+                                />
+                              );
+                            })}
+                          </colgroup>
                           <ScheduleHeader 
                               printNumWeeks={printNumWeeks}
                               dates={dates} 

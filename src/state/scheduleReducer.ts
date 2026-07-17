@@ -536,6 +536,8 @@ export const scheduleReducer = (state: ScheduleState, action: ScheduleAction): S
                                 info.isShifted = true;
                                 const lag = getWorkingDaysDiff(predInfo.origEnd!, info.origStart!);
                                 info.newStart = addWorkingDays(predInfo.newEnd!, lag);
+                            } else if (info.isShifted) {
+                                info.newStart = addWorkingDays(info.origStart!, delay);
                             } else {
                                 info.isShifted = false;
                                 info.newStart = info.origStart;
