@@ -63,7 +63,7 @@ export const exportToExcelAgent = async (
     const weekRange = firstWeek === lastWeek ? `${firstWeek}` : `${firstWeek}@${lastWeek}`;
 
     const titleRow = Array(baseCols + dates.length).fill('');
-    titleRow[0] = `PROGRAMAÇÃO SEMANAL -${weekRange}\n${title.toUpperCase()}`;
+    titleRow[0] = `PROGRAMAÇÃO SEMANAL - ${weekRange}\n${title.toUpperCase()}`.toUpperCase();
     worksheet.addRow(titleRow);
     worksheet.addRow(Array(baseCols + dates.length).fill(''));
     // Merge cell for the title spanning all columns
@@ -71,10 +71,10 @@ export const exportToExcelAgent = async (
 
     const weekHeadersRow: string[] = Array(baseCols).fill('');
     if (baseCols > 1) {
-        weekHeadersRow[0] = `Elaborado por: ${activeProject.programmerName || ''}`;
-        weekHeadersRow[baseCols - 1] = `Atualizado em: ${new Date(activeProject.lastModified).toLocaleDateString('pt-BR')}`;
+        weekHeadersRow[0] = `ELABORADO POR: ${(activeProject.programmerName || '').toUpperCase()}`;
+        weekHeadersRow[baseCols - 1] = `ATUALIZADO EM: ${new Date(activeProject.lastModified).toLocaleDateString('pt-BR')}`;
     } else if (baseCols === 1) {
-        weekHeadersRow[0] = `Elaborado por: ${activeProject.programmerName || ''} | Atualizado em: ${new Date(activeProject.lastModified).toLocaleDateString('pt-BR')}`;
+        weekHeadersRow[0] = `ELABORADO POR: ${(activeProject.programmerName || '').toUpperCase()} | ATUALIZADO EM: ${new Date(activeProject.lastModified).toLocaleDateString('pt-BR')}`;
     }
 
     const dayNameHeadersRow: string[] = [];
@@ -86,8 +86,8 @@ export const exportToExcelAgent = async (
     const dayNumHeadersRow: string[] = Array(baseCols).fill('');
 
     const dateHeaders = dates.map(d => ({
-        week: `Semana ${getWeek(d)}`,
-        dayName: getDayAbbr(d),
+        week: `SEMANA ${getWeek(d)}`,
+        dayName: getDayAbbr(d).toUpperCase(),
         dayNum: d.getUTCDate(),
         isWeekend: getDayAbbr(d) === 'SÁB' || getDayAbbr(d) === 'DOM'
     }));
@@ -155,17 +155,17 @@ export const exportToExcelAgent = async (
                 }
                 
                 visibleDynamicColsMapping.forEach(col => {
-                    rowData.push(stripHtmlTags(group.customValues?.[col.id]));
+                    rowData.push(stripHtmlTags(group.customValues?.[col.id]).toUpperCase());
                 });
                 
                 if (showTask) {
                     const cleanTitle = stripHtmlTags(task.title);
                     const cleanFa = stripHtmlTags(task.fa || '');
                     const taskText = cleanFa && cleanFa !== 'Nº FA' ? `${cleanTitle}\n${cleanFa}` : cleanTitle;
-                    rowData.push(taskText);
+                    rowData.push(taskText.toUpperCase());
                 }
-                if (showActivity) rowData.push(stripHtmlTags(activity.name));
-                if (showSector) rowData.push(stripHtmlTags(activity.sector || ''));
+                if (showActivity) rowData.push(stripHtmlTags(activity.name).toUpperCase());
+                if (showSector) rowData.push(stripHtmlTags(activity.sector || '').toUpperCase());
                 
                 dates.forEach(date => {
                     const status = activity.schedule[formatDate(date)];
@@ -224,15 +224,15 @@ export const exportToExcelAgent = async (
     worksheet.mergeCells(summaryStartRow, 1, summaryStartRow, baseCols);
 
     const rowLabels = {
-        [rowX]: 'Total Programado (X)',
-        [rowOk]: 'Total Realizado (Ok)',
-        [rowN]: 'Total Não Realizado (N)',
-        [rowC]: 'Total Cancelado (C)',
-        [rowTotal]: 'Total de Atividades',
-        [rowPctX]: '% Programado (X)',
-        [rowPctOk]: '% Realizado (Ok)',
-        [rowPctN]: '% Não Realizado (N)',
-        [rowPctC]: '% Cancelado (C)'
+        [rowX]: 'TOTAL PROGRAMADO (X)',
+        [rowOk]: 'TOTAL REALIZADO (OK)',
+        [rowN]: 'TOTAL NÃO REALIZADO (N)',
+        [rowC]: 'TOTAL CANCELADO (C)',
+        [rowTotal]: 'TOTAL DE ATIVIDADES',
+        [rowPctX]: '% PROGRAMADO (X)',
+        [rowPctOk]: '% REALIZADO (OK)',
+        [rowPctN]: '% NÃO REALIZADO (N)',
+        [rowPctC]: '% CANCELADO (C)'
     };
 
     // Sort labels explicitly by row number to guarantee correct order of row appending
@@ -627,7 +627,7 @@ export const exportToExcelAgent = async (
     }
 
     const buffer = await workbook.xlsx.writeBuffer();
-    saveAs(new Blob([buffer]), `${title.replace(/ /g, '_')}.xlsx`);
+    saveAs(new Blob([buffer]), `${title.replace(/ /g, '_').toUpperCase()}.xlsx`);
 };
 
 export const exportToPdfAgent = (
