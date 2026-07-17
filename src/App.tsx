@@ -2177,11 +2177,8 @@ export const App = () => {
 
         const affectedItems: { activityId: string, taskId: string, dateStr: string }[] = [];
 
-        const allActivityIds = Array.from(activityIdToRowIndex.keys());
         for (let r = minRow; r <= maxRow; r++) {
-            const activityId = allActivityIds[r];
-            if (!activityId) continue;
-            const rowInfo = renderableRows.find(row => row.activity?.id === activityId);
+            const rowInfo = renderableRows[r];
             if (rowInfo && rowInfo.activity) {
                 for (let c = minCol; c <= maxCol; c++) {
                     const dateStr = datesStr[c];
