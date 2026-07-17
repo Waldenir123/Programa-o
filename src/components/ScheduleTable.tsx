@@ -477,7 +477,7 @@ const ScheduleRow = memo((props: ScheduleRowProps) => {
                 </div>
             </td>
             
-            {dynamicColumnsBefore.map((col, idx) => {
+            {renderGroup && dynamicColumnsBefore.map((col, idx) => {
                 const absIdx = idx + 1;
                 const isVisible = visibleColumns ? visibleColumns[col.name] !== false : true;
                 const value = group.customValues?.[col.id] || '';
@@ -486,6 +486,7 @@ const ScheduleRow = memo((props: ScheduleRowProps) => {
                     <td 
                         key={col.id} 
                         className={`col-sticky col-sticky-${absIdx + 1}`} 
+                        rowSpan={groupRowSpan}
                         style={{ width: columnWidths[absIdx], left: stickyColumnPositions[absIdx], display: isVisible ? 'table-cell' : 'none' }} 
                         onClick={(e) => onRowClick(e, { id: group.id, name: value, type: 'group', wbsId: wbsId.split('.')[0] })}
                     >
@@ -548,7 +549,7 @@ const ScheduleRow = memo((props: ScheduleRowProps) => {
                 </td>
             )}
 
-            {dynamicColumnsAfter.map((col, idx) => {
+            {renderGroup && dynamicColumnsAfter.map((col, idx) => {
                 const absIdx = dynamicColumnsBefore.length + 2 + idx;
                 const isVisible = visibleColumns ? visibleColumns[col.name] !== false : true;
                 const value = group.customValues?.[col.id] || '';
@@ -557,6 +558,7 @@ const ScheduleRow = memo((props: ScheduleRowProps) => {
                     <td 
                         key={col.id} 
                         className={`col-sticky col-sticky-${absIdx + 1}`} 
+                        rowSpan={groupRowSpan}
                         style={{ width: columnWidths[absIdx], left: stickyColumnPositions[absIdx], display: isVisible ? 'table-cell' : 'none' }} 
                         onClick={(e) => onRowClick(e, { id: group.id, name: value, type: 'group', wbsId: wbsId.split('.')[0] })}
                     >

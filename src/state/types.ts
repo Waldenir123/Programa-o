@@ -102,6 +102,8 @@ export interface Project {
   displaySettings?: {
     visibleColumns?: Record<string, boolean>;
     activeFilters?: Record<string, string>;
+    fixedColumnWidths?: number[];
+    comparisonFixedColumnWidths?: number[];
   };
 }
 export type UserProjects = Record<string, Project>;

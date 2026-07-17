@@ -201,6 +201,45 @@ const createDemoProject = (userId: string): Project => {
   };
 };
 
+const getProjectFixedColumnWidths = (project: Project): number[] => {
+    const dynamicCols = project?.dynamicColumns || [];
+    const beforeCols = dynamicCols.filter(c => c.position !== 'after');
+    const afterCols = dynamicCols.filter(c => c.position === 'after');
+    const expectedLength = dynamicCols.length + 4; // ID (1) + beforeCols + TAREFA PRINCIPAL (1) + afterCols + ATIVIDADE (1) + SETOR (1)
+    
+    if (project?.displaySettings?.fixedColumnWidths && project.displaySettings.fixedColumnWidths.length === expectedLength) {
+        return project.displaySettings.fixedColumnWidths;
+    }
+    
+    const widths = [50]; // ID
+    beforeCols.forEach(c => widths.push(c.width || 130));
+    widths.push(280); // TAREFA PRINCIPAL
+    afterCols.forEach(c => widths.push(c.width || 130));
+    widths.push(250); // ATIVIDADE
+    widths.push(110); // SETOR
+    return widths;
+};
+
+const getProjectComparisonFixedColumnWidths = (project: Project): number[] => {
+    const dynamicCols = project?.dynamicColumns || [];
+    const beforeCols = dynamicCols.filter(c => c.position !== 'after');
+    const afterCols = dynamicCols.filter(c => c.position === 'after');
+    const expectedLength = dynamicCols.length + 5; // ID (1) + beforeCols + TAREFA PRINCIPAL (1) + afterCols + ATIVIDADE (1) + SETOR (1) + PLANO (1)
+    
+    if (project?.displaySettings?.comparisonFixedColumnWidths && project.displaySettings.comparisonFixedColumnWidths.length === expectedLength) {
+        return project.displaySettings.comparisonFixedColumnWidths;
+    }
+    
+    const widths = [50]; // ID
+    beforeCols.forEach(c => widths.push(c.width || 130));
+    widths.push(280); // TAREFA PRINCIPAL
+    afterCols.forEach(c => widths.push(c.width || 130));
+    widths.push(250); // ATIVIDADE
+    widths.push(110); // SETOR
+    widths.push(80);  // PLANO
+    return widths;
+};
+
 export const App = () => {
   // --- STATE MANAGEMENT ---
   const [projects, setProjects] = useState<Record<string, Project>>({});
@@ -343,6 +382,13 @@ export const App = () => {
   // --- DERIVED STATE FROM activeProject ---
   const savedPlan = useMemo(() => activeProject?.savedPlan || null, [activeProject]);
   const title = useMemo(() => activeProject?.title || '', [activeProject]);
+
+  useEffect(() => {
+    if (activeProject) {
+      setFixedColumnWidths(getProjectFixedColumnWidths(activeProject));
+      setComparisonFixedColumnWidths(getProjectComparisonFixedColumnWidths(activeProject));
+    }
+  }, [activeProject?.id]);
   const [currentStartDate, setCurrentStartDate] = useState(() => activeProject?.startDate ? new Date(activeProject.startDate + 'T00:00:00Z') : new Date('2026-04-13T00:00:00Z'));
   const [goToWeekInput, setGoToWeekInput] = useState(() => getWeek(currentStartDate));
   const printNumWeeks = useMemo(() => {
@@ -671,8 +717,11 @@ export const App = () => {
         summaryData,
         lastModified: Date.now(),
         displaySettings: {
+            ...activeProject.displaySettings,
             visibleColumns,
-            activeFilters: serializableFilters as any
+            activeFilters: serializableFilters as any,
+            fixedColumnWidths,
+            comparisonFixedColumnWidths
         }
     };
     setActiveProject(projectToSave); 
@@ -680,7 +729,7 @@ export const App = () => {
     if (silent !== true) {
       addToast(`Projeto '${projectToSave.name}' salvo!`, 'success');
     }
-  }, [currentUser, activeProject, liveData, summaryData, addToast, visibleColumns, activeFilters]);
+  }, [currentUser, activeProject, liveData, summaryData, addToast, visibleColumns, activeFilters, fixedColumnWidths, comparisonFixedColumnWidths]);
 
   const handleSaveAndExit = useCallback(async () => {
     if (!activeProject) return;
@@ -1983,7 +2032,18 @@ export const App = () => {
 
     const handleResizeEnd = useCallback(() => {
         setResizingInfo({ isResizing: false, columnIndex: null, startX: 0, startWidth: 0 });
-    }, []);
+        setActiveProject(prev => {
+            if (!prev) return null;
+            return {
+                ...prev,
+                displaySettings: {
+                    ...prev.displaySettings,
+                    fixedColumnWidths,
+                    comparisonFixedColumnWidths
+                }
+            };
+        });
+    }, [fixedColumnWidths, comparisonFixedColumnWidths]);
 
     useEffect(() => {
         if (resizingInfo.isResizing) {

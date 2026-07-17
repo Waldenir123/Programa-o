@@ -195,6 +195,117 @@ export const exportToExcelAgent = async (
         wbsGroup++;
     });
 
+    // 2.5 Add Summary Rows Below Schedule
+    const lastDataRow = currentRow - 1;
+    
+    // Add 2 spacing rows
+    worksheet.addRow([]);
+    worksheet.addRow([]);
+    
+    const summaryStartRow = lastDataRow + 3;
+    const rowX = summaryStartRow + 1;
+    const rowOk = summaryStartRow + 2;
+    const rowN = summaryStartRow + 3;
+    const rowC = summaryStartRow + 4;
+    const rowTotal = summaryStartRow + 5;
+    const rowPctX = summaryStartRow + 6;
+    const rowPctOk = summaryStartRow + 7;
+    const rowPctN = summaryStartRow + 8;
+    const rowPctC = summaryStartRow + 9;
+
+    // Header row
+    const headerRowData = Array(baseCols + dates.length).fill('');
+    headerRowData[0] = 'INDICADORES DE PROGRAMAÇÃO E STATUS';
+    worksheet.addRow(headerRowData);
+    worksheet.mergeCells(summaryStartRow, 1, summaryStartRow, baseCols);
+
+    const rowLabels = {
+        [rowX]: 'Total Programado (X)',
+        [rowOk]: 'Total Realizado (Ok)',
+        [rowN]: 'Total Não Realizado (N)',
+        [rowC]: 'Total Cancelado (C)',
+        [rowTotal]: 'Total de Atividades',
+        [rowPctX]: '% Programado (X)',
+        [rowPctOk]: '% Realizado (Ok)',
+        [rowPctN]: '% Não Realizado (N)',
+        [rowPctC]: '% Cancelado (C)'
+    };
+
+    Object.entries(rowLabels).forEach(([rowNumStr, label]) => {
+        const rowNum = parseInt(rowNumStr);
+        const rData = Array(baseCols + dates.length).fill('');
+        rData[0] = label;
+        worksheet.addRow(rData);
+        worksheet.mergeCells(rowNum, 1, rowNum, baseCols);
+    });
+
+    const getColLetter = (col: number): string => {
+        let letter = '';
+        while (col > 0) {
+            let temp = (col - 1) % 26;
+            letter = String.fromCharCode(65 + temp) + letter;
+            col = Math.floor((col - temp) / 26);
+        }
+        return letter;
+    };
+
+    // Populate formulas for each schedule column (from baseCols + 1 to baseCols + dates.length)
+    for (let col = baseCols + 1; col <= baseCols + dates.length; col++) {
+        const colLetter = getColLetter(col);
+        
+        // Count formulas
+        worksheet.getCell(rowX, col).value = { formula: `COUNTIF(${colLetter}$6:${colLetter}$${lastDataRow}, "X")` };
+        worksheet.getCell(rowOk, col).value = { formula: `COUNTIF(${colLetter}$6:${colLetter}$${lastDataRow}, "Ok")` };
+        worksheet.getCell(rowN, col).value = { formula: `COUNTIF(${colLetter}$6:${colLetter}$${lastDataRow}, "N")` };
+        worksheet.getCell(rowC, col).value = { formula: `COUNTIF(${colLetter}$6:${colLetter}$${lastDataRow}, "C")` };
+    }
+
+    if (dates.length > 0) {
+        interface WeekSegment {
+            week: string;
+            startCol: number;
+            endCol: number;
+        }
+        const weekSegments: WeekSegment[] = [];
+        let curWeek = '';
+        let startCol = baseCols + 1;
+
+        dateHeaders.forEach((h, i) => {
+            const colIndex = baseCols + 1 + i;
+            if (h.week !== curWeek) {
+                if (curWeek) {
+                    weekSegments.push({ week: curWeek, startCol, endCol: colIndex - 1 });
+                }
+                curWeek = h.week;
+                startCol = colIndex;
+            }
+        });
+        if (curWeek) {
+            weekSegments.push({ week: curWeek, startCol, endCol: baseCols + dateHeaders.length });
+        }
+
+        weekSegments.forEach(segment => {
+            const startColLetter = getColLetter(segment.startCol);
+            const endColLetter = getColLetter(segment.endCol);
+
+            // Merge total and percentage rows across this week's dates/schedule columns
+            worksheet.mergeCells(rowTotal, segment.startCol, rowTotal, segment.endCol);
+            worksheet.getCell(rowTotal, segment.startCol).value = { formula: `SUM(${startColLetter}${rowX}:${endColLetter}${rowC})` };
+
+            worksheet.mergeCells(rowPctX, segment.startCol, rowPctX, segment.endCol);
+            worksheet.getCell(rowPctX, segment.startCol).value = { formula: `IFERROR(SUM(${startColLetter}${rowX}:${endColLetter}${rowX})/${startColLetter}${rowTotal}, 0)` };
+
+            worksheet.mergeCells(rowPctOk, segment.startCol, rowPctOk, segment.endCol);
+            worksheet.getCell(rowPctOk, segment.startCol).value = { formula: `IFERROR(SUM(${startColLetter}${rowOk}:${endColLetter}${rowOk})/${startColLetter}${rowTotal}, 0)` };
+
+            worksheet.mergeCells(rowPctN, segment.startCol, rowPctN, segment.endCol);
+            worksheet.getCell(rowPctN, segment.startCol).value = { formula: `IFERROR(SUM(${startColLetter}${rowN}:${endColLetter}${rowN})/${startColLetter}${rowTotal}, 0)` };
+
+            worksheet.mergeCells(rowPctC, segment.startCol, rowPctC, segment.endCol);
+            worksheet.getCell(rowPctC, segment.startCol).value = { formula: `IFERROR(SUM(${startColLetter}${rowC}:${endColLetter}${rowC})/${startColLetter}${rowTotal}, 0)` };
+        });
+    }
+
     // 3. Styling
     const colWidthsMapping: any[] = [];
     if (showID) colWidthsMapping.push({ width: 8 });
@@ -212,6 +323,15 @@ export const exportToExcelAgent = async (
     };
 
     worksheet.eachRow({ includeEmpty: true }, (row, rowNumber) => {
+        // Skip styling empty spacing rows
+        if (rowNumber === lastDataRow + 1 || rowNumber === lastDataRow + 2) {
+            row.eachCell({ includeEmpty: true }, (cell) => {
+                cell.border = {};
+                cell.fill = { type: 'pattern', pattern: 'none' };
+            });
+            return;
+        }
+
         row.eachCell({ includeEmpty: true }, (cell, colNumber) => {
             cell.border = borderStyle;
             cell.font = { name: 'Arial', size: 10 };
@@ -235,6 +355,49 @@ export const exportToExcelAgent = async (
                      cell.font = { name: 'Arial', size: 9, bold: true };
                 }
                 cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
+            } else if (rowNumber >= summaryStartRow) {
+                // Summary styling
+                cell.font = { name: 'Arial', size: 9, bold: true };
+                cell.border = borderStyle;
+
+                if (rowNumber === summaryStartRow) {
+                    // Header row
+                    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF334155' } }; // Dark Slate
+                    cell.font = { name: 'Arial', size: 10, bold: true, color: { argb: 'FFFFFFFF' } }; // White text
+                    cell.alignment = { vertical: 'middle', horizontal: 'center' };
+                } else if (rowNumber === rowX) {
+                    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: colNumber > baseCols ? 'FFFEF08A' : 'FFFFFFFF' } };
+                    cell.alignment = { vertical: 'middle', horizontal: colNumber <= baseCols ? 'left' : 'center' };
+                } else if (rowNumber === rowOk) {
+                    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: colNumber > baseCols ? 'FFBBF7D0' : 'FFFFFFFF' } };
+                    cell.alignment = { vertical: 'middle', horizontal: colNumber <= baseCols ? 'left' : 'center' };
+                } else if (rowNumber === rowN) {
+                    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: colNumber > baseCols ? 'FFFECACA' : 'FFFFFFFF' } };
+                    cell.alignment = { vertical: 'middle', horizontal: colNumber <= baseCols ? 'left' : 'center' };
+                } else if (rowNumber === rowC) {
+                    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: colNumber > baseCols ? 'FFBFDBFE' : 'FFFFFFFF' } };
+                    cell.alignment = { vertical: 'middle', horizontal: colNumber <= baseCols ? 'left' : 'center' };
+                } else if (rowNumber === rowTotal) {
+                    // Total Row
+                    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE2E8F0' } }; // Medium-Light slate/gray
+                    cell.alignment = { vertical: 'middle', horizontal: colNumber <= baseCols ? 'left' : 'center' };
+                    cell.border = {
+                        top: { style: 'thin' },
+                        bottom: { style: 'double' },
+                        left: { style: 'thin' },
+                        right: { style: 'thin' }
+                    };
+                } else if (rowNumber >= rowPctX && rowNumber <= rowPctC) {
+                    // Percentage rows
+                    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF8FAFC' } }; // Very light slate
+                    cell.alignment = { vertical: 'middle', horizontal: colNumber <= baseCols ? 'left' : 'center' };
+                    if (colNumber > baseCols) {
+                        cell.numFmt = '0.0%';
+                    }
+                } else {
+                    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFFFF' } };
+                    cell.alignment = { vertical: 'middle', horizontal: colNumber <= baseCols ? 'left' : 'center' };
+                }
             } else {
                 // Body styling
                 if (colNumber <= baseCols) {
@@ -298,22 +461,12 @@ export const exportToExcelAgent = async (
     });
 
     // Add conditional formatting so styling is preserved when edited in Excel
-    if (currentRow > 6) {
-        const getColLetter = (col: number): string => {
-            let letter = '';
-            while (col > 0) {
-                let temp = (col - 1) % 26;
-                letter = String.fromCharCode(65 + temp) + letter;
-                col = Math.floor((col - temp) / 26);
-            }
-            return letter;
-        };
-
+    if (lastDataRow >= 6) {
         // Dates grid status conditional formatting
         if (dates.length > 0) {
             const startColLetter = getColLetter(baseCols + 1);
             const endColLetter = getColLetter(baseCols + dates.length);
-            const range = `${startColLetter}6:${endColLetter}${currentRow - 1}`;
+            const range = `${startColLetter}6:${endColLetter}${lastDataRow}`;
 
             worksheet.addConditionalFormatting({
                 ref: range,
@@ -362,7 +515,7 @@ export const exportToExcelAgent = async (
         if (showSector) {
             const sectorColNumber = (showID ? 1 : 0) + visibleDynamicColsMapping.length + (showTask ? 1 : 0) + (showActivity ? 1 : 0) + 1;
             const sectorColLetter = getColLetter(sectorColNumber);
-            const sectorRange = `${sectorColLetter}6:${sectorColLetter}${currentRow - 1}`;
+            const sectorRange = `${sectorColLetter}6:${sectorColLetter}${lastDataRow}`;
 
             const PREDEFINED_SECTORS = [
               'CTMSP', 'IE', 'IEI', 'IEP', 'IE-TS', 'IPC-C', 'IPC-M', 'IPC-MC', 'IPC-T', 
