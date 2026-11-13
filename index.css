@@ -1879,3 +1879,65 @@ tr.add-group-row.drop-target-end > .add-group-cell {
         page-break-inside: avoid !important;
     }
 }
+
+/* --- Machine Cards Visual States --- */
+@keyframes machine-gear-spin {
+    from {
+        transform: rotate(0deg);
+    }
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+.machine-gear-spinning {
+    transform-origin: center;
+    animation: machine-gear-spin 5s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .machine-gear-spinning {
+        animation: none !important;
+    }
+}
+
+.machine-hazard-stripe {
+    background-image: repeating-linear-gradient(
+        -45deg,
+        #f59e0b,
+        #f59e0b 8px,
+        #fef3c7 8px,
+        #fef3c7 16px
+    );
+}
+
+/* --- Daily Allocation Executive Sticky & Row Height Fixes --- */
+.daily-allocation-view .schedule-table thead tr:nth-child(1) th {
+    height: 32px;
+    top: 0;
+}
+.daily-allocation-view .schedule-table thead tr:nth-child(2) th {
+    height: 44px;
+    top: 32px;
+}
+.daily-allocation-view .schedule-table thead tr:nth-child(3) th {
+    height: 28px;
+    top: 76px;
+}
+.daily-allocation-view .schedule-table tbody tr {
+    height: 44px;
+}
+.daily-allocation-view .schedule-table tbody td {
+    height: 44px;
+    max-height: 44px;
+}
+.daily-allocation-view .col-sticky {
+    position: sticky !important;
+    background-color: #ffffff;
+}
+.daily-allocation-view .schedule-table thead th.col-sticky {
+    background-color: #f1f5f9;
+}
+.daily-allocation-view .schedule-table tbody tr:hover > td.col-sticky {
+    background-color: #eff6ff;
+}

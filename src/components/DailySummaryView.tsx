@@ -57,8 +57,37 @@ export const DailySummaryView: React.FC<DailySummaryViewProps> = ({ data, dates,
         return "Outras Atividades";
     };
 
+    const resolveGroupMeta = (customValues?: Record<string, string>) => {
+        if (customValues?.['grupo']?.trim()) {
+            const val = customValues['grupo'].trim();
+            return {
+                label: val.toLowerCase() === 'grupo sem nome' ? 'Sem Agrupador Definido' : val,
+                fieldKey: 'grupo',
+            };
+        }
+        if (customValues?.['fa']?.trim()) {
+            const val = customValues['fa'].trim();
+            return {
+                label: val.toLowerCase() === 'grupo sem nome' ? 'Sem Agrupador Definido' : val,
+                fieldKey: 'fa',
+            };
+        }
+        const firstEntry = Object.entries(customValues || {}).find(([, v]) => v && v.trim() !== '');
+        if (firstEntry) {
+            const val = firstEntry[1].trim();
+            return {
+                label: val.toLowerCase() === 'grupo sem nome' ? 'Sem Agrupador Definido' : val,
+                fieldKey: firstEntry[0],
+            };
+        }
+        return {
+            label: 'Sem Agrupador Definido',
+            fieldKey: 'fa',
+        };
+    };
+
     const dailySummary = useMemo(() => {
-        const categories: Record<string, { groupId: string; groupTitle: string; taskId: string; taskTitle: string; taskFa: string; activities: { id: string; name: string; status: Status }[] }[]> = {
+        const categories: Record<string, { groupId: string; groupTitle: string; groupFieldKey: string; taskId: string; taskTitle: string; taskFa: string; activities: { id: string; name: string; status: Status }[] }[]> = {
             "Setor de Traçagem e Corte": [],
             "Inspeções (VT, LP, DT, UT, e RX e ensaios)": [],
             "Soldagem e Tratamento Térmico": [],
@@ -70,7 +99,7 @@ export const DailySummaryView: React.FC<DailySummaryViewProps> = ({ data, dates,
         const term = searchQuery.trim().toLowerCase();
 
         (data || []).forEach(group => {
-            const groupTitle = group.customValues?.['grupo'] || 'Grupo Sem Nome'; 
+            const { label: groupTitle, fieldKey: groupFieldKey } = resolveGroupMeta(group.customValues);
             (group.tarefas || []).forEach(task => {
                 (task.activities || []).forEach(a => {
                     const status = a.schedule[selectedDateStr];
@@ -78,7 +107,13 @@ export const DailySummaryView: React.FC<DailySummaryViewProps> = ({ data, dates,
                         if (selectedStatus && status !== selectedStatus) {
                             return;
                         }
-                        if (term && !a.name.toLowerCase().includes(term) && !groupTitle.toLowerCase().includes(term) && !task.title.toLowerCase().includes(term)) {
+                        if (
+                            term &&
+                            !a.name.toLowerCase().includes(term) &&
+                            !groupTitle.toLowerCase().includes(term) &&
+                            !task.title.toLowerCase().includes(term) &&
+                            !(task.fa || '').toLowerCase().includes(term)
+                        ) {
                             return;
                         }
                         const catKey = a.sector || categorizeActivity(a.name);
@@ -86,12 +121,13 @@ export const DailySummaryView: React.FC<DailySummaryViewProps> = ({ data, dates,
                         if (!categories[catKey]) {
                             categories[catKey] = [];
                         }
-                        
+
                         let taskEntry = categories[catKey].find(t => t.taskId === task.id);
                         if (!taskEntry) {
                             taskEntry = {
                                 groupId: group.id,
                                 groupTitle,
+                                groupFieldKey,
                                 taskId: task.id,
                                 taskTitle: task.title,
                                 taskFa: task.fa || '',
@@ -99,7 +135,7 @@ export const DailySummaryView: React.FC<DailySummaryViewProps> = ({ data, dates,
                             };
                             categories[catKey].push(taskEntry);
                         }
-                        
+
                         taskEntry.activities.push({
                             id: a.id,
                             name: a.name,
@@ -143,10 +179,10 @@ export const DailySummaryView: React.FC<DailySummaryViewProps> = ({ data, dates,
             }
         } else {
             if (!customStart || !customEnd) return [];
-            
+
             const dStartIndex = dates.findIndex(d => formatDate(d) === customStart);
             const dEndIndex = dates.findIndex(d => formatDate(d) === customEnd);
-            
+
             if (dStartIndex !== -1 && dEndIndex !== -1) {
                 const start = Math.min(dStartIndex, dEndIndex);
                 const end = Math.max(dStartIndex, dEndIndex);
@@ -170,7 +206,7 @@ export const DailySummaryView: React.FC<DailySummaryViewProps> = ({ data, dates,
             };
 
             (data || []).forEach(group => {
-                const groupTitle = group.customValues?.['grupo'] || 'Grupo Sem Nome'; 
+                const { label: groupTitle, fieldKey: groupFieldKey } = resolveGroupMeta(group.customValues);
                 (group.tarefas || []).forEach(task => {
                     (task.activities || []).forEach(a => {
                         const status = a.schedule[dateStr];
@@ -181,19 +217,26 @@ export const DailySummaryView: React.FC<DailySummaryViewProps> = ({ data, dates,
                             if (selectedStatus && status !== selectedStatus) {
                                 return;
                             }
-                            if (term && !a.name.toLowerCase().includes(term) && !groupTitle.toLowerCase().includes(term) && !task.title.toLowerCase().includes(term)) {
+                            if (
+                                term &&
+                                !a.name.toLowerCase().includes(term) &&
+                                !groupTitle.toLowerCase().includes(term) &&
+                                !task.title.toLowerCase().includes(term) &&
+                                !(task.fa || '').toLowerCase().includes(term)
+                            ) {
                                 return;
                             }
                             const catKey = a.sector || categorizeActivity(a.name);
                             if (!categories[catKey]) {
                                 categories[catKey] = [];
                             }
-                            
+
                             let taskEntry = categories[catKey].find((t: any) => t.taskId === task.id);
                             if (!taskEntry) {
                                 taskEntry = {
                                     groupId: group.id,
                                     groupTitle,
+                                    groupFieldKey,
                                     taskId: task.id,
                                     taskTitle: task.title,
                                     taskFa: task.fa || '',
@@ -201,7 +244,7 @@ export const DailySummaryView: React.FC<DailySummaryViewProps> = ({ data, dates,
                                 };
                                 categories[catKey].push(taskEntry);
                             }
-                            
+
                             taskEntry.activities.push({
                                 id: a.id,
                                 name: a.name,
@@ -227,81 +270,104 @@ export const DailySummaryView: React.FC<DailySummaryViewProps> = ({ data, dates,
         });
 
         return result;
-    }, [data, customStart, customEnd, searchQuery, dates, selectedCategory, selectedStatus]);
+    }, [data, customStart, customEnd, searchQuery, dates, selectedCategory, selectedStatus, viewMode, todayStr]);
 
     const handlePrint = () => {
         window.print();
     };
 
+    const handleExportWord = () => {
+        import('../utils/exportAgents').then(module => {
+            module.exportDailySummaryToWordAgent(
+                viewMode,
+                viewMode === 'daily' ? selectedDateStr : customStart,
+                customEnd,
+                searchQuery,
+                viewMode === 'daily' ? dailySummary : weeklySummaryByDay
+            );
+        });
+    };
+
     return (
-        <div className="daily-summary-view" style={{ padding: '24px', backgroundColor: '#f8fafc', height: '100%', overflowY: 'auto' }}>
-            <div className="no-print" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', flexWrap: 'wrap', gap: '16px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-                    <h2 style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#1e293b', margin: 0 }}>Gestão de Atividades</h2>
-                    <div style={{ display: 'flex', backgroundColor: '#e2e8f0', borderRadius: '8px', padding: '4px' }}>
-                        <button 
+        <div className="daily-summary-view h-full overflow-y-auto bg-slate-50 p-5 md:p-6">
+            {/* Header Row */}
+            <div className="no-print flex flex-wrap items-center justify-between gap-4 mb-4">
+                <div className="flex flex-wrap items-center gap-4">
+                    <h2 className="text-xl font-bold tracking-tight text-slate-900 m-0">Gestão de Atividades</h2>
+                    <div className="inline-flex items-center bg-slate-200/80 p-1 rounded-lg">
+                        <button
+                            type="button"
                             onClick={() => setViewMode('daily')}
-                            style={{ 
-                                padding: '6px 16px', 
-                                borderRadius: '6px', 
-                                border: 'none', 
-                                cursor: 'pointer',
-                                backgroundColor: viewMode === 'daily' ? 'white' : 'transparent',
-                                boxShadow: viewMode === 'daily' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
-                                fontWeight: viewMode === 'daily' ? 'bold' : 'normal',
-                                color: viewMode === 'daily' ? '#0f172a' : '#64748b'
-                            }}
+                            className={`px-3.5 py-1.5 rounded-md text-xs font-semibold transition-all cursor-pointer border-0 ${
+                                viewMode === 'daily'
+                                    ? 'bg-white text-slate-900 shadow-sm'
+                                    : 'bg-transparent text-slate-600 hover:text-slate-900'
+                            }`}
                         >
                             Resumo Diário
                         </button>
-                        <button 
+                        <button
+                            type="button"
                             onClick={() => setViewMode('weekly')}
-                            style={{ 
-                                padding: '6px 16px', 
-                                borderRadius: '6px', 
-                                border: 'none', 
-                                cursor: 'pointer',
-                                backgroundColor: viewMode === 'weekly' ? 'white' : 'transparent',
-                                boxShadow: viewMode === 'weekly' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
-                                fontWeight: viewMode === 'weekly' ? 'bold' : 'normal',
-                                color: viewMode === 'weekly' ? '#0f172a' : '#64748b'
-                            }}
+                            className={`px-3.5 py-1.5 rounded-md text-xs font-semibold transition-all cursor-pointer border-0 ${
+                                viewMode === 'weekly'
+                                    ? 'bg-white text-slate-900 shadow-sm'
+                                    : 'bg-transparent text-slate-600 hover:text-slate-900'
+                            }`}
                         >
                             Filtro Semanal
                         </button>
-                        <button 
+                        <button
+                            type="button"
                             onClick={() => setViewMode('next4weeks')}
-                            style={{ 
-                                padding: '6px 16px', 
-                                borderRadius: '6px', 
-                                border: 'none', 
-                                cursor: 'pointer',
-                                backgroundColor: viewMode === 'next4weeks' ? 'white' : 'transparent',
-                                boxShadow: viewMode === 'next4weeks' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
-                                fontWeight: viewMode === 'next4weeks' ? 'bold' : 'normal',
-                                color: viewMode === 'next4weeks' ? '#0f172a' : '#64748b'
-                            }}
+                            className={`px-3.5 py-1.5 rounded-md text-xs font-semibold transition-all cursor-pointer border-0 ${
+                                viewMode === 'next4weeks'
+                                    ? 'bg-white text-slate-900 shadow-sm'
+                                    : 'bg-transparent text-slate-600 hover:text-slate-900'
+                            }`}
                         >
                             Próxim. 4 Semanas
                         </button>
                     </div>
                 </div>
-                
-                <div style={{ display: 'flex', gap: '16px', alignItems: 'center', flexWrap: 'wrap' }}>
-                    <button 
-                        onClick={() => onAddItem('group', undefined, viewMode === 'daily' ? selectedDateStr : undefined)}
-                        style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '8px 16px', backgroundColor: '#3b82f6', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}
-                        className="no-print"
-                    >
-                        <span className="material-icons" style={{ fontSize: '18px' }}>add</span> Adicionar Grupo
-                    </button>
-                    
-                    <div>
-                        <label style={{ marginRight: '8px', fontWeight: 'bold', color: '#475569' }}>Setor:</label>
-                        <select 
-                            value={selectedCategory} 
+
+                <button
+                    type="button"
+                    onClick={() => onAddItem('group', undefined, viewMode === 'daily' ? selectedDateStr : undefined)}
+                    className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold shadow-sm transition-colors cursor-pointer border-0"
+                >
+                    <span className="material-icons" style={{ fontSize: '17px' }}>add</span>
+                    Adicionar Grupo
+                </button>
+            </div>
+
+            {/* Unified Single Aligned Control Bar */}
+            <div className="no-print bg-white border border-slate-200 rounded-xl px-4 py-3 mb-6 shadow-sm flex flex-wrap items-center justify-between gap-3">
+                {/* Left: Filters */}
+                <div className="flex flex-wrap items-center gap-2.5 flex-1 min-w-0">
+                    <div className="relative min-w-[200px] flex-1 max-w-[260px]">
+                        <span
+                            className="material-icons absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"
+                            style={{ fontSize: '17px' }}
+                        >
+                            search
+                        </span>
+                        <input
+                            type="text"
+                            placeholder="Buscar atividade, FA ou grupo..."
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            className="w-full pl-8 pr-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-blue-500 focus:bg-white transition-colors"
+                        />
+                    </div>
+
+                    <div className="flex items-center gap-1.5">
+                        <label htmlFor="summary-sector" className="text-xs font-semibold text-slate-500">Setor:</label>
+                        <select
+                            id="summary-sector"
+                            value={selectedCategory}
                             onChange={(e) => setSelectedCategory(e.target.value)}
-                            style={{ padding: '8px', borderRadius: '4px', border: '1px solid #cbd5e1', outline: 'none' }}
+                            className="px-2.5 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-700 font-medium focus:outline-none focus:border-blue-500 focus:bg-white"
                         >
                             <option value="">Todos</option>
                             <option value="Setor de Traçagem e Corte">Setor de Traçagem e Corte</option>
@@ -313,39 +379,29 @@ export const DailySummaryView: React.FC<DailySummaryViewProps> = ({ data, dates,
                         </select>
                     </div>
 
-                    <div>
-                        <label style={{ marginRight: '8px', fontWeight: 'bold', color: '#475569' }}>Status:</label>
-                        <select 
-                            value={selectedStatus} 
+                    <div className="flex items-center gap-1.5">
+                        <label htmlFor="summary-status" className="text-xs font-semibold text-slate-500">Status:</label>
+                        <select
+                            id="summary-status"
+                            value={selectedStatus}
                             onChange={(e) => setSelectedStatus(e.target.value)}
-                            style={{ padding: '8px', borderRadius: '4px', border: '1px solid #cbd5e1', outline: 'none' }}
+                            className="px-2.5 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-700 font-medium focus:outline-none focus:border-blue-500 focus:bg-white"
                         >
                             <option value="">Todos</option>
-                            {/* Assumes STATUS_LABELS is imported from types */}
                             {Object.entries(STATUS_LABELS).map(([statusKey, label]) => (
                                 <option key={statusKey} value={statusKey}>{label}</option>
                             ))}
                         </select>
                     </div>
 
-                    <div style={{ position: 'relative' }}>
-                        <span className="material-icons" style={{ position: 'absolute', left: '8px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8', fontSize: '18px' }}>search</span>
-                        <input 
-                            type="text" 
-                            placeholder="Buscar atividade..." 
-                            value={searchQuery}
-                            onChange={(e) => setSearchQuery(e.target.value)}
-                            style={{ padding: '8px 8px 8px 32px', borderRadius: '4px', border: '1px solid #cbd5e1', outline: 'none', width: '200px' }}
-                        />
-                    </div>
-
                     {viewMode === 'daily' ? (
-                        <div>
-                            <label style={{ marginRight: '8px', fontWeight: 'bold', color: '#475569' }}>Data:</label>
-                            <select 
-                                value={selectedDateStr} 
+                        <div className="flex items-center gap-1.5">
+                            <label htmlFor="summary-date" className="text-xs font-semibold text-slate-500">Data:</label>
+                            <select
+                                id="summary-date"
+                                value={selectedDateStr}
                                 onChange={(e) => setSelectedDateStr(e.target.value)}
-                                style={{ padding: '8px', borderRadius: '4px', border: '1px solid #cbd5e1', outline: 'none' }}
+                                className="px-2.5 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-700 font-medium tabular-nums focus:outline-none focus:border-blue-500 focus:bg-white"
                             >
                                 {dates.map(d => (
                                     <option key={formatDate(d)} value={formatDate(d)}>
@@ -355,13 +411,14 @@ export const DailySummaryView: React.FC<DailySummaryViewProps> = ({ data, dates,
                             </select>
                         </div>
                     ) : viewMode === 'weekly' ? (
-                        <div style={{ display: 'flex', gap: '16px', alignItems: 'center', flexWrap: 'wrap' }}>
-                            <div>
-                                <label style={{ marginRight: '8px', fontWeight: 'bold', color: '#475569' }}>De:</label>
-                                <select 
-                                    value={customStart} 
+                        <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-1.5">
+                                <label htmlFor="summary-start" className="text-xs font-semibold text-slate-500">De:</label>
+                                <select
+                                    id="summary-start"
+                                    value={customStart}
                                     onChange={(e) => setCustomStart(e.target.value)}
-                                    style={{ padding: '8px', borderRadius: '4px', border: '1px solid #cbd5e1', outline: 'none' }}
+                                    className="px-2.5 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-700 font-medium tabular-nums focus:outline-none focus:border-blue-500 focus:bg-white"
                                 >
                                     {dates.map(d => (
                                         <option key={formatDate(d)} value={formatDate(d)}>
@@ -370,12 +427,13 @@ export const DailySummaryView: React.FC<DailySummaryViewProps> = ({ data, dates,
                                     ))}
                                 </select>
                             </div>
-                            <div>
-                                <label style={{ marginRight: '8px', fontWeight: 'bold', color: '#475569' }}>Até:</label>
-                                <select 
-                                    value={customEnd} 
+                            <div className="flex items-center gap-1.5">
+                                <label htmlFor="summary-end" className="text-xs font-semibold text-slate-500">Até:</label>
+                                <select
+                                    id="summary-end"
+                                    value={customEnd}
                                     onChange={(e) => setCustomEnd(e.target.value)}
-                                    style={{ padding: '8px', borderRadius: '4px', border: '1px solid #cbd5e1', outline: 'none' }}
+                                    className="px-2.5 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-700 font-medium tabular-nums focus:outline-none focus:border-blue-500 focus:bg-white"
                                 >
                                     {dates.map(d => (
                                         <option key={formatDate(d)} value={formatDate(d)}>
@@ -386,33 +444,34 @@ export const DailySummaryView: React.FC<DailySummaryViewProps> = ({ data, dates,
                             </div>
                         </div>
                     ) : null}
-                    <button 
+                </div>
+
+                {/* Right: Unified Action Buttons */}
+                <div className="flex items-center gap-2 shrink-0">
+                    <button
+                        type="button"
                         onClick={onSyncWithSchedule}
-                        className="control-button" 
-                        style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '8px 16px', backgroundColor: '#3b82f6', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold transition-colors cursor-pointer"
                         title="Sincronizar com os dados atuais da aba Programação"
                     >
-                        <span className="material-icons" style={{ fontSize: '18px' }}>sync</span> Sincronizar
+                        <span className="material-icons text-blue-600" style={{ fontSize: '16px' }}>sync</span>
+                        Sincronizar
                     </button>
-                    <button onClick={handlePrint} className="control-button" style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '8px 16px', backgroundColor: '#fbbf24', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}>
-                        <span className="material-icons" style={{ fontSize: '18px' }}>print</span> Imprimir
-                    </button>
-                    <button 
-                        onClick={() => {
-                            import('../utils/exportAgents').then(module => {
-                                module.exportDailySummaryToWordAgent(
-                                    viewMode,
-                                    viewMode === 'daily' ? selectedDateStr : customStart,
-                                    customEnd,
-                                    searchQuery,
-                                    viewMode === 'daily' ? dailySummary : weeklySummaryByDay
-                                );
-                            });
-                        }} 
-                        style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '8px 16px', backgroundColor: '#3b82f6', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }} 
-                        className="no-print"
+                    <button
+                        type="button"
+                        onClick={handleExportWord}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold transition-colors cursor-pointer border-0"
                     >
-                        <span className="material-icons" style={{ fontSize: '18px' }}>description</span> Exportar Word
+                        <span className="material-icons" style={{ fontSize: '16px' }}>description</span>
+                        Exportar Word
+                    </button>
+                    <button
+                        type="button"
+                        onClick={handlePrint}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-400 hover:bg-amber-500 text-slate-900 text-xs font-semibold transition-colors cursor-pointer border-0"
+                    >
+                        <span className="material-icons" style={{ fontSize: '16px' }}>print</span>
+                        Imprimir
                     </button>
                 </div>
             </div>
@@ -420,191 +479,228 @@ export const DailySummaryView: React.FC<DailySummaryViewProps> = ({ data, dates,
             {viewMode === 'daily' ? (
                 <>
                     {dailySummary.length === 0 ? (
-                        <div className="no-print" style={{ padding: '40px', textAlign: 'center', backgroundColor: 'white', borderRadius: '8px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
-                            <span className="material-icons" style={{ fontSize: '48px', color: '#cbd5e1', marginBottom: '16px' }}>event_busy</span>
-                            <p style={{ color: '#64748b', fontSize: '1.1rem' }}>Não há atividades programadas para este dia.</p>
+                        <div className="no-print bg-white border border-slate-200 rounded-xl p-10 text-center shadow-sm">
+                            <span className="material-icons text-slate-300 mb-3" style={{ fontSize: '44px' }}>event_busy</span>
+                            <p className="text-slate-500 text-sm font-medium m-0">Não há atividades programadas para este dia.</p>
                         </div>
                     ) : (
-                        <div className="print-area" style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-                            <div className="print-only" style={{ display: 'none', marginBottom: '16px' }}>
-                                 <h1 style={{ fontSize: '1.5rem', textAlign: 'center', marginBottom: '8px' }}>Resumo Diário - {new Date(selectedDateStr).toLocaleDateString('pt-BR', { timeZone: 'UTC' })}</h1>
+                        <div className="print-area flex flex-col gap-6">
+                            <div className="print-only hidden mb-4">
+                                <h1 className="text-xl font-bold text-center mb-1">
+                                    Resumo Diário - {new Date(selectedDateStr + 'T00:00:00Z').toLocaleDateString('pt-BR', { timeZone: 'UTC' })}
+                                </h1>
                             </div>
-                            {dailySummary.map(({ category, tasks }) => (
-                                <div 
-                                    key={category} 
-                                    style={{ pageBreakInside: 'avoid' }}
-                                    className="p-2 rounded-lg transition-colors"
-                                    onDragOver={handleDragOver}
-                                    onDrop={(e) => handleDrop(e, category)}
-                                >
-                                    <h3 className="text-xl font-bold text-slate-800 border-b-2 border-slate-200 pb-2 mb-4 tracking-tight">{category}</h3>
-                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                                        {tasks.map((item, idx) => (
-                                            <div key={`${item.taskId}-${idx}`} className="bg-white rounded-xl p-5 shadow-sm border border-slate-200 hover:shadow-md transition-shadow relative group">
-                                                <button 
-                                                    onClick={() => onDeleteItem(item.taskId, 'task')}
-                                                    className="no-print"
-                                                    style={{ position: 'absolute', top: '8px', right: '8px', background: 'transparent', border: 'none', color: '#ef4444', cursor: 'pointer', padding: '4px' }}
-                                                    title="Excluir Tarefa"
+                            {dailySummary.map(({ category, tasks }) => {
+                                const totalActivities = tasks.reduce((acc, t) => acc + t.activities.length, 0);
+                                return (
+                                    <div
+                                        key={category}
+                                        style={{ pageBreakInside: 'avoid' }}
+                                        className="rounded-xl transition-colors"
+                                        onDragOver={handleDragOver}
+                                        onDrop={(e) => handleDrop(e, category)}
+                                    >
+                                        <div className="flex items-center justify-between border-b border-slate-200 pb-2 mb-4">
+                                            <h3 className="text-base font-bold text-slate-800 tracking-tight m-0">{category}</h3>
+                                            <span className="text-xs font-semibold text-slate-500 tabular-nums">
+                                                {tasks.length} {tasks.length === 1 ? 'tarefa' : 'tarefas'} · {totalActivities} {totalActivities === 1 ? 'atividade' : 'atividades'}
+                                            </span>
+                                        </div>
+                                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                            {tasks.map((item, idx) => (
+                                                <div
+                                                    key={`${item.taskId}-${idx}`}
+                                                    className="bg-white rounded-xl p-4 border border-slate-200 shadow-sm hover:shadow-md transition-shadow relative group flex flex-col"
                                                 >
-                                                    <span className="material-icons" style={{ fontSize: '20px' }}>delete</span>
-                                                </button>
-                                                <div style={{ marginBottom: '12px', paddingBottom: '8px', borderBottom: '1px solid #f1f5f9' }}>
-                                                    <div 
-                                                        contentEditable
-                                                        suppressContentEditableWarning
-                                                        onBlur={e => onTextUpdate(item.groupId, 'grupo', e.currentTarget.textContent || '')}
-                                                        style={{ fontSize: '0.85rem', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em', outline: 'none' }}
-                                                        dangerouslySetInnerHTML={{ __html: cleanText(item.groupTitle) }}
-                                                    />
-                                                    <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px' }}>
-                                                        <div 
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => onDeleteItem(item.taskId, 'task')}
+                                                        className="no-print absolute top-3 right-3 text-slate-400 hover:text-rose-600 bg-transparent border-0 p-1 rounded cursor-pointer transition-colors"
+                                                        title="Excluir Tarefa"
+                                                    >
+                                                        <span className="material-icons" style={{ fontSize: '18px' }}>delete_outline</span>
+                                                    </button>
+
+                                                    <div className="mb-3 pb-2.5 border-b border-slate-100 pr-7">
+                                                        <div
                                                             contentEditable
                                                             suppressContentEditableWarning
-                                                            onBlur={e => onTextUpdate(item.taskId, 'tarefa', e.currentTarget.textContent || '')}
-                                                            style={{ fontSize: '1.1rem', fontWeight: 'bold', color: '#0f172a', outline: 'none' }}
-                                                            dangerouslySetInnerHTML={{ __html: cleanText(item.taskTitle) }}
+                                                            onBlur={e => onTextUpdate(item.groupId, item.groupFieldKey, e.currentTarget.textContent || '')}
+                                                            className="text-[11px] font-semibold text-slate-500 uppercase tracking-wide outline-none truncate"
+                                                            title={item.groupTitle}
+                                                            dangerouslySetInnerHTML={{ __html: cleanText(item.groupTitle) }}
                                                         />
-                                                        <div 
-                                                            contentEditable
-                                                            suppressContentEditableWarning
-                                                            onBlur={e => onTextUpdate(item.taskId, 'tarefa_fa', e.currentTarget.textContent || '')}
-                                                            style={{ fontSize: '0.9rem', color: '#94a3b8', fontStyle: 'italic', outline: 'none' }}
-                                                            dangerouslySetInnerHTML={{ __html: cleanText(item.taskFa ? `${item.taskFa}` : '(FA)') }}
-                                                        />
+                                                        <div className="flex flex-wrap items-baseline gap-1.5 mt-1">
+                                                            <div
+                                                                contentEditable
+                                                                suppressContentEditableWarning
+                                                                onBlur={e => onTextUpdate(item.taskId, 'tarefa', e.currentTarget.textContent || '')}
+                                                                className="text-sm font-bold text-slate-900 outline-none leading-snug"
+                                                                dangerouslySetInnerHTML={{ __html: cleanText(item.taskTitle) }}
+                                                            />
+                                                            <span className="text-slate-300 text-xs select-none">·</span>
+                                                            <div
+                                                                contentEditable
+                                                                suppressContentEditableWarning
+                                                                onBlur={e => onTextUpdate(item.taskId, 'tarefa_fa', e.currentTarget.textContent || '')}
+                                                                className="text-xs font-medium text-slate-500 tabular-nums outline-none"
+                                                                dangerouslySetInnerHTML={{ __html: cleanText(item.taskFa ? `${item.taskFa}` : 'Sem FA') }}
+                                                            />
+                                                        </div>
                                                     </div>
+
+                                                    <ul className="list-none p-0 m-0 flex-1">
+                                                        {item.activities.map((act, actIdx) => (
+                                                            <li
+                                                                key={act.id}
+                                                                draggable
+                                                                onDragStart={(e) => handleDragStart(e, act.id)}
+                                                                className={`flex justify-between items-center py-2 cursor-grab ${
+                                                                    actIdx < item.activities.length - 1 ? 'border-b border-dashed border-slate-200' : ''
+                                                                }`}
+                                                            >
+                                                                <div className="flex items-center gap-1.5 flex-1 min-w-0">
+                                                                    <span className="material-icons text-slate-300 shrink-0" style={{ fontSize: '16px' }}>drag_indicator</span>
+                                                                    <div
+                                                                        contentEditable
+                                                                        suppressContentEditableWarning
+                                                                        onBlur={e => onTextUpdate(act.id, 'atividade', e.currentTarget.textContent || '')}
+                                                                        className="text-xs font-medium text-slate-700 flex-1 outline-none leading-snug"
+                                                                        dangerouslySetInnerHTML={{ __html: cleanText(act.name) }}
+                                                                    />
+                                                                </div>
+                                                                <span className={`ml-2.5 px-2 py-0.5 rounded-md text-[11px] font-semibold whitespace-nowrap ${STATUS_BADGE_CLASSES[act.status]}`}>
+                                                                    {STATUS_LABELS[act.status]}
+                                                                </span>
+                                                            </li>
+                                                        ))}
+                                                    </ul>
+
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => onAddItem('activity', item.taskId, selectedDateStr)}
+                                                        className="no-print w-full mt-3 py-1.5 bg-transparent border border-dashed border-slate-300 hover:border-blue-400 hover:text-blue-600 rounded-lg cursor-pointer text-slate-500 text-xs font-medium flex items-center justify-center gap-1 transition-colors"
+                                                    >
+                                                        <span className="material-icons" style={{ fontSize: '15px' }}>add</span>
+                                                        Nova Atividade
+                                                    </button>
                                                 </div>
-                                                <ul style={{ listStyleType: 'none', padding: 0, margin: 0 }}>
-                                                    {item.activities.map((act, actIdx) => (
-                                                        <li 
-                                                            key={act.id} 
-                                                            draggable
-                                                            onDragStart={(e) => handleDragStart(e, act.id)}
-                                                            style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: actIdx < item.activities.length - 1 ? '1px dashed #e2e8f0' : 'none', cursor: 'grab' }}
-                                                        >
-                                                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexGrow: 1 }}>
-                                                                <span className="material-icons" style={{ color: '#94a3b8', fontSize: '18px', cursor: 'grab' }}>drag_indicator</span>
-                                                                <div 
-                                                                    contentEditable
-                                                                    suppressContentEditableWarning
-                                                                    onBlur={e => onTextUpdate(act.id, 'atividade', e.currentTarget.textContent || '')}
-                                                                    style={{ color: '#334155', flexGrow: 1, outline: 'none' }}
-                                                                    dangerouslySetInnerHTML={{ __html: cleanText(act.name) }}
-                                                                />
-                                                            </div>
-                                                            <span className={`ml-3 px-2 py-0.5 rounded-md text-xs font-semibold whitespace-nowrap ${STATUS_BADGE_CLASSES[act.status]}`}>
-                                                                {STATUS_LABELS[act.status]}
-                                                            </span>
-                                                        </li>
-                                                    ))}
-                                                </ul>
-                                                <button
-                                                    onClick={() => onAddItem('activity', item.taskId, selectedDateStr)}
-                                                    className="no-print"
-                                                    style={{ width: '100%', marginTop: '12px', padding: '6px', background: 'transparent', border: '1px dashed #cbd5e1', borderRadius: '4px', cursor: 'pointer', color: '#64748b', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                                                >
-                                                    <span className="material-icons" style={{ fontSize: '16px', marginRight: '4px' }}>add</span>
-                                                    Nova Atividade
-                                                </button>
-                                            </div>
-                                        ))}
+                                            ))}
+                                        </div>
                                     </div>
-                                </div>
-                            ))}
+                                );
+                            })}
                         </div>
                     )}
                 </>
             ) : (
                 <>
                     {weeklySummaryByDay.every(day => day.categories.length === 0) ? (
-                        <div className="no-print" style={{ padding: '40px', textAlign: 'center', backgroundColor: 'white', borderRadius: '8px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
-                            <span className="material-icons" style={{ fontSize: '48px', color: '#cbd5e1', marginBottom: '16px' }}>search_off</span>
-                            <p style={{ color: '#64748b', fontSize: '1.1rem' }}>
-                                {searchQuery.trim() ? 'Nenhuma atividade encontrada com esse filtro na semana.' : 'Nenhuma atividade agendada nesta semana.'}
+                        <div className="no-print bg-white border border-slate-200 rounded-xl p-10 text-center shadow-sm">
+                            <span className="material-icons text-slate-300 mb-3" style={{ fontSize: '44px' }}>search_off</span>
+                            <p className="text-slate-500 text-sm font-medium m-0">
+                                {searchQuery.trim() ? 'Nenhuma atividade encontrada com esse filtro no período.' : 'Nenhuma atividade agendada neste período.'}
                             </p>
                         </div>
                     ) : (
-                        <div className="print-area" style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
-                            <div className="print-only" style={{ display: 'none', marginBottom: '16px' }}>
-                                 <h1 style={{ fontSize: '1.5rem', textAlign: 'center', marginBottom: '8px' }}>
-                                     Resumo Semanal
-                                     {searchQuery.trim() ? ` - Filtro: "${searchQuery}"` : ''}
-                                 </h1>
-                                 <p style={{ textAlign: 'center', color: '#64748b' }}>
-                                     {new Date(customStart + 'T00:00:00Z').toLocaleDateString('pt-BR', { timeZone: 'UTC' })} até {new Date(customEnd + 'T00:00:00Z').toLocaleDateString('pt-BR', { timeZone: 'UTC' })}
-                                 </p>
+                        <div className="print-area flex flex-col gap-6">
+                            <div className="print-only hidden mb-4">
+                                <h1 className="text-xl font-bold text-center mb-1">
+                                    Resumo Semanal
+                                    {searchQuery.trim() ? ` - Filtro: "${searchQuery}"` : ''}
+                                </h1>
+                                <p className="text-center text-slate-500 text-xs">
+                                    {new Date(customStart + 'T00:00:00Z').toLocaleDateString('pt-BR', { timeZone: 'UTC' })} até {new Date(customEnd + 'T00:00:00Z').toLocaleDateString('pt-BR', { timeZone: 'UTC' })}
+                                </p>
                             </div>
-                            {weeklySummaryByDay.map((daySummary, dayIdx) => daySummary.categories.length > 0 && (
-                                <div key={daySummary.dateStr} style={{ backgroundColor: 'white', borderRadius: '12px', padding: '24px', boxShadow: '0 1px 4px rgba(0,0,0,0.1)', pageBreakInside: 'avoid' }}>
-                                    <h2 style={{ fontSize: '1.5rem', borderBottom: '2px solid #3b82f6', paddingBottom: '8px', marginBottom: '16px', color: '#1e293b' }}>
+                            {weeklySummaryByDay.map((daySummary) => daySummary.categories.length > 0 && (
+                                <div
+                                    key={daySummary.dateStr}
+                                    className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm"
+                                    style={{ pageBreakInside: 'avoid' }}
+                                >
+                                    <h2 className="text-base font-bold text-slate-900 border-b border-slate-200 pb-2.5 mb-4 m-0">
                                         {daySummary.dateObj.toLocaleDateString('pt-BR', { weekday: 'long', timeZone: 'UTC', day: '2-digit', month: '2-digit' }).replace(/^\w/, c => c.toUpperCase())}
                                     </h2>
-                                    
-                                    <div className="flex flex-col gap-6">
+
+                                    <div className="flex flex-col gap-5">
                                         {daySummary.categories.map(({ category, tasks }) => (
                                             <div key={category}>
-                                                <h3 className="text-lg font-bold text-slate-700 mb-3 tracking-tight">{category}</h3>
+                                                <h3 className="text-sm font-bold text-slate-700 mb-3 tracking-tight">{category}</h3>
                                                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                                                     {tasks.map((item: any, idx: number) => (
-                                                        <div key={`${item.taskId}-${idx}`} className="bg-slate-50 border border-slate-200 rounded-xl p-4 shadow-sm hover:shadow-md transition-shadow relative group">
-                                                            <button 
+                                                        <div
+                                                            key={`${item.taskId}-${idx}`}
+                                                            className="bg-slate-50/70 border border-slate-200 rounded-xl p-4 shadow-sm hover:shadow-md transition-shadow relative group flex flex-col"
+                                                        >
+                                                            <button
+                                                                type="button"
                                                                 onClick={() => onDeleteItem(item.taskId, 'task')}
-                                                                className="no-print"
-                                                                style={{ position: 'absolute', top: '8px', right: '8px', background: 'transparent', border: 'none', color: '#ef4444', cursor: 'pointer', padding: '4px' }}
+                                                                className="no-print absolute top-3 right-3 text-slate-400 hover:text-rose-600 bg-transparent border-0 p-1 rounded cursor-pointer transition-colors"
                                                                 title="Excluir Tarefa"
                                                             >
-                                                                <span className="material-icons" style={{ fontSize: '20px' }}>delete</span>
+                                                                <span className="material-icons" style={{ fontSize: '18px' }}>delete_outline</span>
                                                             </button>
-                                                            <div style={{ marginBottom: '8px', paddingBottom: '8px', borderBottom: '1px solid #e2e8f0' }}>
-                                                                <div 
+
+                                                            <div className="mb-2.5 pb-2 border-b border-slate-200/80 pr-7">
+                                                                <div
                                                                     contentEditable
                                                                     suppressContentEditableWarning
-                                                                    onBlur={e => onTextUpdate(item.groupId, 'grupo', e.currentTarget.textContent || '')}
-                                                                    style={{ fontSize: '0.8rem', color: '#64748b', textTransform: 'uppercase', outline: 'none' }}
+                                                                    onBlur={e => onTextUpdate(item.groupId, item.groupFieldKey || 'fa', e.currentTarget.textContent || '')}
+                                                                    className="text-[11px] font-semibold text-slate-500 uppercase tracking-wide outline-none truncate"
+                                                                    title={item.groupTitle}
                                                                     dangerouslySetInnerHTML={{ __html: cleanText(item.groupTitle) }}
                                                                 />
-                                                                <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px' }}>
-                                                                    <div 
+                                                                <div className="flex flex-wrap items-baseline gap-1.5 mt-1">
+                                                                    <div
                                                                         contentEditable
                                                                         suppressContentEditableWarning
                                                                         onBlur={e => onTextUpdate(item.taskId, 'tarefa', e.currentTarget.textContent || '')}
-                                                                        style={{ fontSize: '1rem', fontWeight: 'bold', color: '#0f172a', outline: 'none' }}
+                                                                        className="text-sm font-bold text-slate-900 outline-none leading-snug"
                                                                         dangerouslySetInnerHTML={{ __html: cleanText(item.taskTitle) }}
                                                                     />
-                                                                    <div 
+                                                                    <span className="text-slate-300 text-xs select-none">·</span>
+                                                                    <div
                                                                         contentEditable
                                                                         suppressContentEditableWarning
                                                                         onBlur={e => onTextUpdate(item.taskId, 'tarefa_fa', e.currentTarget.textContent || '')}
-                                                                        style={{ fontSize: '0.85rem', color: '#94a3b8', fontStyle: 'italic', outline: 'none' }}
-                                                                        dangerouslySetInnerHTML={{ __html: cleanText(item.taskFa ? `${item.taskFa}` : '(FA)') }}
+                                                                        className="text-xs font-medium text-slate-500 tabular-nums outline-none"
+                                                                        dangerouslySetInnerHTML={{ __html: cleanText(item.taskFa ? `${item.taskFa}` : 'Sem FA') }}
                                                                     />
                                                                 </div>
                                                             </div>
-                                                            <ul style={{ listStyleType: 'none', padding: 0, margin: 0 }}>
+
+                                                            <ul className="list-none p-0 m-0 flex-1">
                                                                 {item.activities.map((act: any, actIdx: number) => (
-                                                                    <li key={act.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 0', borderBottom: actIdx < item.activities.length - 1 ? '1px dashed #cbd5e1' : 'none' }}>
-                                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexGrow: 1 }}>
-                                                                            <span className="material-icons" style={{ color: '#94a3b8', fontSize: '16px' }}>chevron_right</span>
-                                                                            <div 
+                                                                    <li
+                                                                        key={act.id}
+                                                                        className={`flex justify-between items-center py-1.5 ${
+                                                                            actIdx < item.activities.length - 1 ? 'border-b border-dashed border-slate-200' : ''
+                                                                        }`}
+                                                                    >
+                                                                        <div className="flex items-center gap-1.5 flex-1 min-w-0">
+                                                                            <span className="material-icons text-slate-400 shrink-0" style={{ fontSize: '15px' }}>chevron_right</span>
+                                                                            <div
                                                                                 contentEditable
                                                                                 suppressContentEditableWarning
                                                                                 onBlur={e => onTextUpdate(act.id, 'atividade', e.currentTarget.textContent || '')}
-                                                                                style={{ color: '#334155', flexGrow: 1, outline: 'none', fontSize: '0.95rem' }}
+                                                                                className="text-xs font-medium text-slate-700 flex-1 outline-none leading-snug"
                                                                                 dangerouslySetInnerHTML={{ __html: cleanText(act.name) }}
                                                                             />
                                                                         </div>
-                                                                        <span className={`ml-3 px-2 py-0.5 rounded-md text-[11px] font-semibold whitespace-nowrap ${STATUS_BADGE_CLASSES[act.status]}`}>
+                                                                        <span className={`ml-2.5 px-2 py-0.5 rounded-md text-[11px] font-semibold whitespace-nowrap ${STATUS_BADGE_CLASSES[act.status]}`}>
                                                                             {STATUS_LABELS[act.status]}
                                                                         </span>
                                                                     </li>
                                                                 ))}
                                                             </ul>
+
                                                             <button
+                                                                type="button"
                                                                 onClick={() => onAddItem('activity', item.taskId, daySummary.dateStr)}
-                                                                className="no-print"
-                                                                style={{ width: '100%', marginTop: '12px', padding: '6px', background: 'transparent', border: '1px dashed #cbd5e1', borderRadius: '4px', cursor: 'pointer', color: '#64748b', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                                                                className="no-print w-full mt-3 py-1.5 bg-transparent border border-dashed border-slate-300 hover:border-blue-400 hover:text-blue-600 rounded-lg cursor-pointer text-slate-500 text-xs font-medium flex items-center justify-center gap-1 transition-colors"
                                                             >
-                                                                <span className="material-icons" style={{ fontSize: '16px', marginRight: '4px' }}>add</span>
+                                                                <span className="material-icons" style={{ fontSize: '15px' }}>add</span>
                                                                 Nova Atividade
                                                             </button>
                                                         </div>

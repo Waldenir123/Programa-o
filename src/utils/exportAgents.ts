@@ -1,5 +1,7 @@
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import Chart, { ChartConfiguration, Plugin } from 'chart.js/auto';
+import ChartDataLabels from 'chartjs-plugin-datalabels';
 import { ScheduleData, Status, ManpowerAllocation, Project, DynamicColumn } from '../state/types';
 import { getWeek, getDayAbbr, formatDate, getDateRangeOfWeek, isBrazilianHoliday, getRoleAbbreviation, getWeekYear } from './dataUtils';
 import { STATUS_COLOR_MAP } from '../state/types';
@@ -1328,23 +1330,108 @@ export const exportManpowerDashboardToPdfAgent = (chartImage: string | null, tit
     doc.save(`Dashboard_MO_${title.replace(/ /g, '_')}.pdf`);
 };
 
-const compositeCanvasForPdf = (canvas: HTMLCanvasElement | null): string | null => {
-    if (!canvas) return null;
+const PDF_CHART_SCALE = 2;
+
+interface CapturedPdfChart {
+    dataUrl: string;
+    width: number;
+    height: number;
+}
+
+const pdfWhiteBackgroundPlugin: Plugin = {
+    id: 'pdfWhiteBackground',
+    beforeDraw(chart) {
+        const { ctx, canvas } = chart;
+        ctx.save();
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.restore();
+    },
+};
+
+const renderOffscreenChart = (
+    logicalWidth: number,
+    logicalHeight: number,
+    config: ChartConfiguration<any, any, any>
+): CapturedPdfChart | null => {
     try {
-        const offscreen = document.createElement('canvas');
-        offscreen.width = canvas.width || 800;
-        offscreen.height = canvas.height || 400;
-        const ctx = offscreen.getContext('2d');
-        if (!ctx) return canvas.toDataURL('image/png', 1.0);
-        ctx.fillStyle = '#0f172a';
-        ctx.fillRect(0, 0, offscreen.width, offscreen.height);
-        ctx.drawImage(canvas, 0, 0, offscreen.width, offscreen.height);
-        return offscreen.toDataURL('image/png', 1.0);
-    } catch (e) {
-        console.error('Error compositing canvas for PDF:', e);
+        const canvas = document.createElement('canvas');
+        canvas.width = logicalWidth;
+        canvas.height = logicalHeight;
+        canvas.style.width = `${logicalWidth}px`;
+        canvas.style.height = `${logicalHeight}px`;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return null;
+
+        const existingPlugins = Array.isArray(config.plugins) ? config.plugins : [];
+        const chart = new Chart(ctx, {
+            ...config,
+            plugins: [pdfWhiteBackgroundPlugin, ...existingPlugins],
+            options: {
+                ...(config.options || {}),
+                responsive: false,
+                maintainAspectRatio: false,
+                animation: false,
+                devicePixelRatio: PDF_CHART_SCALE,
+            },
+        });
+
+        chart.update('none');
+        chart.draw();
+
+        const dataUrl = canvas.toDataURL('image/png', 1.0);
+        const result = {
+            dataUrl,
+            width: canvas.width,
+            height: canvas.height,
+        };
+        chart.destroy();
+        return result;
+    } catch (error) {
+        console.error('Error rendering offscreen PDF chart:', error);
         return null;
     }
 };
+
+const fitImageInBox = (
+    canvasWidth: number,
+    canvasHeight: number,
+    boxX: number,
+    maxWidth: number,
+    maxHeight: number
+) => {
+    const ratio = canvasHeight / canvasWidth;
+    let imgW = maxWidth;
+    let imgH = imgW * ratio;
+    if (imgH > maxHeight) {
+        imgH = maxHeight;
+        imgW = imgH / ratio;
+    }
+    const drawX = boxX + (maxWidth - imgW) / 2;
+    return { imgW, imgH, drawX };
+};
+
+const createDoughnutCenterPlugin = (mainText: string, subText: string): Plugin => ({
+    id: 'pdfDoughnutCenterText',
+    afterDraw(chart) {
+        const meta = chart.getDatasetMeta(0);
+        const firstArc = meta?.data?.[0];
+        if (!firstArc) return;
+        const { x, y } = firstArc.getProps(['x', 'y'], true);
+        const { ctx } = chart;
+        ctx.save();
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillStyle = '#0f172a';
+        ctx.font = '700 32px Inter, Helvetica, Arial, sans-serif';
+        ctx.fillText(mainText, x, y - 9);
+        ctx.fillStyle = '#475569';
+        ctx.font = '600 12px Inter, Helvetica, Arial, sans-serif';
+        ctx.fillText(subText, x, y + 15);
+        ctx.restore();
+    },
+});
 
 const drawDashboardReportHeader = (
     doc: jsPDF,
@@ -1403,11 +1490,23 @@ export interface ScheduleDashboardPdfPayload {
         totalCancelado: number;
         totalProgramadoOpen: number;
     };
-    canvases: {
-        daily: HTMLCanvasElement | null;
-        doughnut: HTMLCanvasElement | null;
-        sector: HTMLCanvasElement | null;
-    };
+    dailyChartMode: 'daily' | 'curveS';
+    dailySeries: {
+        label: string;
+        dailyPct: number;
+        cumRealPct: number;
+        cumPlanPct: number;
+        active: number;
+    }[];
+    sectorChartMode: 'ranking' | 'volume';
+    sectorStats: {
+        sector: string;
+        ok: number;
+        n: number;
+        c: number;
+        x: number;
+        adherencePct: number;
+    }[];
     faRows: { faLabel: string; sector: string; ok: number; active: number; pending: number; pct: string }[];
     actionRows: { dateBr: string; faLabel: string; sector: string; taskTitle: string; activityName: string; statusLabel: string }[];
 }
@@ -1417,6 +1516,7 @@ export const exportScheduleDashboardPdf = (payload: ScheduleDashboardPdfPayload)
     const pageWidth = doc.internal.pageSize.getWidth();
     const pageHeight = doc.internal.pageSize.getHeight();
     const margin = 14;
+    const contentW = pageWidth - margin * 2;
 
     let cursorY = drawDashboardReportHeader(
         doc,
@@ -1445,44 +1545,426 @@ export const exportScheduleDashboardPdf = (payload: ScheduleDashboardPdfPayload)
     });
     cursorY = (doc as any).lastAutoTable.finalY + 6;
 
-    // 2. Charts (Daily + Doughnut side by side, then Sector below)
-    const dailyImg = compositeCanvasForPdf(payload.canvases.daily);
-    const doughnutImg = compositeCanvasForPdf(payload.canvases.doughnut);
-    const sectorImg = compositeCanvasForPdf(payload.canvases.sector);
+    // 2. Render Offscreen High-Res (2x) Light-Theme Charts
+    const targetAdherence = payload.kpis.targetAdherence;
 
-    const contentW = pageWidth - margin * 2;
-    if (dailyImg || doughnutImg) {
-        const rowH = 56;
-        if (cursorY + rowH > pageHeight - margin) {
+    const metaHorizontalPlugin: Plugin = {
+        id: 'pdfMetaHorizontalLine',
+        afterDatasetsDraw(chart) {
+            const { ctx, chartArea, scales } = chart;
+            const yScale = scales.y;
+            if (!yScale || !chartArea) return;
+            const yPos = yScale.getPixelForValue(targetAdherence);
+            if (yPos < chartArea.top - 5 || yPos > chartArea.bottom + 5) return;
+
+            ctx.save();
+            ctx.beginPath();
+            ctx.setLineDash([6, 4]);
+            ctx.lineWidth = 1.75;
+            ctx.strokeStyle = '#0284c7';
+            ctx.moveTo(chartArea.left, yPos);
+            ctx.lineTo(chartArea.right, yPos);
+            ctx.stroke();
+
+            const labelText = `Meta ${targetAdherence}%`;
+            ctx.font = '600 11px Inter, Helvetica, Arial, sans-serif';
+            const textW = ctx.measureText(labelText).width;
+            const boxX = Math.max(chartArea.left + 4, chartArea.right - textW - 14);
+            const boxY = Math.max(chartArea.top + 2, yPos - 20);
+            ctx.fillStyle = '#f0f9ff';
+            ctx.strokeStyle = '#0284c7';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.roundRect(boxX, boxY, textW + 10, 17, 4);
+            ctx.fill();
+            ctx.stroke();
+
+            ctx.fillStyle = '#0369a1';
+            ctx.textAlign = 'left';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(labelText, boxX + 5, boxY + 8.5);
+            ctx.restore();
+        },
+    };
+
+    const dailyChart =
+        payload.dailySeries.length > 0
+            ? renderOffscreenChart(
+                  680,
+                  360,
+                  payload.dailyChartMode === 'daily'
+                      ? {
+                            type: 'bar',
+                            plugins: [metaHorizontalPlugin],
+                            data: {
+                                labels: payload.dailySeries.map(d => d.label),
+                                datasets: [
+                                    {
+                                        label: '% Atingimento Diário (OK / Ativas)',
+                                        data: payload.dailySeries.map(d => d.dailyPct),
+                                        backgroundColor: payload.dailySeries.map(d =>
+                                            d.active === 0
+                                                ? '#cbd5e1'
+                                                : d.dailyPct >= targetAdherence
+                                                  ? '#10b981'
+                                                  : d.dailyPct >= targetAdherence - 20
+                                                    ? '#f59e0b'
+                                                    : '#f43f5e'
+                                        ),
+                                        borderRadius: 4,
+                                        maxBarThickness: 32,
+                                    },
+                                ],
+                            },
+                            options: {
+                                plugins: {
+                                    legend: {
+                                        display: true,
+                                        labels: { color: '#0f172a', font: { size: 11, weight: 'bold' } },
+                                    },
+                                },
+                                scales: {
+                                    x: {
+                                        ticks: {
+                                            color: '#475569',
+                                            font: { size: 10 },
+                                            autoSkip: true,
+                                            maxTicksLimit: 10,
+                                            maxRotation: 0,
+                                        },
+                                        grid: { display: false },
+                                    },
+                                    y: {
+                                        min: 0,
+                                        max: 100,
+                                        ticks: {
+                                            color: '#475569',
+                                            font: { size: 10 },
+                                            callback: val => `${val}%`,
+                                        },
+                                        grid: { color: 'rgba(15, 23, 42, 0.1)' },
+                                    },
+                                },
+                            },
+                        }
+                      : {
+                            type: 'line',
+                            plugins: [metaHorizontalPlugin],
+                            data: {
+                                labels: payload.dailySeries.map(d => d.label),
+                                datasets: [
+                                    {
+                                        label: '% Realizado Acumulado (Curva S)',
+                                        data: payload.dailySeries.map(d => d.cumRealPct),
+                                        borderColor: '#059669',
+                                        backgroundColor: 'rgba(16, 185, 129, 0.14)',
+                                        fill: true,
+                                        tension: 0.3,
+                                        borderWidth: 2.5,
+                                        pointRadius: 3,
+                                        pointBackgroundColor: '#059669',
+                                    },
+                                    {
+                                        label: '% Previsto Acumulado',
+                                        data: payload.dailySeries.map(d => d.cumPlanPct),
+                                        borderColor: '#64748b',
+                                        borderDash: [5, 5],
+                                        backgroundColor: 'transparent',
+                                        fill: false,
+                                        tension: 0.3,
+                                        borderWidth: 2,
+                                        pointRadius: 2,
+                                        pointBackgroundColor: '#64748b',
+                                    },
+                                ],
+                            },
+                            options: {
+                                plugins: {
+                                    legend: {
+                                        display: true,
+                                        labels: { color: '#0f172a', font: { size: 11, weight: 'bold' } },
+                                    },
+                                },
+                                scales: {
+                                    x: {
+                                        ticks: {
+                                            color: '#475569',
+                                            font: { size: 10 },
+                                            autoSkip: true,
+                                            maxTicksLimit: 10,
+                                            maxRotation: 0,
+                                        },
+                                        grid: { display: false },
+                                    },
+                                    y: {
+                                        min: 0,
+                                        max: 100,
+                                        ticks: {
+                                            color: '#475569',
+                                            font: { size: 10 },
+                                            callback: val => `${val}%`,
+                                        },
+                                        grid: { color: 'rgba(15, 23, 42, 0.1)' },
+                                    },
+                                },
+                            },
+                        }
+              )
+            : null;
+
+    const statusSlices = [
+        { label: 'Concluído OK', count: payload.kpis.totalRealizado, color: '#10b981', rgb: [16, 185, 129] as [number, number, number] },
+        { label: 'Não Realizada N', count: payload.kpis.totalNaoRealizado, color: '#f43f5e', rgb: [244, 63, 94] as [number, number, number] },
+        { label: 'Cancelada C', count: payload.kpis.totalCancelado, color: '#64748b', rgb: [100, 116, 139] as [number, number, number] },
+        ...(payload.kpis.totalProgramadoOpen > 0
+            ? [{ label: 'Programado X', count: payload.kpis.totalProgramadoOpen, color: '#f59e0b', rgb: [245, 158, 11] as [number, number, number] }]
+            : []),
+    ];
+    const totalDoughnut = statusSlices.reduce((sum, s) => sum + s.count, 0);
+
+    const doughnutChart = renderOffscreenChart(380, 380, {
+        type: 'doughnut',
+        plugins: [createDoughnutCenterPlugin(payload.kpis.adherenceRate, 'Aderência Efetiva')],
+        data: {
+            labels: statusSlices.map(s => s.label),
+            datasets: [
+                {
+                    data: totalDoughnut > 0 ? statusSlices.map(s => s.count) : [1],
+                    backgroundColor: totalDoughnut > 0 ? statusSlices.map(s => s.color) : ['#e2e8f0'],
+                    borderColor: '#ffffff',
+                    borderWidth: 3,
+                },
+            ],
+        },
+        options: {
+            cutout: '70%',
+            layout: { padding: 8 },
+            plugins: {
+                legend: { display: false },
+            },
+        },
+    });
+
+    // Row 1: Daily Evolution (left) + Status Doughnut & Legend (right)
+    const row1CardH = 74;
+    if (cursorY + row1CardH > pageHeight - margin) {
+        doc.addPage();
+        cursorY = margin;
+    }
+
+    const gap = 4;
+    const leftBoxW = contentW * 0.59;
+    const rightBoxW = contentW - leftBoxW - gap;
+    const rightBoxX = margin + leftBoxW + gap;
+
+    // Left Card Frame (Evolução Diária)
+    doc.setDrawColor(203, 213, 225);
+    doc.setFillColor(255, 255, 255);
+    doc.roundedRect(margin, cursorY, leftBoxW, row1CardH, 2, 2, 'FD');
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(15, 23, 42);
+    doc.text(
+        payload.dailyChartMode === 'daily'
+            ? 'Atingimento Diário da Programação'
+            : 'Evolução Acumulada (Curva S)',
+        margin + 3.5,
+        cursorY + 6
+    );
+    if (dailyChart) {
+        const fitted = fitImageInBox(dailyChart.width, dailyChart.height, margin + 2.5, leftBoxW - 5, row1CardH - 10);
+        const drawY = cursorY + 8.5 + (row1CardH - 10 - fitted.imgH) / 2;
+        doc.addImage(dailyChart.dataUrl, 'PNG', fitted.drawX, drawY, fitted.imgW, fitted.imgH);
+    } else {
+        doc.setFontSize(8);
+        doc.setFont('helvetica', 'normal');
+        doc.setTextColor(100, 116, 139);
+        doc.text('Sem dados no filtro atual.', margin + leftBoxW / 2, cursorY + row1CardH / 2, { align: 'center' });
+    }
+
+    // Right Card Frame (Distribuição do Status — Circle 1:1 + Legend)
+    doc.setDrawColor(203, 213, 225);
+    doc.setFillColor(255, 255, 255);
+    doc.roundedRect(rightBoxX, cursorY, rightBoxW, row1CardH, 2, 2, 'FD');
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(15, 23, 42);
+    doc.text('Distribuição do Status', rightBoxX + 3.5, cursorY + 6);
+
+    const legendAreaH = statusSlices.length * 4.6 + 3;
+    const maxDoughnutH = row1CardH - 10 - legendAreaH;
+    if (doughnutChart) {
+        const fittedD = fitImageInBox(
+            doughnutChart.width,
+            doughnutChart.height,
+            rightBoxX + 3,
+            rightBoxW - 6,
+            maxDoughnutH
+        );
+        doc.addImage(doughnutChart.dataUrl, 'PNG', fittedD.drawX, cursorY + 8.5, fittedD.imgW, fittedD.imgH);
+    }
+
+    // Crisp vector legend right below doughnut
+    let legY = cursorY + row1CardH - legendAreaH + 1.5;
+    statusSlices.forEach(s => {
+        const pct = totalDoughnut > 0 ? ((s.count / totalDoughnut) * 100).toFixed(1) : '0.0';
+        doc.setFillColor(s.rgb[0], s.rgb[1], s.rgb[2]);
+        doc.circle(rightBoxX + 5.5, legY - 1, 1.3, 'F');
+        doc.setFontSize(7.5);
+        doc.setFont('helvetica', 'normal');
+        doc.setTextColor(15, 23, 42);
+        doc.text(s.label, rightBoxX + 8.5, legY);
+        doc.setFont('helvetica', 'bold');
+        doc.text(`${s.count} (${pct}%)`, rightBoxX + rightBoxW - 4, legY, { align: 'right' });
+        legY += 4.5;
+    });
+
+    cursorY += row1CardH + 6;
+
+    // 3. Sector Performance Chart (proportional height: Math.max(240, sectors.length * 22))
+    const sectorLogicalH = Math.max(240, payload.sectorStats.length * 22);
+    const metaVerticalPlugin: Plugin = {
+        id: 'pdfSectorMetaVertical',
+        afterDatasetsDraw(chart) {
+            if (payload.sectorChartMode !== 'ranking') return;
+            const { ctx, chartArea, scales } = chart;
+            const xScale = scales.x;
+            if (!xScale || !chartArea) return;
+            const xPos = xScale.getPixelForValue(targetAdherence);
+            if (xPos < chartArea.left - 5 || xPos > chartArea.right + 5) return;
+            ctx.save();
+            ctx.beginPath();
+            ctx.setLineDash([5, 4]);
+            ctx.lineWidth = 1.5;
+            ctx.strokeStyle = '#0284c7';
+            ctx.moveTo(xPos, chartArea.top);
+            ctx.lineTo(xPos, chartArea.bottom);
+            ctx.stroke();
+            ctx.restore();
+        },
+    };
+
+    const sectorChart =
+        payload.sectorStats.length > 0
+            ? renderOffscreenChart(
+                  760,
+                  sectorLogicalH,
+                  payload.sectorChartMode === 'ranking'
+                      ? {
+                            type: 'bar',
+                            plugins: [metaVerticalPlugin, ChartDataLabels],
+                            data: {
+                                labels: payload.sectorStats.map(s => s.sector),
+                                datasets: [
+                                    {
+                                        label: '% Aderência Efetiva',
+                                        data: payload.sectorStats.map(s => s.adherencePct),
+                                        backgroundColor: payload.sectorStats.map(s =>
+                                            s.adherencePct >= targetAdherence
+                                                ? '#10b981'
+                                                : s.adherencePct >= targetAdherence - 20
+                                                  ? '#f59e0b'
+                                                  : '#f43f5e'
+                                        ),
+                                        borderRadius: 4,
+                                        barThickness: 14,
+                                    },
+                                ],
+                            },
+                            options: {
+                                indexAxis: 'y',
+                                layout: { padding: { right: 42 } },
+                                plugins: {
+                                    legend: { display: false },
+                                    datalabels: {
+                                        anchor: 'end',
+                                        align: 'right',
+                                        color: '#0f172a',
+                                        font: { weight: 'bold', size: 10 },
+                                        formatter: val => `${val}%`,
+                                    },
+                                },
+                                scales: {
+                                    x: {
+                                        min: 0,
+                                        max: 100,
+                                        ticks: { color: '#475569', font: { size: 10 }, callback: v => `${v}%` },
+                                        grid: { color: 'rgba(15, 23, 42, 0.1)' },
+                                    },
+                                    y: {
+                                        ticks: { color: '#0f172a', font: { size: 10, weight: 'bold' }, autoSkip: false },
+                                        grid: { display: false },
+                                    },
+                                },
+                            },
+                        }
+                      : {
+                            type: 'bar',
+                            data: {
+                                labels: payload.sectorStats.map(s => s.sector),
+                                datasets: [
+                                    { label: 'Realizado (OK)', data: payload.sectorStats.map(s => s.ok), backgroundColor: '#10b981', borderRadius: 2 },
+                                    { label: 'Programado (X)', data: payload.sectorStats.map(s => s.x), backgroundColor: '#f59e0b', borderRadius: 2 },
+                                    { label: 'Não Realizado (N)', data: payload.sectorStats.map(s => s.n), backgroundColor: '#f43f5e', borderRadius: 2 },
+                                    { label: 'Cancelado (C)', data: payload.sectorStats.map(s => s.c), backgroundColor: '#64748b', borderRadius: 2 },
+                                ],
+                            },
+                            options: {
+                                indexAxis: 'y',
+                                plugins: {
+                                    legend: {
+                                        display: true,
+                                        position: 'bottom',
+                                        labels: { color: '#0f172a', font: { size: 10, weight: 'bold' }, boxWidth: 11 },
+                                    },
+                                },
+                                scales: {
+                                    x: {
+                                        stacked: true,
+                                        ticks: { color: '#475569', font: { size: 10 }, precision: 0 },
+                                        grid: { color: 'rgba(15, 23, 42, 0.1)' },
+                                    },
+                                    y: {
+                                        stacked: true,
+                                        ticks: { color: '#0f172a', font: { size: 10, weight: 'bold' }, autoSkip: false },
+                                        grid: { display: false },
+                                    },
+                                },
+                            },
+                        }
+              )
+            : null;
+
+    if (sectorChart) {
+        const maxSectorCardImgH = pageHeight - margin * 2 - 20;
+        const fittedSec = fitImageInBox(sectorChart.width, sectorChart.height, margin + 3, contentW - 6, maxSectorCardImgH);
+        const secCardH = fittedSec.imgH + 12;
+
+        if (cursorY + secCardH > pageHeight - margin) {
             doc.addPage();
             cursorY = margin;
         }
-        if (dailyImg && doughnutImg) {
-            const leftW = contentW * 0.58;
-            const rightW = contentW * 0.39;
-            doc.addImage(dailyImg, 'PNG', margin, cursorY, leftW, rowH);
-            doc.addImage(doughnutImg, 'PNG', margin + leftW + contentW * 0.03, cursorY, rightW, rowH);
-        } else if (dailyImg) {
-            doc.addImage(dailyImg, 'PNG', margin, cursorY, contentW, rowH);
-        } else if (doughnutImg) {
-            doc.addImage(doughnutImg, 'PNG', margin, cursorY, contentW * 0.5, rowH);
-        }
-        cursorY += rowH + 6;
+
+        doc.setDrawColor(203, 213, 225);
+        doc.setFillColor(255, 255, 255);
+        doc.roundedRect(margin, cursorY, contentW, secCardH, 2, 2, 'FD');
+        doc.setFontSize(9);
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(15, 23, 42);
+        doc.text(
+            payload.sectorChartMode === 'ranking'
+                ? `Aderência e Desempenho por Setor (Meta ${targetAdherence}%)`
+                : 'Distribuição de Volume por Setor',
+            margin + 3.5,
+            cursorY + 6
+        );
+        doc.addImage(sectorChart.dataUrl, 'PNG', fittedSec.drawX, cursorY + 9, fittedSec.imgW, fittedSec.imgH);
+        cursorY += secCardH + 6;
     }
 
-    if (sectorImg) {
-        const secH = 62;
-        if (cursorY + secH > pageHeight - margin) {
-            doc.addPage();
-            cursorY = margin;
-        }
-        doc.addImage(sectorImg, 'PNG', margin, cursorY, contentW, secH);
-        cursorY += secH + 6;
-    }
-
-    // 3. FA Summary Table
+    // 4. FA Summary Table
     if (payload.faRows.length > 0) {
-        if (cursorY + 25 > pageHeight - margin) {
+        if (cursorY + 30 > pageHeight - margin) {
             doc.addPage();
             cursorY = margin;
         }
@@ -1499,13 +1981,13 @@ export const exportScheduleDashboardPdf = (payload: ScheduleDashboardPdfPayload)
             body: payload.faRows.slice(0, 20).map(r => [r.faLabel, r.sector, `${r.ok}/${r.active}`, r.pending, r.pct]),
             theme: 'striped',
             headStyles: { fillColor: [30, 41, 59], textColor: [255, 255, 255], fontSize: 8 },
-            bodyStyles: { fontSize: 7.5 },
+            bodyStyles: { fontSize: 7.5, textColor: [15, 23, 42] },
         });
         cursorY = (doc as any).lastAutoTable.finalY + 8;
     }
 
-    // 4. Action Plan Table (N and C)
-    if (cursorY + 25 > pageHeight - margin) {
+    // 5. Action Plan Table (N and C)
+    if (cursorY + 30 > pageHeight - margin) {
         doc.addPage();
         cursorY = margin;
     }
@@ -1525,7 +2007,7 @@ export const exportScheduleDashboardPdf = (payload: ScheduleDashboardPdfPayload)
                 : [['—', '—', '—', 'Nenhuma atividade N ou C nos filtros atuais.', '—', '—']],
         theme: 'striped',
         headStyles: { fillColor: [153, 27, 27], textColor: [255, 255, 255], fontSize: 8 },
-        bodyStyles: { fontSize: 7.5 },
+        bodyStyles: { fontSize: 7.5, textColor: [15, 23, 42] },
     });
 
     const safeName = (payload.title || 'Projeto').replace(/[^\w\-]+/g, '_');
@@ -1545,11 +2027,21 @@ export interface ManpowerDashboardPdfPayload {
         shift2PctInfo: string;
         peakDailyValue: string;
         peakDailyInfo: string;
+        totalPlannedCapacity: number;
     };
-    canvases: {
-        histogram: HTMLCanvasElement | null;
-        category: HTMLCanvasElement | null;
-        roles: HTMLCanvasElement | null;
+    histogramDays: {
+        label: string;
+        valuesByCategory: number[]; // order: Supervisão, Ofícios, Inspeção, Outros
+    }[];
+    categoryBreakdown: {
+        total: number;
+        items: {
+            category: string;
+            count: number;
+            pct: number;
+            color: string;
+            rgb: [number, number, number];
+        }[];
     };
     tableRows: {
         role: string;
@@ -1567,6 +2059,7 @@ export const exportManpowerDashboardPdf = (payload: ManpowerDashboardPdfPayload)
     const pageWidth = doc.internal.pageSize.getWidth();
     const pageHeight = doc.internal.pageSize.getHeight();
     const margin = 14;
+    const contentW = pageWidth - margin * 2;
 
     let cursorY = drawDashboardReportHeader(
         doc,
@@ -1593,43 +2086,261 @@ export const exportManpowerDashboardPdf = (payload: ManpowerDashboardPdfPayload)
     });
     cursorY = (doc as any).lastAutoTable.finalY + 6;
 
-    // 2. Charts (Histogram + Category Doughnut side by side, then Roles bar chart)
-    const histImg = compositeCanvasForPdf(payload.canvases.histogram);
-    const catImg = compositeCanvasForPdf(payload.canvases.category);
-    const rolesImg = compositeCanvasForPdf(payload.canvases.roles);
-    const contentW = pageWidth - margin * 2;
+    // 2. Render 2x Light-Theme Offscreen MO Charts
+    const catNames = ['Supervisão', 'Ofícios', 'Inspeção', 'Outros'];
+    const catColors = ['#0284c7', '#10b981', '#f59e0b', '#9333ea'];
 
-    if (histImg || catImg) {
-        const rowH = 56;
-        if (cursorY + rowH > pageHeight - margin) {
+    const capacityPlugin: Plugin = {
+        id: 'pdfMoCapacityLine',
+        afterDatasetsDraw(chart) {
+            const { ctx, chartArea, scales } = chart;
+            const yScale = scales.y;
+            if (!yScale || !chartArea) return;
+            const cap = payload.kpis.totalPlannedCapacity;
+            const yPos = yScale.getPixelForValue(cap);
+            if (yPos < chartArea.top - 5 || yPos > chartArea.bottom + 5) return;
+
+            ctx.save();
+            ctx.beginPath();
+            ctx.setLineDash([6, 4]);
+            ctx.lineWidth = 1.75;
+            ctx.strokeStyle = '#0284c7';
+            ctx.moveTo(chartArea.left, yPos);
+            ctx.lineTo(chartArea.right, yPos);
+            ctx.stroke();
+
+            const labelText = `Capacidade: ${cap}`;
+            ctx.font = '600 10.5px Inter, Helvetica, Arial, sans-serif';
+            const textW = ctx.measureText(labelText).width;
+            const boxX = Math.max(chartArea.left + 4, chartArea.right - textW - 14);
+            const boxY = Math.max(chartArea.top + 2, yPos - 19);
+            ctx.fillStyle = '#f0f9ff';
+            ctx.strokeStyle = '#0284c7';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.roundRect(boxX, boxY, textW + 10, 16, 4);
+            ctx.fill();
+            ctx.stroke();
+
+            ctx.fillStyle = '#0369a1';
+            ctx.textAlign = 'left';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(labelText, boxX + 5, boxY + 8);
+            ctx.restore();
+        },
+    };
+
+    const maxStackVal = Math.max(
+        payload.kpis.totalPlannedCapacity,
+        ...payload.histogramDays.map(d => d.valuesByCategory.reduce((a, b) => a + b, 0)),
+        1
+    );
+
+    const histChart =
+        payload.histogramDays.length > 0
+            ? renderOffscreenChart(680, 360, {
+                  type: 'bar',
+                  plugins: [capacityPlugin],
+                  data: {
+                      labels: payload.histogramDays.map(d => d.label),
+                      datasets: catNames.map((cat, idx) => ({
+                          label: cat,
+                          data: payload.histogramDays.map(d => d.valuesByCategory[idx] || 0),
+                          backgroundColor: catColors[idx],
+                          borderRadius: 3,
+                          maxBarThickness: 42,
+                      })),
+                  },
+                  options: {
+                      plugins: {
+                          legend: {
+                              display: true,
+                              position: 'bottom',
+                              labels: { color: '#0f172a', font: { size: 10, weight: 'bold' }, boxWidth: 11 },
+                          },
+                      },
+                      scales: {
+                          x: {
+                              stacked: true,
+                              ticks: {
+                                  color: '#0f172a',
+                                  font: { size: 10, weight: 'bold' },
+                                  autoSkip: true,
+                                  maxTicksLimit: 10,
+                                  maxRotation: 0,
+                              },
+                              grid: { display: false },
+                          },
+                          y: {
+                              stacked: true,
+                              beginAtZero: true,
+                              suggestedMax: Math.ceil(maxStackVal * 1.18),
+                              ticks: { color: '#475569', font: { size: 10 }, precision: 0 },
+                              grid: { color: 'rgba(15, 23, 42, 0.1)' },
+                          },
+                      },
+                  },
+              })
+            : null;
+
+    const catChart = renderOffscreenChart(380, 380, {
+        type: 'doughnut',
+        plugins: [createDoughnutCenterPlugin(`${payload.categoryBreakdown.total}`, 'Profissionais')],
+        data: {
+            labels: payload.categoryBreakdown.items.map(i => i.category),
+            datasets: [
+                {
+                    data:
+                        payload.categoryBreakdown.total > 0
+                            ? payload.categoryBreakdown.items.map(i => i.count)
+                            : [1],
+                    backgroundColor:
+                        payload.categoryBreakdown.total > 0
+                            ? payload.categoryBreakdown.items.map(i => i.color)
+                            : ['#e2e8f0'],
+                    borderColor: '#ffffff',
+                    borderWidth: 3,
+                },
+            ],
+        },
+        options: {
+            cutout: '70%',
+            layout: { padding: 8 },
+            plugins: { legend: { display: false } },
+        },
+    });
+
+    // Row 1: Histogram (left) + Category Doughnut & Legend (right)
+    const row1CardH = 74;
+    if (cursorY + row1CardH > pageHeight - margin) {
+        doc.addPage();
+        cursorY = margin;
+    }
+
+    const gap = 4;
+    const leftBoxW = contentW * 0.59;
+    const rightBoxW = contentW - leftBoxW - gap;
+    const rightBoxX = margin + leftBoxW + gap;
+
+    doc.setDrawColor(203, 213, 225);
+    doc.setFillColor(255, 255, 255);
+    doc.roundedRect(margin, cursorY, leftBoxW, row1CardH, 2, 2, 'FD');
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(15, 23, 42);
+    doc.text('Histograma Diário de Mão de Obra (Seg a Sex)', margin + 3.5, cursorY + 6);
+    if (histChart) {
+        const fittedH = fitImageInBox(histChart.width, histChart.height, margin + 2.5, leftBoxW - 5, row1CardH - 10);
+        const drawY = cursorY + 8.5 + (row1CardH - 10 - fittedH.imgH) / 2;
+        doc.addImage(histChart.dataUrl, 'PNG', fittedH.drawX, drawY, fittedH.imgW, fittedH.imgH);
+    }
+
+    doc.setDrawColor(203, 213, 225);
+    doc.setFillColor(255, 255, 255);
+    doc.roundedRect(rightBoxX, cursorY, rightBoxW, row1CardH, 2, 2, 'FD');
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(15, 23, 42);
+    doc.text('Distribuição por Categoria', rightBoxX + 3.5, cursorY + 6);
+
+    const catLegH = payload.categoryBreakdown.items.length * 4.6 + 3;
+    const maxCatDoughnutH = row1CardH - 10 - catLegH;
+    if (catChart) {
+        const fittedC = fitImageInBox(catChart.width, catChart.height, rightBoxX + 3, rightBoxW - 6, maxCatDoughnutH);
+        doc.addImage(catChart.dataUrl, 'PNG', fittedC.drawX, cursorY + 8.5, fittedC.imgW, fittedC.imgH);
+    }
+
+    let catLegY = cursorY + row1CardH - catLegH + 1.5;
+    payload.categoryBreakdown.items.forEach(item => {
+        doc.setFillColor(item.rgb[0], item.rgb[1], item.rgb[2]);
+        doc.circle(rightBoxX + 5.5, catLegY - 1, 1.3, 'F');
+        doc.setFontSize(7.5);
+        doc.setFont('helvetica', 'normal');
+        doc.setTextColor(15, 23, 42);
+        doc.text(item.category, rightBoxX + 8.5, catLegY);
+        doc.setFont('helvetica', 'bold');
+        doc.text(`${item.count} (${item.pct.toFixed(0)}%)`, rightBoxX + rightBoxW - 4, catLegY, { align: 'right' });
+        catLegY += 4.5;
+    });
+
+    cursorY += row1CardH + 6;
+
+    // 3. Planned vs Allocated by Role Chart (proportional height)
+    const orderedRoles = [...payload.tableRows].sort(
+        (a, b) => Math.max(b.planned, b.allocated) - Math.max(a.planned, a.allocated)
+    );
+    const rolesLogicalH = Math.max(240, orderedRoles.length * 26);
+
+    const rolesChart =
+        orderedRoles.length > 0
+            ? renderOffscreenChart(760, rolesLogicalH, {
+                  type: 'bar',
+                  data: {
+                      labels: orderedRoles.map(r => r.role),
+                      datasets: [
+                          {
+                              label: 'Planejado',
+                              data: orderedRoles.map(r => r.planned),
+                              backgroundColor: '#0284c7',
+                              borderRadius: 4,
+                              barThickness: 10,
+                          },
+                          {
+                              label: 'Alocado (Pico)',
+                              data: orderedRoles.map(r => r.allocated),
+                              backgroundColor: orderedRoles.map(r => (r.allocated > r.planned ? '#f43f5e' : '#10b981')),
+                              borderRadius: 4,
+                              barThickness: 10,
+                          },
+                      ],
+                  },
+                  options: {
+                      indexAxis: 'y',
+                      plugins: {
+                          legend: {
+                              display: true,
+                              position: 'bottom',
+                              labels: { color: '#0f172a', font: { size: 10, weight: 'bold' }, boxWidth: 11 },
+                          },
+                      },
+                      scales: {
+                          x: {
+                              beginAtZero: true,
+                              ticks: { color: '#475569', font: { size: 10 }, precision: 0 },
+                              grid: { color: 'rgba(15, 23, 42, 0.1)' },
+                          },
+                          y: {
+                              ticks: { color: '#0f172a', font: { size: 10, weight: 'bold' }, autoSkip: false },
+                              grid: { display: false },
+                          },
+                      },
+                  },
+              })
+            : null;
+
+    if (rolesChart) {
+        const maxRolesImgH = pageHeight - margin * 2 - 20;
+        const fittedR = fitImageInBox(rolesChart.width, rolesChart.height, margin + 3, contentW - 6, maxRolesImgH);
+        const rolesCardH = fittedR.imgH + 12;
+
+        if (cursorY + rolesCardH > pageHeight - margin) {
             doc.addPage();
             cursorY = margin;
         }
-        if (histImg && catImg) {
-            const leftW = contentW * 0.58;
-            const rightW = contentW * 0.39;
-            doc.addImage(histImg, 'PNG', margin, cursorY, leftW, rowH);
-            doc.addImage(catImg, 'PNG', margin + leftW + contentW * 0.03, cursorY, rightW, rowH);
-        } else if (histImg) {
-            doc.addImage(histImg, 'PNG', margin, cursorY, contentW, rowH);
-        } else if (catImg) {
-            doc.addImage(catImg, 'PNG', margin, cursorY, contentW * 0.5, rowH);
-        }
-        cursorY += rowH + 6;
+
+        doc.setDrawColor(203, 213, 225);
+        doc.setFillColor(255, 255, 255);
+        doc.roundedRect(margin, cursorY, contentW, rolesCardH, 2, 2, 'FD');
+        doc.setFontSize(9);
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(15, 23, 42);
+        doc.text('Planejado vs. Alocado por Cargo', margin + 3.5, cursorY + 6);
+        doc.addImage(rolesChart.dataUrl, 'PNG', fittedR.drawX, cursorY + 9, fittedR.imgW, fittedR.imgH);
+        cursorY += rolesCardH + 6;
     }
 
-    if (rolesImg) {
-        const rolesH = 66;
-        if (cursorY + rolesH > pageHeight - margin) {
-            doc.addPage();
-            cursorY = margin;
-        }
-        doc.addImage(rolesImg, 'PNG', margin, cursorY, contentW, rolesH);
-        cursorY += rolesH + 6;
-    }
-
-    // 3. Balanceamento & Desvios de Efetivo Table
-    if (cursorY + 25 > pageHeight - margin) {
+    // 4. Balanceamento & Desvios de Efetivo Table
+    if (cursorY + 30 > pageHeight - margin) {
         doc.addPage();
         cursorY = margin;
     }
@@ -1657,7 +2368,7 @@ export const exportManpowerDashboardPdf = (payload: ManpowerDashboardPdfPayload)
                 : [['—', '—', 0, 0, 0, '0', 'Sem dados para os filtros selecionados']],
         theme: 'striped',
         headStyles: { fillColor: [30, 41, 59], textColor: [255, 255, 255], fontSize: 8 },
-        bodyStyles: { fontSize: 8 },
+        bodyStyles: { fontSize: 8, textColor: [15, 23, 42] },
     });
 
     const safeName = (payload.title || 'Projeto').replace(/[^\w\-]+/g, '_');

@@ -146,7 +146,17 @@ export const DailyAllocationView: React.FC<{
         }
         return positions;
     }, [fixedColumnWidths]);
-    
+
+    const totalFixedWidth = useMemo(
+        () => fixedColumnWidths.reduce((a, b) => a + b, 0),
+        [fixedColumnWidths]
+    );
+
+    const totalTableWidth = useMemo(
+        () => totalFixedWidth + dates.length * dateColumnWidth,
+        [totalFixedWidth, dates.length, dateColumnWidth]
+    );
+
     // Sync horizontal scroll
     useEffect(() => {
         const main = mainTableRef.current;
@@ -178,15 +188,15 @@ export const DailyAllocationView: React.FC<{
             return next;
         });
     };
-    
+
     const handleCellClick = (e: React.MouseEvent<HTMLTableCellElement>, activityId: string, date: string) => {
-        if(popover?.activityId === activityId && popover?.date === date) {
+        if (popover?.activityId === activityId && popover?.date === date) {
             setPopover(null);
         } else {
             setPopover({ activityId, date, element: e.currentTarget });
         }
     };
-    
+
     const summaryData = useMemo(() => {
         const dailyTotals: Record<string, Record<string, number>> = {};
         dates.forEach(date => {
@@ -220,7 +230,7 @@ export const DailyAllocationView: React.FC<{
                 });
             }
         });
-        
+
         return { dailyTotals, weeklyAvailable };
     }, [project, dates]);
 
@@ -247,10 +257,10 @@ export const DailyAllocationView: React.FC<{
 
                     if (!newDaily[activityId]) newDaily[activityId] = {};
                     if (!newDaily[activityId][date]) newDaily[activityId][date] = {};
-                    
+
                     const currentQty = newDaily[activityId][date][role] || 0;
                     newDaily[activityId][date][role] = currentQty + 1;
-                    
+
                     return newProject;
                 });
             }
@@ -258,34 +268,39 @@ export const DailyAllocationView: React.FC<{
             console.error("Failed to handle drop", err);
         }
     };
-    
+
+    const weekSpans = useMemo(() => {
+        const spans: { week: number; count: number }[] = [];
+        if (dates.length > 0) {
+            let currentWeek = getWeek(dates[0]);
+            let count = 0;
+            dates.forEach(date => {
+                const week = getWeek(date);
+                if (week === currentWeek) count++;
+                else {
+                    spans.push({ week: currentWeek, count });
+                    currentWeek = week;
+                    count = 1;
+                }
+            });
+            spans.push({ week: currentWeek, count });
+        }
+        return spans;
+    }, [dates]);
+
     const ColGroup = () => (
         <colgroup>
-            {fixedColumnWidths.map((width, index) => <col key={`col-fixed-${index}`} style={{ width: `${width}px` }} />)}
-            {dates.map(date => <col key={`col-date-${formatDate(date)}`} style={{ width: `${dateColumnWidth}px`, minWidth: `${dateColumnWidth}px` }} />)}
+            {fixedColumnWidths.map((width, index) => (
+                <col key={`col-fixed-${index}`} style={{ width: `${width}px`, minWidth: `${width}px` }} />
+            ))}
+            {dates.map(date => (
+                <col key={`col-date-${formatDate(date)}`} style={{ width: `${dateColumnWidth}px`, minWidth: `${dateColumnWidth}px` }} />
+            ))}
         </colgroup>
     );
 
     const TableHeader = () => {
         const headers = ['ID', 'Fase/Agrupador', 'Tarefa Principal'];
-        const weekSpans = useMemo(() => {
-            const spans: { week: number; count: number }[] = [];
-            if(dates.length > 0) {
-                let currentWeek = getWeek(dates[0]);
-                let count = 0;
-                dates.forEach(date => {
-                    const week = getWeek(date);
-                    if (week === currentWeek) count++;
-                    else {
-                        spans.push({ week: currentWeek, count });
-                        currentWeek = week;
-                        count = 1;
-                    }
-                });
-                spans.push({ week: currentWeek, count });
-            }
-            return spans;
-        }, [dates]);
 
         return (
             <thead>
@@ -294,27 +309,65 @@ export const DailyAllocationView: React.FC<{
                         <th
                             key={header}
                             rowSpan={3}
-                            className={`col-sticky col-sticky-${index + 1}`}
-                            style={{ width: fixedColumnWidths[index], left: stickyColumnPositions[index] }}
+                            className={`col-sticky col-sticky-${index + 1} text-xs font-bold text-slate-700 bg-slate-100`}
+                            style={{
+                                width: fixedColumnWidths[index],
+                                minWidth: fixedColumnWidths[index],
+                                maxWidth: fixedColumnWidths[index],
+                                left: stickyColumnPositions[index],
+                                boxShadow: index === 2 ? '2px 0 6px -2px rgba(15, 23, 42, 0.14)' : undefined,
+                            }}
                         >
-                            <div className="header-content">{header}</div>
+                            <div className="header-content truncate">{header}</div>
                             <div className="resize-handle" onMouseDown={(e) => handleResizeStart(index, e)}></div>
                         </th>
                     ))}
-                    {weekSpans.map(s => <th key={s.week} colSpan={s.count} className="week-header">Semana {s.week}</th>)}
+                    {weekSpans.map(s => (
+                        <th key={s.week} colSpan={s.count} className="week-header text-xs font-bold text-slate-700">
+                            Semana {s.week}
+                        </th>
+                    ))}
+                </tr>
+                <tr>
+                    {dates.map(d => {
+                        const dateStr = formatDate(d);
+                        const weekYear = getWeekYear(d);
+                        const dayAbbr = getDayAbbr(d);
+                        const weekendClass = dayAbbr === 'SÁB' || dayAbbr === 'DOM' ? 'saturday-col' : '';
+                        const totalDaily = (Object.values(summaryData.dailyTotals[dateStr] || {}) as number[]).reduce((a, b) => a + b, 0);
+                        const availableWeekly = (Object.values(summaryData.weeklyAvailable[weekYear] || {}) as number[]).reduce((a, b) => a + b, 0);
+                        const isOverloaded = totalDaily > availableWeekly;
+
+                        return (
+                            <th key={`dayhead-${dateStr}`} className={`${weekendClass} align-middle`}>
+                                <div className="flex flex-col items-center justify-center leading-tight gap-0.5">
+                                    <span className="text-[10px] font-bold tracking-wide text-slate-700">{dayAbbr}</span>
+                                    <span
+                                        className={`text-[10px] font-semibold tabular-nums px-1 py-0.5 rounded whitespace-nowrap ${
+                                            isOverloaded
+                                                ? 'bg-rose-100 text-rose-800 border border-rose-300'
+                                                : totalDaily > 0
+                                                ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                                                : 'text-slate-500'
+                                        }`}
+                                        title={`Alocado: ${totalDaily} / Disponível: ${availableWeekly} MO`}
+                                    >
+                                        {totalDaily}/{availableWeekly} MO
+                                    </span>
+                                </div>
+                            </th>
+                        );
+                    })}
                 </tr>
                 <tr>
                     {dates.map(d => {
                         const dayAbbr = getDayAbbr(d);
                         const weekendClass = dayAbbr === 'SÁB' || dayAbbr === 'DOM' ? 'saturday-col' : '';
-                        return <th key={`dayhead-${formatDate(d)}`} className={weekendClass}>{dayAbbr}</th>
-                    })}
-                </tr>
-                 <tr>
-                    {dates.map(d => {
-                        const dayAbbr = getDayAbbr(d);
-                        const weekendClass = dayAbbr === 'SÁB' || dayAbbr === 'DOM' ? 'saturday-col' : '';
-                        return <th key={`datehead-${formatDate(d)}`} className={weekendClass}>{d.getUTCDate()}</th>
+                        return (
+                            <th key={`datehead-${formatDate(d)}`} className={`${weekendClass} text-[11px] font-semibold tabular-nums text-slate-600`}>
+                                {d.getUTCDate()}
+                            </th>
+                        );
                     })}
                 </tr>
             </thead>
@@ -322,56 +375,75 @@ export const DailyAllocationView: React.FC<{
     };
 
     const SummaryTable = () => {
-        const weekSpans = useMemo(() => {
-            if (dates.length === 0) return [];
-            const spans: { week: number; count: number }[] = [];
-            let currentWeek = getWeek(dates[0]);
-            let count = 0;
-            dates.forEach(date => {
-                const week = getWeek(date);
-                if (week === currentWeek) {
-                    count++;
-                } else {
-                    spans.push({ week: currentWeek, count });
-                    currentWeek = week;
-                    count = 1;
-                }
-            });
-            spans.push({ week: currentWeek, count });
-            return spans;
-        }, [dates]);
-
         return (
-            <div className="table-wrapper summary-table-wrapper" ref={summaryTableRef}>
-                <table className="schedule-table daily-allocation-summary-table">
+            <div className="table-wrapper summary-table-wrapper rounded-lg border border-slate-200 bg-white shadow-sm" ref={summaryTableRef}>
+                <table
+                    className="schedule-table daily-allocation-summary-table"
+                    style={{ width: totalTableWidth, minWidth: totalTableWidth }}
+                >
                     <ColGroup />
                     <thead>
                         <tr>
-                            <th colSpan={3} rowSpan={3} className="col-sticky col-sticky-1 summary-header" style={{ width: fixedColumnWidths.slice(0, 3).reduce((a, b) => a + b, 0), left: 0 }}>
+                            <th
+                                colSpan={3}
+                                rowSpan={3}
+                                className="col-sticky col-sticky-1 summary-header text-xs font-bold text-slate-800 uppercase tracking-wide"
+                                style={{
+                                    width: totalFixedWidth,
+                                    minWidth: totalFixedWidth,
+                                    maxWidth: totalFixedWidth,
+                                    left: 0,
+                                    boxShadow: '2px 0 6px -2px rgba(15, 23, 42, 0.14)',
+                                }}
+                            >
                                 Resumo de Alocação de Mão de Obra
                             </th>
-                            {weekSpans.map(span => <th key={`summary-week-${span.week}`} colSpan={span.count} className="week-header">Semana {span.week}</th>)}
+                            {weekSpans.map(span => (
+                                <th key={`summary-week-${span.week}`} colSpan={span.count} className="week-header text-xs font-bold text-slate-700">
+                                    Semana {span.week}
+                                </th>
+                            ))}
                         </tr>
                         <tr>
                             {dates.map(date => {
                                 const dayAbbr = getDayAbbr(date);
                                 const weekendClass = dayAbbr === 'SÁB' || dayAbbr === 'DOM' ? 'saturday-col' : '';
-                                return <th key={`summary-day-${formatDate(date)}`} className={weekendClass}>{dayAbbr}</th>;
+                                return (
+                                    <th key={`summary-day-${formatDate(date)}`} className={`${weekendClass} text-[11px] font-bold text-slate-700`}>
+                                        {dayAbbr}
+                                    </th>
+                                );
                             })}
                         </tr>
                         <tr>
                             {dates.map(date => {
                                 const dayAbbr = getDayAbbr(date);
                                 const weekendClass = dayAbbr === 'SÁB' || dayAbbr === 'DOM' ? 'saturday-col' : '';
-                                return <th key={`summary-date-${formatDate(date)}`} className={weekendClass}>{date.getUTCDate()}</th>;
+                                return (
+                                    <th key={`summary-date-${formatDate(date)}`} className={`${weekendClass} text-[11px] font-semibold tabular-nums text-slate-600`}>
+                                        {date.getUTCDate()}
+                                    </th>
+                                );
                             })}
                         </tr>
                     </thead>
                     <tbody>
                         {project.manpowerAllocation.roles.map(role => (
                             <tr key={`summary-row-${role}`}>
-                                <td colSpan={3} className="col-sticky col-sticky-1" style={{ width: fixedColumnWidths.slice(0, 3).reduce((a, b) => a + b, 0), left: 0, textAlign: 'left', padding: '0 8px', fontWeight: 'bold' }}>
-                                    {role}
+                                <td
+                                    colSpan={3}
+                                    className="col-sticky col-sticky-1 text-xs font-semibold text-slate-800"
+                                    style={{
+                                        width: totalFixedWidth,
+                                        minWidth: totalFixedWidth,
+                                        maxWidth: totalFixedWidth,
+                                        left: 0,
+                                        textAlign: 'left',
+                                        padding: '0 10px',
+                                        boxShadow: '2px 0 6px -2px rgba(15, 23, 42, 0.14)',
+                                    }}
+                                >
+                                    <div className="truncate" title={role}>{role}</div>
                                 </td>
                                 {dates.map(date => {
                                     const dateStr = formatDate(date);
@@ -381,7 +453,10 @@ export const DailyAllocationView: React.FC<{
                                     const isSuperAllocated = totalDaily > availableWeekly;
                                     const weekendClass = getDayAbbr(date) === 'SÁB' || getDayAbbr(date) === 'DOM' ? 'saturday-col' : '';
                                     return (
-                                        <td key={`summary-cell-${role}-${dateStr}`} className={`${isSuperAllocated ? 'super-allocated' : ''} ${weekendClass}`}>
+                                        <td
+                                            key={`summary-cell-${role}-${dateStr}`}
+                                            className={`tabular-nums text-xs ${isSuperAllocated ? 'super-allocated' : ''} ${weekendClass}`}
+                                        >
                                             {`${totalDaily} / ${availableWeekly}`}
                                         </td>
                                     );
@@ -391,8 +466,20 @@ export const DailyAllocationView: React.FC<{
                     </tbody>
                     <tfoot>
                         <tr>
-                            <td colSpan={3} className="col-sticky col-sticky-1" style={{ width: fixedColumnWidths.slice(0, 3).reduce((a, b) => a + b, 0), left: 0, textAlign: 'left', fontWeight: 'bold', padding: '0 8px' }}>
-                                <strong>TOTAL GERAL</strong>
+                            <td
+                                colSpan={3}
+                                className="col-sticky col-sticky-1 text-xs font-bold text-slate-900 bg-slate-100"
+                                style={{
+                                    width: totalFixedWidth,
+                                    minWidth: totalFixedWidth,
+                                    maxWidth: totalFixedWidth,
+                                    left: 0,
+                                    textAlign: 'left',
+                                    padding: '0 10px',
+                                    boxShadow: '2px 0 6px -2px rgba(15, 23, 42, 0.14)',
+                                }}
+                            >
+                                TOTAL GERAL
                             </td>
                             {dates.map(date => {
                                 const dateStr = formatDate(date);
@@ -402,7 +489,10 @@ export const DailyAllocationView: React.FC<{
                                 const isSuperAllocated = totalDaily > availableWeekly;
                                 const weekendClass = getDayAbbr(date) === 'SÁB' || getDayAbbr(date) === 'DOM' ? 'saturday-col' : '';
                                 return (
-                                    <td key={`summary-total-${dateStr}`} className={`${isSuperAllocated ? 'super-allocated' : ''} ${weekendClass}`} style={{ fontWeight: 'bold' }}>
+                                    <td
+                                        key={`summary-total-${dateStr}`}
+                                        className={`tabular-nums text-xs font-bold ${isSuperAllocated ? 'super-allocated' : 'bg-slate-50 text-slate-900'} ${weekendClass}`}
+                                    >
                                         {`${totalDaily} / ${availableWeekly}`}
                                     </td>
                                 );
@@ -417,56 +507,81 @@ export const DailyAllocationView: React.FC<{
     return (
         <div className="daily-allocation-view" style={{ zoom: zoomLevel / 100 }}>
             {popover && <AllocationPopover popover={popover} project={project} setProject={setProject} onClose={() => setPopover(null)} />}
-            <aside className="daily-allocation-sidebar">
-                <h3>Mão de Obra</h3>
-                {Object.entries(MANPOWER_CATEGORIES).map(([category, roles]) => (
-                    <div key={category} className={`role-category ${collapsedCategories.has(category) ? 'collapsed' : ''}`}>
-                        <h4 onClick={() => toggleCategory(category)}>
-                            {category}
-                            <span className="material-icons">expand_more</span>
-                        </h4>
-                        {!collapsedCategories.has(category) && (
-                            <ul>
-                                {roles.filter(r => project.manpowerAllocation.roles.includes(r)).map(role => (
-                                    <li 
-                                      key={role} 
-                                      draggable 
-                                      onDragStart={(e) => handleDragStart(e, role)}
-                                      onDragEnd={() => setDragOverInfo(null)}
+            <aside className="daily-allocation-sidebar shadow-sm">
+                <div className="flex items-center justify-between border-b border-slate-200 pb-3 mb-3">
+                    <h3 className="!m-0 text-sm font-bold text-slate-800 uppercase tracking-wide">Mão de Obra</h3>
+                    <span className="text-[11px] font-medium text-slate-500">Arraste p/ grade</span>
+                </div>
+                {Object.entries(MANPOWER_CATEGORIES).map(([category, roles]) => {
+                    const availableRoles = roles.filter(r => project.manpowerAllocation.roles.includes(r));
+                    if (availableRoles.length === 0) return null;
+                    return (
+                        <div key={category} className={`role-category ${collapsedCategories.has(category) ? 'collapsed' : ''}`}>
+                            <h4 onClick={() => toggleCategory(category)}>
+                                <span>{category}</span>
+                                <span className="material-icons">expand_more</span>
+                            </h4>
+                            {!collapsedCategories.has(category) && (
+                                <ul>
+                                    {availableRoles.map(role => (
+                                        <li
+                                            key={role}
+                                            draggable
+                                            onDragStart={(e) => handleDragStart(e, role)}
+                                            onDragEnd={() => setDragOverInfo(null)}
+                                            className="flex items-center gap-1.5 text-slate-700 font-medium"
+                                        >
+                                            <span className="material-icons text-slate-400" style={{ fontSize: '15px' }}>drag_indicator</span>
+                                            <span className="truncate" title={role}>{role}</span>
+                                        </li>
+                                    ))}
+                                </ul>
+                            )}
+                        </div>
+                    );
+                })}
+                {project.manpowerAllocation.roles.some(r => !Object.values(MANPOWER_CATEGORIES).flat().includes(r)) && (
+                    <div className="role-category">
+                        <h4>Outros</h4>
+                        <ul>
+                            {project.manpowerAllocation.roles
+                                .filter(r => !Object.values(MANPOWER_CATEGORIES).flat().includes(r))
+                                .map(role => (
+                                    <li
+                                        key={role}
+                                        draggable
+                                        onDragStart={e => handleDragStart(e, role)}
+                                        onDragEnd={() => setDragOverInfo(null)}
+                                        className="flex items-center gap-1.5 text-slate-700 font-medium"
                                     >
-                                      {role}
+                                        <span className="material-icons text-slate-400" style={{ fontSize: '15px' }}>drag_indicator</span>
+                                        <span className="truncate" title={role}>{role}</span>
                                     </li>
                                 ))}
-                            </ul>
-                        )}
+                        </ul>
                     </div>
-                ))}
-                 {/* This section can be for un-categorized roles */}
-                <div className="role-category">
-                     <h4>Outros</h4>
-                     <ul>
-                        {project.manpowerAllocation.roles
-                            .filter(r => !Object.values(MANPOWER_CATEGORIES).flat().includes(r))
-                            .map(role => (
-                            <li key={role} draggable onDragStart={e => handleDragStart(e, role)} onDragEnd={() => setDragOverInfo(null)}>
-                                {role}
-                            </li>
-                        ))}
-                    </ul>
-                </div>
+                )}
             </aside>
             <main className="daily-allocation-main">
-                 <div className="view-header" style={{padding: '0 8px', marginBottom: 0}}>
-                    <h2>Alocação Diária de Mão de Obra</h2>
-                     <div className="view-controls">
-                        <button className="control-button" onClick={handleExport}>
-                            <span className="material-icons">print</span> Imprimir
+                <div className="flex flex-wrap items-center justify-between gap-3 bg-white border border-slate-200 rounded-lg px-4 py-2.5 shadow-sm">
+                    <div className="flex items-center gap-3 min-w-0">
+                        <h2 className="text-base font-bold text-slate-900 tracking-tight m-0">Alocação Diária de Mão de Obra</h2>
+                        <span className="hidden md:inline text-xs text-slate-500">
+                            Clique em uma célula programada ou arraste uma função da barra lateral
+                        </span>
+                    </div>
+                    <div className="view-controls flex items-center gap-2">
+                        <button className="control-button text-xs font-semibold" onClick={handleExport}>
+                            <span className="material-icons" style={{ fontSize: '17px' }}>print</span> Imprimir
                         </button>
                     </div>
                 </div>
-                
-                <div className="table-wrapper" ref={mainTableRef}>
-                    <table className="schedule-table">
+
+                <div className="table-wrapper rounded-lg border border-slate-200 bg-white shadow-sm" ref={mainTableRef}>
+                    <table
+                        className="schedule-table"
+                        style={{ width: totalTableWidth, minWidth: totalTableWidth }}
+                    >
                         <ColGroup />
                         <TableHeader />
                         <tbody>
@@ -474,30 +589,82 @@ export const DailyAllocationView: React.FC<{
                                 group.tarefas.flatMap((task, tIdx) =>
                                     task.activities.map((activity, aIdx) => {
                                         const wbsId = `${gIdx + 1}.${tIdx + 1}.${aIdx + 1}`;
-                                        const groupFa = group.customValues?.fa || 'N/A';
+                                        const groupFa = group.customValues?.fa || group.customValues?.['grupo'] || task.fa || 'Sem Agrupador';
+                                        const taskActivityLabel = `${task.title} - ${activity.name}`;
                                         return (
                                             <tr key={activity.id}>
-                                                <td className="id-cell col-sticky col-sticky-1" style={{ width: fixedColumnWidths[0], left: stickyColumnPositions[0] }}>{wbsId}</td>
-                                                <td className="col-sticky col-sticky-2" style={{textAlign: 'left', padding: '0 8px', width: fixedColumnWidths[1], left: stickyColumnPositions[1], fontSize: '0.75rem', color: '#64748b' }}>{groupFa}</td>
-                                                <td className="col-sticky col-sticky-3" style={{textAlign: 'left', padding: '0 8px', width: fixedColumnWidths[2], left: stickyColumnPositions[2]}}>{task.title} - {activity.name}</td>
+                                                <td
+                                                    className="id-cell col-sticky col-sticky-1 tabular-nums text-xs font-semibold text-slate-500"
+                                                    style={{
+                                                        width: fixedColumnWidths[0],
+                                                        minWidth: fixedColumnWidths[0],
+                                                        maxWidth: fixedColumnWidths[0],
+                                                        left: stickyColumnPositions[0],
+                                                    }}
+                                                >
+                                                    {wbsId}
+                                                </td>
+                                                <td
+                                                    className="col-sticky col-sticky-2"
+                                                    style={{
+                                                        textAlign: 'left',
+                                                        padding: '0 8px',
+                                                        width: fixedColumnWidths[1],
+                                                        minWidth: fixedColumnWidths[1],
+                                                        maxWidth: fixedColumnWidths[1],
+                                                        left: stickyColumnPositions[1],
+                                                    }}
+                                                >
+                                                    <div className="truncate text-xs font-medium text-slate-600" title={groupFa}>
+                                                        {groupFa}
+                                                    </div>
+                                                </td>
+                                                <td
+                                                    className="col-sticky col-sticky-3"
+                                                    style={{
+                                                        textAlign: 'left',
+                                                        padding: '0 8px',
+                                                        width: fixedColumnWidths[2],
+                                                        minWidth: fixedColumnWidths[2],
+                                                        maxWidth: fixedColumnWidths[2],
+                                                        left: stickyColumnPositions[2],
+                                                        boxShadow: '2px 0 6px -2px rgba(15, 23, 42, 0.14)',
+                                                    }}
+                                                >
+                                                    <div className="truncate text-xs font-medium text-slate-800" title={taskActivityLabel}>
+                                                        {taskActivityLabel}
+                                                    </div>
+                                                </td>
                                                 {dates.map(date => {
                                                     const dateStr = formatDate(date);
                                                     const status = activity.schedule[dateStr];
                                                     const allocations = project.dailyManpowerAllocation[activity.id]?.[dateStr];
-                                                    const cellText = allocations ? Object.entries(allocations).map(([role, qty]) => `${getRoleAbbreviation(role)}: ${qty}`).join('\n') : '';
+                                                    const allocationSummary = allocations
+                                                        ? Object.entries(allocations).map(([role, qty]) => `${role}: ${qty}`).join(' · ')
+                                                        : '';
+                                                    const cellText = allocations
+                                                        ? Object.entries(allocations).map(([role, qty]) => `${getRoleAbbreviation(role)}: ${qty}`).join('\n')
+                                                        : '';
                                                     const isDroppable = !!status;
                                                     const isDragOver = dragOverInfo?.activityId === activity.id && dragOverInfo.date === dateStr;
 
                                                     return (
                                                         <td
                                                             key={dateStr}
+                                                            title={allocationSummary || undefined}
                                                             className={`status-cell ${status ? STATUS_CLASS_MAP[status] : ''} ${getDayAbbr(date) === 'SÁB' || getDayAbbr(date) === 'DOM' ? 'saturday-col' : ''} ${isDragOver && isDroppable ? 'droppable-hover' : ''}`}
                                                             onClick={(e) => isDroppable && handleCellClick(e, activity.id, dateStr)}
                                                             onDragOver={(e) => { if (isDroppable) { e.preventDefault(); setDragOverInfo({ activityId: activity.id, date: dateStr }); } }}
                                                             onDragLeave={() => setDragOverInfo(null)}
                                                             onDrop={(e) => isDroppable && handleDrop(e, activity.id, dateStr)}
                                                         >
-                                                            {cellText && <div className="daily-allocation-cell-content"><span className='allocation-text-bubble'>{cellText}</span></div>}
+                                                            {cellText && (
+                                                                <div className="daily-allocation-cell-content px-0.5 overflow-hidden">
+                                                                    <span className="allocation-text-bubble tabular-nums max-h-[38px] overflow-hidden block truncate whitespace-pre-wrap">
+                                                                        {cellText}
+                                                                    </span>
+                                                                </div>
+                                                            )}
                                                         </td>
                                                     );
                                                 })}

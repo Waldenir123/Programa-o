@@ -75,8 +75,12 @@ export const DailyMachineAllocationView: React.FC<{
         });
     };
 
-    const handleDragStart = (e: React.DragEvent<HTMLLIElement>, machineId: string) => {
-        e.dataTransfer.setData('application/json', JSON.stringify({ type: 'machine', machineId }));
+    const handleDragStart = (e: React.DragEvent<HTMLLIElement>, machine: Machine) => {
+        if (machine.status === 'Em manutenção') {
+            e.preventDefault();
+            return;
+        }
+        e.dataTransfer.setData('application/json', JSON.stringify({ type: 'machine', machineId: machine.id }));
         e.dataTransfer.effectAllowed = 'copy';
     };
 
@@ -89,6 +93,10 @@ export const DailyMachineAllocationView: React.FC<{
             if (!data) return;
             if (data && data.type === 'machine') {
                 const { machineId } = data;
+                const targetMachine = project.machines.find(m => m.id === machineId);
+                if (!targetMachine || targetMachine.status === 'Em manutenção') {
+                    return;
+                }
                 setProject(prev => {
                     if (!prev) return null;
                     const newDaily = { ...(prev.dailyMachineAllocation || {}) };
@@ -188,12 +196,20 @@ export const DailyMachineAllocationView: React.FC<{
         return map;
     }, [project.machines]);
 
+    const sidebarCategories = useMemo(() => {
+        const cats = new Set<string>(MACHINE_CATEGORIES);
+        project.machines.forEach(m => {
+            if (m.category) cats.add(m.category);
+        });
+        return Array.from(cats);
+    }, [project.machines]);
+
     return (
         <div className="daily-allocation-view" style={{ zoom: zoomLevel / 100 }}>
             <aside className="daily-allocation-sidebar">
-                <h3>Máquinas Disponíveis</h3>
-                {MACHINE_CATEGORIES.map(category => {
-                    const machines = project.machines.filter(m => m.category === category && m.status === 'Em funcionamento');
+                <h3>Máquinas</h3>
+                {sidebarCategories.map(category => {
+                    const machines = project.machines.filter(m => m.category === category);
                     if (machines.length === 0) return null;
                     return (
                         <div key={category} className={`role-category ${collapsedCategories.has(category) ? 'collapsed' : ''}`}>
@@ -203,23 +219,54 @@ export const DailyMachineAllocationView: React.FC<{
                             </h4>
                             {!collapsedCategories.has(category) && (
                                 <ul>
-                                    {machines.map(machine => (
-                                        <li 
-                                          key={machine.id} 
-                                          draggable 
-                                          onDragStart={(e) => handleDragStart(e, machine.id)}
-                                          onDragEnd={() => setDragOverInfo(null)}
-                                        >
-                                          {machine.name}
-                                        </li>
-                                    ))}
+                                    {machines.map(machine => {
+                                        const isMaint = machine.status === 'Em manutenção';
+                                        const isOp = machine.status === 'Em funcionamento';
+                                        return (
+                                            <li
+                                                key={machine.id}
+                                                draggable={!isMaint}
+                                                onDragStart={(e) => handleDragStart(e, machine)}
+                                                onDragEnd={() => setDragOverInfo(null)}
+                                                title={
+                                                    isMaint
+                                                        ? 'Em manutenção — Bloqueada para alocação diária'
+                                                        : 'Arraste para alocar na atividade'
+                                                }
+                                                style={{
+                                                    cursor: isMaint ? 'not-allowed' : 'grab',
+                                                    opacity: isMaint ? 0.65 : 1,
+                                                    backgroundColor: isMaint ? '#fffbeb' : isOp ? '#ecfdf5' : '#f8fafc',
+                                                    borderColor: isMaint ? '#f59e0b' : isOp ? '#a7f3d0' : '#e2e8f0',
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'space-between',
+                                                    gap: '6px',
+                                                }}
+                                            >
+                                                <span className="truncate font-medium text-slate-800">{machine.name}</span>
+                                                <span
+                                                    className={`text-[10px] font-semibold shrink-0 flex items-center gap-0.5 ${
+                                                        isMaint
+                                                            ? 'text-amber-700'
+                                                            : isOp
+                                                              ? 'text-emerald-700'
+                                                              : 'text-slate-500'
+                                                    }`}
+                                                >
+                                                    {isMaint && <span className="material-icons text-[12px]">lock</span>}
+                                                    {isMaint ? 'Manut.' : isOp ? 'Oper.' : 'Disp.'}
+                                                </span>
+                                            </li>
+                                        );
+                                    })}
                                 </ul>
                             )}
                         </div>
                     );
                 })}
                 {project.machines.length === 0 && (
-                    <p style={{ fontSize: '0.85rem', color: '#64748b', fontStyle: 'italic' }}>Nenhuma máquina em funcionamento para alocar. Cadastre máquinas na aba "Máquinas".</p>
+                    <p style={{ fontSize: '0.85rem', color: '#64748b', fontStyle: 'italic' }}>Nenhuma máquina cadastrada. Cadastre máquinas na aba "Máquinas".</p>
                 )}
             </aside>
             <main className="daily-allocation-main">

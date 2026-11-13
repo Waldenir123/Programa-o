@@ -181,7 +181,11 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     const moRolesChartInstance = useRef<Chart | null>(null);
 
     // --- SCHEDULE DASHBOARD STATE ---
-    const [selectedWeek, setSelectedWeek] = useState<string>('all');
+    const [selectedWeeks, setSelectedWeeks] = useState<string[]>([]);
+    const [isWeekDropdownOpen, setIsWeekDropdownOpen] = useState<boolean>(false);
+    const [weekRangeStart, setWeekRangeStart] = useState<string>('');
+    const [weekRangeEnd, setWeekRangeEnd] = useState<string>('');
+    const weekDropdownRef = useRef<HTMLDivElement>(null);
     const [selectedSector, setSelectedSector] = useState<string>('all');
     const [selectedFa, setSelectedFa] = useState<string>('all');
     const [selectedStatus, setSelectedStatus] = useState<Status | 'all'>('all');
@@ -304,10 +308,45 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     }, [data, breakdownCol]);
 
     useEffect(() => {
-        if (selectedWeek !== 'all' && !availableWeeks.some(w => w.value === selectedWeek)) {
-            setSelectedWeek('all');
+        setSelectedWeeks(prev => {
+            const valid = prev.filter(v => availableWeeks.some(w => w.value === v));
+            return valid.length === prev.length ? prev : valid;
+        });
+    }, [availableWeeks]);
+
+    useEffect(() => {
+        if (availableWeeks.length === 0) {
+            setWeekRangeStart('');
+            setWeekRangeEnd('');
+            return;
         }
-    }, [availableWeeks, selectedWeek]);
+        setWeekRangeStart(prev =>
+            prev && availableWeeks.some(w => w.value === prev) ? prev : availableWeeks[0].value
+        );
+        setWeekRangeEnd(prev =>
+            prev && availableWeeks.some(w => w.value === prev)
+                ? prev
+                : availableWeeks[availableWeeks.length - 1].value
+        );
+    }, [availableWeeks]);
+
+    useEffect(() => {
+        if (!isWeekDropdownOpen) return;
+        const handleOutside = (e: MouseEvent) => {
+            if (weekDropdownRef.current && !weekDropdownRef.current.contains(e.target as Node)) {
+                setIsWeekDropdownOpen(false);
+            }
+        };
+        const handleKey = (e: KeyboardEvent) => {
+            if (e.key === 'Escape') setIsWeekDropdownOpen(false);
+        };
+        document.addEventListener('mousedown', handleOutside);
+        document.addEventListener('keydown', handleKey);
+        return () => {
+            document.removeEventListener('mousedown', handleOutside);
+            document.removeEventListener('keydown', handleKey);
+        };
+    }, [isWeekDropdownOpen]);
 
     useEffect(() => {
         if (selectedSector !== 'all' && !availableSectors.includes(selectedSector)) {
@@ -321,15 +360,58 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         }
     }, [availableFas, selectedFa]);
 
+    const applyWeekRange = useCallback(
+        (fromVal: string, toVal: string) => {
+            const idx1 = availableWeeks.findIndex(w => w.value === fromVal);
+            const idx2 = availableWeeks.findIndex(w => w.value === toVal);
+            if (idx1 === -1 || idx2 === -1) return;
+            const startIdx = Math.min(idx1, idx2);
+            const endIdx = Math.max(idx1, idx2);
+            setSelectedWeeks(availableWeeks.slice(startIdx, endIdx + 1).map(w => w.value));
+        },
+        [availableWeeks]
+    );
+
+    const toggleSingleWeek = useCallback(
+        (weekVal: string) => {
+            setSelectedWeeks(prev => {
+                const exists = prev.includes(weekVal);
+                const nextSet = new Set(prev);
+                if (exists) nextSet.delete(weekVal);
+                else nextSet.add(weekVal);
+                return availableWeeks.filter(w => nextSet.has(w.value)).map(w => w.value);
+            });
+        },
+        [availableWeeks]
+    );
+
+    const selectedWeeksSummaryLabel = useMemo(() => {
+        if (selectedWeeks.length === 0) return 'Todo o Período';
+        const ordered = availableWeeks.filter(w => selectedWeeks.includes(w.value));
+        if (ordered.length === 0) return 'Todo o Período';
+        if (ordered.length === 1) return ordered[0].label;
+
+        const indices = ordered.map(w => availableWeeks.findIndex(aw => aw.value === w.value));
+        const isContiguous = indices.every((idx, i) => i === 0 || idx === indices[i - 1] + 1);
+        if (isContiguous) {
+            const firstNum = ordered[0].weekNum.toString().padStart(2, '0');
+            const lastNum = ordered[ordered.length - 1].weekNum.toString().padStart(2, '0');
+            return `Sem. ${firstNum} até Sem. ${lastNum} (${ordered.length} sem.)`;
+        }
+        const nums = ordered.map(w => `S${w.weekNum.toString().padStart(2, '0')}`);
+        const preview = nums.length <= 4 ? nums.join(', ') : `${nums.slice(0, 3).join(', ')} +${nums.length - 3}`;
+        return `${ordered.length} semanas (${preview})`;
+    }, [selectedWeeks, availableWeeks]);
+
     const filteredOccurrences = useMemo(() => {
         return occurrences.filter(item => {
-            if (selectedWeek !== 'all' && item.weekYear !== selectedWeek) return false;
+            if (selectedWeeks.length > 0 && !selectedWeeks.includes(item.weekYear)) return false;
             if (selectedSector !== 'all' && item.sector !== selectedSector) return false;
             if (selectedFa !== 'all' && item.faKey !== selectedFa) return false;
             if (selectedStatus !== 'all' && item.effectiveStatus !== selectedStatus) return false;
             return true;
         });
-    }, [occurrences, selectedWeek, selectedSector, selectedFa, selectedStatus]);
+    }, [occurrences, selectedWeeks, selectedSector, selectedFa, selectedStatus]);
 
     const kpis = useMemo(() => {
         let totalRealizado = 0;
@@ -573,13 +655,13 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     }, [filteredOccurrences, actionFilterStatus, actionSearch]);
 
     const hasScheduleActiveFilters =
-        selectedWeek !== 'all' ||
+        selectedWeeks.length > 0 ||
         selectedSector !== 'all' ||
         selectedFa !== 'all' ||
         selectedStatus !== 'all';
 
     const clearScheduleFilters = useCallback(() => {
-        setSelectedWeek('all');
+        setSelectedWeeks([]);
         setSelectedSector('all');
         setSelectedFa('all');
         setSelectedStatus('all');
@@ -1678,17 +1760,13 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     // ============================================================================
     const scheduleFiltersSummary = useMemo(() => {
         const parts: string[] = [];
-        parts.push(
-            selectedWeek === 'all'
-                ? 'Semana: Todo o Período'
-                : `Semana: ${availableWeeks.find(w => w.value === selectedWeek)?.label || selectedWeek}`
-        );
+        parts.push(`Semanas: ${selectedWeeksSummaryLabel}`);
         parts.push(`Setor: ${selectedSector === 'all' ? 'Todos' : selectedSector}`);
         parts.push(`FA: ${selectedFa === 'all' ? 'Todas' : formatFaLabel(selectedFa)}`);
         parts.push(`Status: ${selectedStatus === 'all' ? 'Todos' : STATUS_LABELS[selectedStatus]}`);
         parts.push(`Meta: ${targetAdherence}%`);
         return parts.join('  |  ');
-    }, [selectedWeek, availableWeeks, selectedSector, selectedFa, selectedStatus, targetAdherence]);
+    }, [selectedWeeksSummaryLabel, selectedSector, selectedFa, selectedStatus, targetAdherence]);
 
     const moFiltersSummary = useMemo(() => {
         const weekLabel = allMoWeeks.find(w => w.value === selectedMoWeek)?.label || selectedMoWeek || 'Não definida';
@@ -1715,11 +1793,23 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                     totalCancelado: kpis.totalCancelado,
                     totalProgramadoOpen: kpis.totalProgramadoOpen,
                 },
-                canvases: {
-                    daily: dailyChartRef.current,
-                    doughnut: doughnutChartRef.current,
-                    sector: sectorChartRef.current,
-                },
+                dailyChartMode,
+                dailySeries: dailySeries.map(d => ({
+                    label: d.label,
+                    dailyPct: d.dailyPct,
+                    cumRealPct: d.cumRealPct,
+                    cumPlanPct: d.cumPlanPct,
+                    active: d.active,
+                })),
+                sectorChartMode,
+                sectorStats: sectorStats.map(s => ({
+                    sector: s.sector,
+                    ok: s.ok,
+                    n: s.n,
+                    c: s.c,
+                    x: s.x,
+                    adherencePct: s.adherencePct,
+                })),
                 faRows: faStats.map(f => ({
                     faLabel: f.faLabel,
                     sector: f.primarySector,
@@ -1743,6 +1833,12 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 })),
             });
         } else {
+            const catRgbMap: Record<MoCategory, [number, number, number]> = {
+                'Supervisão': [2, 132, 199],
+                'Ofícios': [16, 185, 129],
+                'Inspeção': [245, 158, 11],
+                'Outros': [147, 51, 234],
+            };
             exportManpowerDashboardPdf({
                 title,
                 programmerName,
@@ -1758,11 +1854,25 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                     shift2PctInfo: `${moKpis.shift2Pct.toFixed(1)}% do efetivo`,
                     peakDailyValue: `${moKpis.peakDailyValue} prof.`,
                     peakDailyInfo: `Dia: ${moKpis.peakDailyLabel}`,
+                    totalPlannedCapacity: moKpis.totalPlanned,
                 },
-                canvases: {
-                    histogram: moHistogramChartRef.current,
-                    category: moCategoryChartRef.current,
-                    roles: moRolesChartRef.current,
+                histogramDays: moWorkdays.map((wd, dayIdx) => ({
+                    label: wd.label,
+                    valuesByCategory: MO_CATEGORY_ORDER.map(category =>
+                        moRoleRows
+                            .filter(r => r.category === category)
+                            .reduce((sum, r) => sum + (r.dailyAllocations[dayIdx] || 0), 0)
+                    ),
+                })),
+                categoryBreakdown: {
+                    total: moCategoryBreakdown.total,
+                    items: moCategoryBreakdown.items.map(item => ({
+                        category: item.category,
+                        count: item.count,
+                        pct: item.pct,
+                        color: item.category === 'Supervisão' ? '#0284c7' : item.category === 'Outros' ? '#9333ea' : item.color,
+                        rgb: catRgbMap[item.category],
+                    })),
                 },
                 tableRows: moRoleRows.map(r => ({
                     role: r.role,
@@ -1899,26 +2009,129 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 {activeTab === 'schedule' && (
                     <>
                         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-2.5">
-                            <div className="flex flex-col gap-1">
+                            <div className="flex flex-col gap-1 relative" ref={weekDropdownRef}>
                                 <label
                                     htmlFor="dash-week"
                                     className="text-[11px] font-semibold uppercase tracking-wider text-slate-400"
                                 >
-                                    Semana
+                                    Semanas (Intervalo / Múltiplas)
                                 </label>
-                                <select
+                                <button
                                     id="dash-week"
-                                    value={selectedWeek}
-                                    onChange={e => setSelectedWeek(e.target.value)}
-                                    className="w-full px-2.5 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-slate-100 text-xs focus:outline-none focus:border-sky-500 cursor-pointer"
+                                    type="button"
+                                    onClick={() => setIsWeekDropdownOpen(prev => !prev)}
+                                    aria-expanded={isWeekDropdownOpen}
+                                    className={`w-full px-2.5 py-1.5 rounded-lg bg-slate-900 border text-xs text-left flex items-center justify-between gap-2 focus:outline-none cursor-pointer transition-colors ${
+                                        selectedWeeks.length > 0
+                                            ? 'border-sky-500 text-sky-200 font-semibold'
+                                            : 'border-slate-700 text-slate-100 hover:border-slate-600'
+                                    }`}
                                 >
-                                    <option value="all">Todo o Período</option>
-                                    {availableWeeks.map(w => (
-                                        <option key={w.value} value={w.value}>
-                                            {w.label}
-                                        </option>
-                                    ))}
-                                </select>
+                                    <span className="truncate">{selectedWeeksSummaryLabel}</span>
+                                    <span className="material-icons text-[16px] text-slate-400 shrink-0">
+                                        {isWeekDropdownOpen ? 'expand_less' : 'expand_more'}
+                                    </span>
+                                </button>
+
+                                {isWeekDropdownOpen && (
+                                    <div className="absolute left-0 top-full mt-1.5 z-40 w-80 max-w-[90vw] rounded-xl bg-slate-900 border border-slate-700 shadow-2xl p-3 flex flex-col gap-2.5">
+                                        <div className="flex items-center justify-between gap-2 pb-2 border-b border-slate-800">
+                                            <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-300">
+                                                Selecionar Semanas
+                                            </span>
+                                            <button
+                                                type="button"
+                                                onClick={() => setSelectedWeeks([])}
+                                                className={`px-2 py-0.5 rounded text-[11px] font-semibold border cursor-pointer transition-colors ${
+                                                    selectedWeeks.length === 0
+                                                        ? 'bg-sky-600 text-white border-sky-500'
+                                                        : 'bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-700'
+                                                }`}
+                                            >
+                                                Todo o Período
+                                            </button>
+                                        </div>
+
+                                        {availableWeeks.length > 0 && (
+                                            <div className="p-2 rounded-lg bg-slate-950/80 border border-slate-800 flex flex-col gap-2">
+                                                <span className="text-[10px] font-semibold uppercase tracking-wider text-sky-400">
+                                                    Intervalo (De → Até)
+                                                </span>
+                                                <div className="grid grid-cols-2 gap-1.5">
+                                                    <select
+                                                        aria-label="Semana inicial do intervalo"
+                                                        value={weekRangeStart}
+                                                        onChange={e => {
+                                                            const nextStart = e.target.value;
+                                                            setWeekRangeStart(nextStart);
+                                                            applyWeekRange(nextStart, weekRangeEnd);
+                                                        }}
+                                                        className="w-full px-2 py-1 rounded bg-slate-900 border border-slate-700 text-slate-100 text-[11px] focus:outline-none focus:border-sky-500 cursor-pointer"
+                                                    >
+                                                        {availableWeeks.map(w => (
+                                                            <option key={`from-${w.value}`} value={w.value}>
+                                                                De: Sem. {w.weekNum.toString().padStart(2, '0')}
+                                                            </option>
+                                                        ))}
+                                                    </select>
+                                                    <select
+                                                        aria-label="Semana final do intervalo"
+                                                        value={weekRangeEnd}
+                                                        onChange={e => {
+                                                            const nextEnd = e.target.value;
+                                                            setWeekRangeEnd(nextEnd);
+                                                            applyWeekRange(weekRangeStart, nextEnd);
+                                                        }}
+                                                        className="w-full px-2 py-1 rounded bg-slate-900 border border-slate-700 text-slate-100 text-[11px] focus:outline-none focus:border-sky-500 cursor-pointer"
+                                                    >
+                                                        {availableWeeks.map(w => (
+                                                            <option key={`to-${w.value}`} value={w.value}>
+                                                                Até: Sem. {w.weekNum.toString().padStart(2, '0')}
+                                                            </option>
+                                                        ))}
+                                                    </select>
+                                                </div>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => applyWeekRange(weekRangeStart, weekRangeEnd)}
+                                                    className="w-full py-1 rounded bg-sky-600/20 hover:bg-sky-600/30 border border-sky-500/40 text-sky-300 text-[11px] font-semibold cursor-pointer transition-colors"
+                                                >
+                                                    Aplicar Intervalo
+                                                </button>
+                                            </div>
+                                        )}
+
+                                        <div className="flex flex-col gap-1 max-h-52 overflow-y-auto pr-1">
+                                            {availableWeeks.length === 0 ? (
+                                                <span className="text-xs text-slate-500 py-2 text-center">
+                                                    Nenhuma semana disponível.
+                                                </span>
+                                            ) : (
+                                                availableWeeks.map(w => {
+                                                    const isChecked = selectedWeeks.includes(w.value);
+                                                    return (
+                                                        <label
+                                                            key={w.value}
+                                                            className={`flex items-center gap-2 px-2 py-1.5 rounded-md text-xs cursor-pointer transition-colors ${
+                                                                isChecked
+                                                                    ? 'bg-sky-500/15 text-sky-200 border border-sky-500/30'
+                                                                    : 'text-slate-300 hover:bg-slate-800 border border-transparent'
+                                                            }`}
+                                                        >
+                                                            <input
+                                                                type="checkbox"
+                                                                checked={isChecked}
+                                                                onChange={() => toggleSingleWeek(w.value)}
+                                                                className="accent-sky-500 rounded cursor-pointer"
+                                                            />
+                                                            <span className="truncate">{w.label}</span>
+                                                        </label>
+                                                    );
+                                                })
+                                            )}
+                                        </div>
+                                    </div>
+                                )}
                             </div>
 
                             <div className="flex flex-col gap-1">
@@ -2020,13 +2233,13 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                                     <span className="material-icons text-[14px]">filter_list</span>
                                     Filtros ativos:
                                 </span>
-                                {selectedWeek !== 'all' && (
+                                {selectedWeeks.length > 0 && (
                                     <button
                                         type="button"
-                                        onClick={() => setSelectedWeek('all')}
+                                        onClick={() => setSelectedWeeks([])}
                                         className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-sky-500/15 border border-sky-500/30 text-sky-300 text-xs cursor-pointer hover:bg-sky-500/25"
                                     >
-                                        {availableWeeks.find(w => w.value === selectedWeek)?.label || selectedWeek}
+                                        {selectedWeeksSummaryLabel}
                                         <span className="material-icons text-[13px]">close</span>
                                     </button>
                                 )}
