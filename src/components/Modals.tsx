@@ -101,7 +101,7 @@ export const SaveModal = ({ onClose, onSave, currentName, currentObra }: { onClo
     );
 };
 
-export const LoadModal = ({ schedules, onLoad, onDelete, onRenameProject, onMoveProject, onDuplicateProject, onRenameFolder, onDeleteFolder, onClose, isAdmin }: { 
+export const LoadModal = ({ schedules, onLoad, onDelete, onRenameProject, onMoveProject, onDuplicateProject, onRenameFolder, onDeleteFolder, onCreateNewProject, onClose, isAdmin }: { 
     schedules: Project[], 
     onLoad: (id: string) => void, 
     onDelete: (id: string) => void, 
@@ -110,6 +110,7 @@ export const LoadModal = ({ schedules, onLoad, onDelete, onRenameProject, onMove
     onDuplicateProject: (id: string) => void,
     onRenameFolder: (oldName: string, newName: string) => void,
     onDeleteFolder: (folderName: string) => void,
+    onCreateNewProject?: () => void,
     onClose: () => void, 
     isAdmin?: boolean 
 }) => {
@@ -177,7 +178,22 @@ export const LoadModal = ({ schedules, onLoad, onDelete, onRenameProject, onMove
     return (
         <div className="modal-overlay">
             <div className="modal-content wide" role="dialog" aria-modal="true" aria-labelledby="load-modal-title">
-                <h2 id="load-modal-title">Gerenciar Meus Projetos</h2>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', gap: '12px', flexWrap: 'wrap' }}>
+                    <h2 id="load-modal-title" style={{ margin: 0 }}>Abrir Projeto</h2>
+                    {onCreateNewProject && (
+                        <button
+                            className="submit-button"
+                            onClick={() => {
+                                onClose();
+                                onCreateNewProject();
+                            }}
+                            style={{ padding: '6px 12px', fontSize: '0.85rem' }}
+                        >
+                            <span className="material-icons" style={{ fontSize: '18px' }}>add_box</span>
+                            Novo Projeto
+                        </button>
+                    )}
+                </div>
                 
                 {!selectedObra ? (
                     <>
@@ -307,7 +323,7 @@ export const LoadModal = ({ schedules, onLoad, onDelete, onRenameProject, onMove
                                         <span className="schedule-date">Modificado em: {new Date(s.lastModified).toLocaleString()}</span>
                                     </div>
                                     <div className="schedule-actions">
-                                        <button className="submit-button" onClick={() => onLoad(s.id)}>Carregar</button>
+                                        <button className="submit-button" onClick={() => onLoad(s.id)}>Abrir</button>
                                         <button className="control-button" title="Mover para outra pasta" onClick={(e) => handleStartMoveProject(e, s)}>
                                             <span className="material-icons">drive_file_move</span>
                                         </button>
@@ -476,21 +492,21 @@ export const TutorialModal = ({ isOpen, onClose }: { isOpen: boolean, onClose: (
         <div className="modal-overlay">
             <div className="modal-content wide tutorial-modal" style={{ maxWidth: '800px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', borderBottom: '2px solid #3b82f6', paddingBottom: '10px' }}>
-                    <h2 style={{ margin: 0, color: '#1e3a8a' }}>Tutorial: Guia do Planejador - V6</h2>
+                    <h2 style={{ margin: 0, color: '#1e3a8a' }}>Tutorial: Guia do Planejador</h2>
                     <button onClick={onClose} className="material-icons" style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#64748b' }}>close</button>
                 </div>
                 
                 <div className="tutorial-content" style={{ maxHeight: '70vh', overflowY: 'auto', paddingRight: '10px' }}>
                     <section style={{ marginBottom: '24px' }}>
                         <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#2563eb' }}>
-                            <span className="material-icons">calendar_today</span> 1. Cronograma Semanal
+                            <span className="material-icons">calendar_today</span> 1. Cronograma Semanal (Aba "Programação")
                         </h3>
-                        <p>A tela principal permite planejar 4 semanas de trabalho simultaneamente. </p>
+                        <p>A aba <strong>"Programação"</strong> permite planejar várias semanas de trabalho simultaneamente.</p>
                         <ul style={{ paddingLeft: '20px' }}>
-                            <li><strong>Edição Direta:</strong> Clique em qualquer texto (Fase, Tarefa, Atividade) para editar na hora.</li>
-                            <li><strong>Nº da FA:</strong> Em baixo do nome da tarefa, você pode inserir o número da Folha de Atividade.</li>
-                            <li><strong>Programação:</strong> Clique nas células de data para alternar os status (Programado [X], Realizado [Ok], etc).</li>
-                            <li><strong>Movimentação:</strong> Arraste o ícone de 6 pontos (drag handle) à esquerda para reordenar grupos.</li>
+                            <li><strong>Edição Direta:</strong> Clique em qualquer texto (Fase/Agrupador, Tarefa Principal, Atividade) para editar na hora e use a barra de formatação (Desfazer, Refazer, Negrito, Cores) logo acima da tabela.</li>
+                            <li><strong>Nº da FA:</strong> Abaixo do nome da tarefa, você pode inserir o número da Folha de Atividade.</li>
+                            <li><strong>Programação:</strong> Clique nas células de data para alternar os status (Programado [X], Realizado [Ok], Não Realizado [N], Cancelado [C]).</li>
+                            <li><strong>Movimentação:</strong> Arraste o ícone de 6 pontos à esquerda para reordenar grupos e tarefas.</li>
                         </ul>
                     </section>
 
@@ -498,26 +514,28 @@ export const TutorialModal = ({ isOpen, onClose }: { isOpen: boolean, onClose: (
                         <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#2563eb' }}>
                             <span className="material-icons">engineering</span> 2. Alocação de Mão de Obra
                         </h3>
-                        <p>Configure sua equipe na aba <strong>"Quantitativo de MO"</strong> definindo quantos profissionais de cada cargo estão disponíveis por semana.</p>
-                        <p>Na aba <strong>"Alocação Diária de MO"</strong>, arraste os nomes dos profissionais da barra lateral para as atividades programadas.</p>
+                        <p>Configure sua equipe na aba <strong>"Quantitativo de MO"</strong> definindo quantos profissionais de cada função estão disponíveis por semana.</p>
+                        <p>Na aba <strong>"Alocação Diária MO"</strong>, arraste os profissionais da barra lateral para as atividades programadas.</p>
                     </section>
 
                     <section style={{ marginBottom: '24px' }}>
                         <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#2563eb' }}>
                             <span className="material-icons">precision_manufacturing</span> 3. Gestão e Conflitos de Máquinas
                         </h3>
-                        <p>Cadastre suas máquinas na aba <strong>"Máquinas"</strong>. Use a IA para importar listas rápidamente.</p>
+                        <p>Cadastre seus equipamentos na aba <strong>"Máquinas"</strong>. Você também pode usar o painel de IA para cadastrar listas rapidamente.</p>
                         <ul style={{ paddingLeft: '20px' }}>
-                            <li><strong>Alocação:</strong> Na aba <strong>"Alocação de Máquina"</strong>, arraste as máquinas para as atividades.</li>
-                            <li><strong>Conflitos de Uso:</strong> O sistema monitora todos os projetos ativos. Se uma máquina for alocada para duas tarefas diferentes no mesmo dia (em obras diferentes), um <strong>alerta vermelho</strong> piscará na célula, avisando sobre o conflito.</li>
+                            <li><strong>Alocação:</strong> Na aba <strong>"Alocação de Máquina"</strong>, arraste as máquinas disponíveis para as atividades programadas.</li>
+                            <li><strong>Conflitos de Uso:</strong> O sistema monitora todos os projetos ativos. Se uma máquina for alocada para duas tarefas no mesmo dia em obras diferentes, um <strong>alerta vermelho</strong> piscará na célula avisando sobre o conflito.</li>
                         </ul>
                     </section>
 
                     <section style={{ marginBottom: '24px' }}>
                         <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#2563eb' }}>
-                            <span className="material-icons">smart_toy</span> 4. Importação e IA
+                            <span className="material-icons">smart_toy</span> 4. Projetos, Importação e Exportação
                         </h3>
-                        <p>Use o botão <strong>"Importar Detalhe da FA"</strong> no menu lateral. Você pode subir uma foto de uma folha escrita à mão ou um PDF, e a IA estruturará as atividades para você automaticamente.</p>
+                        <p>No cabeçalho superior, use <strong>"+ Novo Projeto"</strong>, <strong>"Abrir Projeto"</strong> e <strong>"Salvar e Sair"</strong> para gerenciar suas obras.</p>
+                        <p>No menu lateral esquerdo, use o botão <strong>"Importar"</strong> para escolher entre Backup TXT / JSON, Planilha Excel, PDF / Imagem (IA) ou <strong>"Importação Avançada (IA)"</strong> (onde fica o botão <strong>"Importar Detalhe da FA"</strong>).</p>
+                        <p>Para gerar relatórios, utilize o botão <strong>"Exportar"</strong> na barra lateral (TXT, Excel ou PDF) ou os botões de <strong>"Imprimir"</strong> e <strong>"Exportar Word"</strong> na aba <strong>"Resumo Diário"</strong>.</p>
                     </section>
                 </div>
 
@@ -578,6 +596,76 @@ export const ManpowerPrintModal = ({ isOpen, onClose, onConfirm, allWeeks, selec
                  <div className="modal-actions">
                     <button onClick={onClose} className="cancel-button">Cancelar</button>
                     <button onClick={onConfirm} className="submit-button">Confirmar Impressão</button>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+export const ClearScheduleModal = ({ isOpen, projectName, onClose, onConfirm }: {
+    isOpen: boolean;
+    projectName: string;
+    onClose: () => void;
+    onConfirm: () => void;
+}) => {
+    const [confirmationInput, setConfirmationInput] = useState('');
+
+    useEffect(() => {
+        if (isOpen) {
+            setConfirmationInput('');
+        }
+    }, [isOpen]);
+
+    if (!isOpen) return null;
+
+    const expectedText = projectName.trim() || 'LIMPAR';
+    const isMatch = confirmationInput.trim() === expectedText;
+
+    return (
+        <div className="modal-overlay">
+            <div className="modal-content" role="dialog" aria-modal="true" aria-labelledby="clear-modal-title">
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px', color: '#dc2626' }}>
+                    <span className="material-icons" style={{ fontSize: '28px' }}>warning_amber</span>
+                    <h2 id="clear-modal-title" style={{ margin: 0, color: '#991b1b' }}>Limpar Todo o Cronograma</h2>
+                </div>
+                <p style={{ color: '#334155', lineHeight: 1.5 }}>
+                    Esta ação apagará permanentemente todas as fases, tarefas, atividades e alocações diárias de MO e máquinas do projeto atual.
+                </p>
+                <div style={{ backgroundColor: '#fef2f2', border: '1px solid #fecaca', borderRadius: '6px', padding: '12px', marginBottom: '16px' }}>
+                    <p style={{ margin: '0 0 8px 0', fontSize: '0.85rem', color: '#7f1d1d' }}>
+                        Para confirmar, digite exatamente o nome do projeto abaixo:
+                    </p>
+                    <div style={{ fontWeight: 'bold', fontSize: '0.95rem', color: '#991b1b', userSelect: 'all' }}>
+                        {expectedText}
+                    </div>
+                </div>
+                <div className="form-group" style={{ marginBottom: 0 }}>
+                    <label htmlFor="confirm-clear-input">Confirmação</label>
+                    <input
+                        id="confirm-clear-input"
+                        type="text"
+                        autoFocus
+                        value={confirmationInput}
+                        onChange={(e) => setConfirmationInput(e.target.value)}
+                        placeholder={`Digite "${expectedText}"`}
+                        style={{ marginBottom: 0 }}
+                    />
+                </div>
+                <div className="modal-actions">
+                    <button onClick={onClose} className="cancel-button">Cancelar</button>
+                    <button
+                        onClick={() => {
+                            if (isMatch) {
+                                onConfirm();
+                                onClose();
+                            }
+                        }}
+                        className="submit-button danger"
+                        disabled={!isMatch}
+                    >
+                        <span className="material-icons" style={{ fontSize: '18px' }}>delete_sweep</span>
+                        Confirmar Limpeza
+                    </button>
                 </div>
             </div>
         </div>

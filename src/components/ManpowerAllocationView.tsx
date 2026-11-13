@@ -228,7 +228,7 @@ export const ManpowerAllocationView: React.FC<{
                         Ocultar MO não alocada
                     </label>
                     <button className="control-button" onClick={handleExport}>
-                        <span className="material-icons">print</span> Imprimir Programação
+                        <span className="material-icons">print</span> Imprimir
                     </button>
                 </div>
             </div>

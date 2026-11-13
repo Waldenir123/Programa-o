@@ -1,17 +1,11 @@
-import React from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { SelectedItem, STATUS_LABELS, STATUS_COLOR_MAP, Status } from '../state/types';
 import { formatDate } from '../utils/dataUtils';
 import { APP_VERSION } from '../version';
 
 interface SidebarProps {
-    handleUndo: () => void;
-    handleRedo: () => void;
-    historyIndex: number;
-    historyLength: number;
     handleSavePlan: () => void;
     setImportModalOpen: (isOpen: boolean) => void;
-    setSaveModalOpen: (isOpen: boolean) => void;
-    setLoadModalOpen: (isOpen: boolean) => void;
     handleSaveProject: () => void;
     handleExportExcel: () => void;
     onExportPdfClick: () => void;
@@ -35,32 +29,61 @@ interface SidebarProps {
     hasSelection?: boolean;
     handleShiftHoliday?: (holidayDateStr: string, skipWeekends: boolean) => void;
     activeCell?: { activityId: string; date: string } | null;
-    handleSaveAndExit?: () => void;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
-    handleUndo, handleRedo, historyIndex, historyLength,
     handleSavePlan,
-    setImportModalOpen, setSaveModalOpen, setLoadModalOpen, handleSaveProject,
-    handleExportExcel, onExportPdfClick, handleExportTxt, onImportTxtClick, handleOpenTutorial,
-    handleDateChange, startDate,
-    goToWeekInput, setGoToWeekInput, handleGoToWeek,
-    selectedItems, handleDeleteSelectedItems, handleClearAll,
-    handleQuickImportClick, onImportExcelClick,
-    visibleColumns, toggleColumnVisibility,
-    onCloseMobile, handleIntelligentReschedule, hasSelection,
+    setImportModalOpen,
+    handleSaveProject,
+    handleExportExcel,
+    onExportPdfClick,
+    handleExportTxt,
+    onImportTxtClick,
+    handleOpenTutorial,
+    handleDateChange,
+    startDate,
+    goToWeekInput,
+    setGoToWeekInput,
+    handleGoToWeek,
+    selectedItems,
+    handleDeleteSelectedItems,
+    handleClearAll,
+    handleQuickImportClick,
+    onImportExcelClick,
+    visibleColumns,
+    toggleColumnVisibility,
+    onCloseMobile,
+    handleIntelligentReschedule,
+    hasSelection,
     handleShiftHoliday,
     activeCell,
-    handleSaveAndExit
 }) => {
-    const [holidayDate, setHolidayDate] = React.useState<string>(formatDate(new Date()));
-    const [skipWeekends, setSkipWeekends] = React.useState<boolean>(true);
+    const [holidayDate, setHolidayDate] = useState<string>(formatDate(new Date()));
+    const [skipWeekends, setSkipWeekends] = useState<boolean>(true);
+    const [isImportMenuOpen, setIsImportMenuOpen] = useState(false);
+    const [isExportMenuOpen, setIsExportMenuOpen] = useState(false);
 
-    React.useEffect(() => {
+    const importDropdownRef = useRef<HTMLDivElement>(null);
+    const exportDropdownRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
         if (activeCell?.date) {
             setHolidayDate(activeCell.date);
         }
     }, [activeCell?.date]);
+
+    useEffect(() => {
+        const handleClickOutside = (e: MouseEvent) => {
+            if (importDropdownRef.current && !importDropdownRef.current.contains(e.target as Node)) {
+                setIsImportMenuOpen(false);
+            }
+            if (exportDropdownRef.current && !exportDropdownRef.current.contains(e.target as Node)) {
+                setIsExportMenuOpen(false);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
 
     const onShiftClick = () => {
         if (!holidayDate) return;
@@ -74,6 +97,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         task: 'Tarefa Principal',
         activity: 'Atividade'
     };
+
     return (
         <div className="control-panel">
             <div className="sidebar-mobile-header" style={{ display: 'none', justifyContent: 'flex-end', marginBottom: '16px' }}>
@@ -81,18 +105,162 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     <span className="material-icons">close</span>
                 </button>
             </div>
-            <div style={{ padding: '0 0 16px 0', borderBottom: '1px solid #e2e8f0', marginBottom: '16px', fontSize: '0.8rem', color: '#64748b' }}>
+
+            <div style={{ padding: '0 0 12px 0', borderBottom: '1px solid #e2e8f0', marginBottom: '16px', fontSize: '0.78rem', color: '#64748b' }}>
                 <strong>Versão:</strong> {APP_VERSION}
             </div>
+
             <div className="control-section">
-                <h3>Ações Rápidas</h3>
-                <button className="control-button" onClick={handleUndo} disabled={historyIndex <= 0}><span className="material-icons" aria-hidden="true">undo</span> Desfazer</button>
-                <button className="control-button" onClick={handleRedo} disabled={historyIndex >= historyLength - 1}><span className="material-icons" aria-hidden="true">redo</span> Refazer</button>
-                <button className="control-button" onClick={onImportTxtClick}><span className="material-icons" aria-hidden="true">data_object</span>Importar TXT / JSON (Backup)</button>
-                <button className="control-button" onClick={onImportExcelClick}><span className="material-icons" aria-hidden="true">grid_on</span>Importar Excel</button>
-                <button className="control-button" onClick={handleQuickImportClick}><span className="material-icons" aria-hidden="true">file_upload</span>Importar PDF/Imagem (IA)</button>
-                <button className="control-button" onClick={() => setImportModalOpen(true)}><span className="material-icons" aria-hidden="true">input</span>Importação Avançada (IA)</button>
-                <button className="control-button" style={{ backgroundColor: '#e0f2fe', color: '#0369a1', borderColor: '#bae6fd' }} onClick={handleOpenTutorial}><span className="material-icons" aria-hidden="true">help_outline</span> Tutorial / Ajuda</button>
+                <h3>Projeto Atual</h3>
+                <button className="submit-button" onClick={handleSaveProject}>
+                    <span className="material-icons" aria-hidden="true">save</span> Salvar Alterações
+                </button>
+                <button
+                    className="control-button"
+                    onClick={handleSavePlan}
+                    title="Salva o cronograma atual como o 'Planejado' para comparações futuras."
+                >
+                    <span className="material-icons" aria-hidden="true">bookmark_add</span> Definir como Base
+                </button>
+            </div>
+
+            <div className="control-section">
+                <h3>Arquivos &amp; Ajuda</h3>
+
+                {/* Dropdown Importar */}
+                <div className="sidebar-dropdown" ref={importDropdownRef}>
+                    <button
+                        type="button"
+                        className="control-button sidebar-dropdown-trigger"
+                        onClick={() => {
+                            setIsImportMenuOpen(prev => !prev);
+                            setIsExportMenuOpen(false);
+                        }}
+                        aria-expanded={isImportMenuOpen}
+                    >
+                        <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <span className="material-icons" aria-hidden="true">file_upload</span>
+                            Importar
+                        </span>
+                        <span className="material-icons" aria-hidden="true" style={{ fontSize: '18px' }}>
+                            {isImportMenuOpen ? 'expand_less' : 'expand_more'}
+                        </span>
+                    </button>
+                    {isImportMenuOpen && (
+                        <div className="sidebar-dropdown-menu">
+                            <button
+                                type="button"
+                                className="sidebar-dropdown-item"
+                                onClick={() => {
+                                    setIsImportMenuOpen(false);
+                                    onImportTxtClick();
+                                }}
+                            >
+                                <span className="material-icons" aria-hidden="true">data_object</span>
+                                Backup TXT / JSON
+                            </button>
+                            <button
+                                type="button"
+                                className="sidebar-dropdown-item"
+                                onClick={() => {
+                                    setIsImportMenuOpen(false);
+                                    onImportExcelClick();
+                                }}
+                            >
+                                <span className="material-icons" aria-hidden="true">grid_on</span>
+                                Planilha Excel
+                            </button>
+                            <button
+                                type="button"
+                                className="sidebar-dropdown-item"
+                                onClick={() => {
+                                    setIsImportMenuOpen(false);
+                                    handleQuickImportClick();
+                                }}
+                            >
+                                <span className="material-icons" aria-hidden="true">document_scanner</span>
+                                PDF / Imagem (IA)
+                            </button>
+                            <button
+                                type="button"
+                                className="sidebar-dropdown-item"
+                                onClick={() => {
+                                    setIsImportMenuOpen(false);
+                                    setImportModalOpen(true);
+                                }}
+                            >
+                                <span className="material-icons" aria-hidden="true">smart_toy</span>
+                                Importação Avançada (IA)
+                            </button>
+                        </div>
+                    )}
+                </div>
+
+                {/* Dropdown Exportar */}
+                <div className="sidebar-dropdown" ref={exportDropdownRef}>
+                    <button
+                        type="button"
+                        className="control-button sidebar-dropdown-trigger"
+                        onClick={() => {
+                            setIsExportMenuOpen(prev => !prev);
+                            setIsImportMenuOpen(false);
+                        }}
+                        aria-expanded={isExportMenuOpen}
+                    >
+                        <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <span className="material-icons" aria-hidden="true">download</span>
+                            Exportar
+                        </span>
+                        <span className="material-icons" aria-hidden="true" style={{ fontSize: '18px' }}>
+                            {isExportMenuOpen ? 'expand_less' : 'expand_more'}
+                        </span>
+                    </button>
+                    {isExportMenuOpen && (
+                        <div className="sidebar-dropdown-menu">
+                            <button
+                                type="button"
+                                className="sidebar-dropdown-item"
+                                onClick={() => {
+                                    setIsExportMenuOpen(false);
+                                    handleExportTxt();
+                                }}
+                            >
+                                <span className="material-icons" aria-hidden="true">data_object</span>
+                                Exportar TXT (Backup)
+                            </button>
+                            <button
+                                type="button"
+                                className="sidebar-dropdown-item"
+                                onClick={() => {
+                                    setIsExportMenuOpen(false);
+                                    handleExportExcel();
+                                }}
+                            >
+                                <span className="material-icons" aria-hidden="true">table_view</span>
+                                Exportar para Excel
+                            </button>
+                            <button
+                                type="button"
+                                className="sidebar-dropdown-item"
+                                onClick={() => {
+                                    setIsExportMenuOpen(false);
+                                    onExportPdfClick();
+                                }}
+                            >
+                                <span className="material-icons" aria-hidden="true">picture_as_pdf</span>
+                                Exportar para PDF
+                            </button>
+                        </div>
+                    )}
+                </div>
+
+                <button
+                    className="control-button"
+                    style={{ backgroundColor: '#e0f2fe', color: '#0369a1', borderColor: '#bae6fd' }}
+                    onClick={handleOpenTutorial}
+                >
+                    <span className="material-icons" aria-hidden="true">help_outline</span> Tutorial / Ajuda
+                </button>
             </div>
 
             <div className="control-section">
@@ -116,55 +284,42 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     </p>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                         <label htmlFor="holiday-date" style={{ fontSize: '0.75rem', fontWeight: 'bold', color: '#334155' }}>Dia do Feriado:</label>
-                        <input 
-                            id="holiday-date" 
-                            type="date" 
-                            value={holidayDate} 
+                        <input
+                            id="holiday-date"
+                            type="date"
+                            value={holidayDate}
                             onChange={e => setHolidayDate(e.target.value)}
-                            style={{ 
-                                padding: '6px 8px', 
-                                border: '1px solid #cbd5e1', 
-                                borderRadius: '4px', 
-                                fontSize: '0.85rem' 
-                            }} 
+                            style={{
+                                padding: '6px 8px',
+                                border: '1px solid #cbd5e1',
+                                borderRadius: '4px',
+                                fontSize: '0.85rem'
+                            }}
                         />
                     </div>
                     <label htmlFor="holiday-skip-weekends" style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.75rem', cursor: 'pointer', userSelect: 'none', color: '#334155' }}>
-                        <input 
+                        <input
                             id="holiday-skip-weekends"
-                            type="checkbox" 
-                            checked={skipWeekends} 
-                            onChange={e => setSkipWeekends(e.target.checked)} 
+                            type="checkbox"
+                            checked={skipWeekends}
+                            onChange={e => setSkipWeekends(e.target.checked)}
                         />
                         Não reprogramar para sáb/dom (padrão)
                     </label>
-                    <button 
+                    <button
                         id="holiday-shift-button"
                         onClick={onShiftClick}
-                        className="control-button" 
-                        style={{ 
-                            backgroundColor: '#10b981', 
-                            color: 'white', 
-                            borderColor: '#059669', 
-                            marginTop: '4px' 
+                        className="control-button"
+                        style={{
+                            backgroundColor: '#10b981',
+                            color: 'white',
+                            borderColor: '#059669',
+                            marginTop: '4px'
                         }}
                     >
                         <span className="material-icons" aria-hidden="true">today</span> Deslocar Programação
                     </button>
                 </div>
-            </div>
-
-            <div className="control-section">
-                <h3>Gerenciar Projeto</h3>
-                <button className="submit-button" onClick={handleSaveProject}><span className="material-icons" aria-hidden="true">save</span> Salvar Alterações</button>
-                {handleSaveAndExit && (
-                    <button className="control-button" onClick={handleSaveAndExit} style={{ backgroundColor: '#10b981', color: '#ffffff', borderColor: '#059669', fontWeight: 'bold' }}>
-                        <span className="material-icons" aria-hidden="true">exit_to_app</span> Salvar e Sair
-                    </button>
-                )}
-                <button className="control-button" onClick={handleSavePlan} title="Salva o cronograma atual como o 'Planejado' para comparações futuras."><span className="material-icons" aria-hidden="true">bookmark_add</span> Definir como Base</button>
-                <button className="control-button" onClick={() => setSaveModalOpen(true)}><span className="material-icons" aria-hidden="true">create_new_folder</span> Novo Projeto</button>
-                <button className="control-button" onClick={() => setLoadModalOpen(true)}><span className="material-icons" aria-hidden="true">folder_open</span> Carregar Projeto</button>
             </div>
 
             <div className="control-section">
@@ -199,22 +354,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 <div className="column-toggles">
                     {Object.keys(visibleColumns).map(col => (
                         <label key={col} className="column-toggle-label">
-                            <input 
-                                type="checkbox" 
-                                checked={visibleColumns[col]} 
+                            <input
+                                type="checkbox"
+                                checked={visibleColumns[col]}
                                 onChange={() => toggleColumnVisibility(col)}
                             />
                             {col}
                         </label>
                     ))}
                 </div>
-            </div>
-
-            <div className="control-section">
-                <h3>Exportar</h3>
-                <button className="control-button" onClick={handleExportTxt}><span className="material-icons" aria-hidden="true">data_object</span> Exportar TXT (Perfeito)</button>
-                <button className="control-button" onClick={handleExportExcel}><span className="material-icons" aria-hidden="true">download</span> Exportar para Excel</button>
-                <button className="control-button" onClick={onExportPdfClick}><span className="material-icons" aria-hidden="true">picture_as_pdf</span> Exportar para PDF</button>
             </div>
 
             <div className="control-section ai-agent-status">
@@ -238,13 +386,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
                         ) : (
                             <p><strong>{selectedItems.length} itens selecionados.</strong></p>
                         )}
-                         <button className="control-button danger" onClick={handleDeleteSelectedItems} disabled={selectedItems.length === 0}>
+                        <button className="control-button danger" onClick={handleDeleteSelectedItems} disabled={selectedItems.length === 0}>
                             <span className="material-icons" aria-hidden="true">delete_forever</span>
                             Excluir {selectedItems.length > 1 ? 'Itens Selecionados' : 'Item Selecionado'}
                         </button>
                     </div>
                 )}
-                 <button className="control-button danger" onClick={handleClearAll} style={{width: '100%', marginTop: '12px'}}>
+                <button className="control-button danger" onClick={handleClearAll} style={{ width: '100%', marginTop: '12px' }}>
                     <span className="material-icons" aria-hidden="true">delete_sweep</span>
                     Limpar Todo o Cronograma
                 </button>

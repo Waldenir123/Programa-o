@@ -56,7 +56,7 @@ import {
 import { useScheduleInteraction } from './hooks/useScheduleInteraction';
 
 // Utils
-import { formatDate, getWeek, generateId, deepClone, flattenData, safeJsonParse, migrateProject, shiftScheduleKeys } from './utils/dataUtils';
+import { formatDate, getWeek, getWeekYear, getDateRangeOfWeek, generateId, deepClone, flattenData, safeJsonParse, migrateProject, shiftScheduleKeys } from './utils/dataUtils';
 import { parseTabularData, parseTxtToRows } from './utils/parsers';
 import { exportToExcelAgent, exportToPdfAgent } from './utils/exportAgents';
 import { APP_VERSION } from './version';
@@ -68,7 +68,7 @@ import { parseScheduleWithAI, parseFADetailWithAI, analyzeDeletionImpactWithAI, 
 // Components
 import { ToastContainer } from './components/Toast';
 import { AuthScreen } from './components/AuthScreen';
-import { ImportModal, LoadModal, SaveModal, DeletionModal, PrintScheduleModal } from './components/Modals';
+import { ImportModal, LoadModal, SaveModal, DeletionModal, PrintScheduleModal, ClearScheduleModal } from './components/Modals';
 import { Sidebar } from './components/Sidebar';
 import { TutorialModal } from './components/Modals';
 import { FilterDropdown } from './components/FilterDropdown';
@@ -77,7 +77,6 @@ import { ComparisonView } from './components/ComparisonView';
 import { DashboardView } from './components/DashboardView';
 import { ManpowerAllocationView } from './components/ManpowerAllocationView';
 import { DailyAllocationView } from './components/DailyAllocationView';
-import { ManpowerDashboardView } from './components/ManpowerDashboardView';
 import { DailySummaryView } from './components/DailySummaryView';
 import { MachineListView } from './components/MachineListView';
 import { DailyMachineAllocationView } from './components/DailyMachineAllocationView';
@@ -253,7 +252,12 @@ export const App = () => {
   const [isAuthReady, setIsAuthReady] = useState(true);
   const [activeProject, setActiveProject] = useState<Project | null>(null);
   const [lastSavedTime, setLastSavedTime] = useState<number | null>(null);
-  const [isAutoSaveEnabled, setIsAutoSaveEnabled] = useState(false);
+  const [isAutoSaveEnabled, setIsAutoSaveEnabled] = useState(true);
+  const lastSavedProjectRef = useRef<Project | null>(null);
+  const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
+  const userMenuRef = useRef<HTMLDivElement>(null);
+  const [isNavMenuOpen, setIsNavMenuOpen] = useState(false);
+  const navMenuRef = useRef<HTMLDivElement>(null);
 
   const [scheduleState, dispatch] = useReducer(scheduleReducer, {
       liveData: [],
@@ -283,6 +287,7 @@ export const App = () => {
   const [isSaveModalOpen, setisSaveModalOpen] = useState(false);
   const [isDeletionModalOpen, setDeletionModalOpen] = useState(false);
   const [isPrintModalOpen, setPrintModalOpen] = useState(false);
+  const [isClearModalOpen, setClearModalOpen] = useState(false);
   const [isTutorialModalOpen, setTutorialModalOpen] = useState(false);
   const [annotationPopup, setAnnotationPopup] = useState<{ activityId: string, date: string, rect: DOMRect, isEditing: boolean, text: string } | null>(null);
 
@@ -303,6 +308,8 @@ export const App = () => {
     });
     return allocations;
   }, [projects]);
+
+  const [selectedKpiWeek, setSelectedKpiWeek] = useState<string>('all');
   const [weeksToPrint, setWeeksToPrint] = useState(4);
   const [orientation, setOrientation] = useState<'p' | 'l'>('l');
   const [isSidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -387,6 +394,7 @@ export const App = () => {
     if (activeProject) {
       setFixedColumnWidths(getProjectFixedColumnWidths(activeProject));
       setComparisonFixedColumnWidths(getProjectComparisonFixedColumnWidths(activeProject));
+      setSelectedKpiWeek('all');
     }
   }, [activeProject?.id]);
   const [currentStartDate, setCurrentStartDate] = useState(() => activeProject?.startDate ? new Date(activeProject.startDate + 'T00:00:00Z') : new Date('2026-04-13T00:00:00Z'));
@@ -408,6 +416,154 @@ export const App = () => {
         return d;
     });
   }, [currentStartDate]);
+
+  const kpiWeekOptions = useMemo(() => {
+    const weekSet = new Set<string>();
+    dates.forEach(d => weekSet.add(getWeekYear(d)));
+
+    const addWeekFromDateStr = (dateStr: string) => {
+      const d = new Date(dateStr + 'T00:00:00Z');
+      if (!isNaN(d.getTime())) weekSet.add(getWeekYear(d));
+    };
+
+    (liveData || []).forEach(g => {
+      (g.tarefas || []).forEach(t => {
+        (t.activities || []).forEach(a => {
+          Object.keys(a.schedule || {}).forEach(addWeekFromDateStr);
+        });
+      });
+    });
+
+    Object.values(activeProject?.dailyManpowerAllocation || {}).forEach(dateMap => {
+      Object.keys(dateMap || {}).forEach(addWeekFromDateStr);
+    });
+    Object.values(activeProject?.dailyMachineAllocation || {}).forEach(dateMap => {
+      Object.keys(dateMap || {}).forEach(addWeekFromDateStr);
+    });
+    if (activeProject?.manpowerAllocation?.data) {
+      Object.values(activeProject.manpowerAllocation.data.adm || {}).forEach(wMap => {
+        Object.keys(wMap || {}).forEach(wk => weekSet.add(wk));
+      });
+      Object.values(activeProject.manpowerAllocation.data.shift2 || {}).forEach(wMap => {
+        Object.keys(wMap || {}).forEach(wk => weekSet.add(wk));
+      });
+    }
+
+    return Array.from(weekSet)
+      .filter(wk => /^\d{4}-\d{2}$/.test(wk))
+      .sort()
+      .map(wk => {
+        const [yr, num] = wk.split('-');
+        return {
+          value: wk,
+          label: `Sem ${Number(num)}/${yr} (${getDateRangeOfWeek(wk)})`,
+        };
+      });
+  }, [dates, liveData, activeProject]);
+
+  const executiveKpis = useMemo(() => {
+    const matchesWeek = (dateStr: string) => {
+      if (selectedKpiWeek === 'all') return true;
+      const d = new Date(dateStr + 'T00:00:00Z');
+      return !isNaN(d.getTime()) && getWeekYear(d) === selectedKpiWeek;
+    };
+
+    let totalActivities = 0;
+    let totalMarks = 0;
+    let programadoCount = 0;
+    let realizadoCount = 0;
+
+    (liveData || []).forEach(group => {
+      if (group.isHidden) return;
+      (group.tarefas || []).forEach(task => {
+        if (task.isHidden) return;
+        (task.activities || []).forEach(act => {
+          if (act.isHidden) return;
+          const entries = Object.entries(act.schedule || {}).filter(([dStr, st]) => !!st && matchesWeek(dStr));
+          if (selectedKpiWeek === 'all' || entries.length > 0) {
+            totalActivities++;
+          }
+          entries.forEach(([, st]) => {
+            totalMarks++;
+            if (st === Status.Programado) programadoCount++;
+            else if (st === Status.Realizado) realizadoCount++;
+          });
+        });
+      });
+    });
+
+    const completionRate = totalMarks > 0 ? Math.round((realizadoCount / totalMarks) * 100) : 0;
+
+    let dailyAllocatedTotal = 0;
+    Object.values(activeProject?.dailyManpowerAllocation || {}).forEach(dateMap => {
+      Object.entries(dateMap || {}).forEach(([dateStr, roleMap]) => {
+        if (!matchesWeek(dateStr)) return;
+        Object.values(roleMap || {}).forEach(qty => {
+          dailyAllocatedTotal += Number(qty) || 0;
+        });
+      });
+    });
+
+    let weeklyAvailable = 0;
+    if (activeProject?.manpowerAllocation) {
+      const { roles, data, hasSecondShift } = activeProject.manpowerAllocation;
+      if (selectedKpiWeek === 'all') {
+        const weekTotals: Record<string, number> = {};
+        (roles || []).forEach(role => {
+          Object.entries(data?.adm?.[role] || {}).forEach(([wk, qty]) => {
+            weekTotals[wk] = (weekTotals[wk] || 0) + (Number(qty) || 0);
+          });
+          if (hasSecondShift) {
+            Object.entries(data?.shift2?.[role] || {}).forEach(([wk, qty]) => {
+              weekTotals[wk] = (weekTotals[wk] || 0) + (Number(qty) || 0);
+            });
+          }
+        });
+        const totals = Object.values(weekTotals);
+        if (totals.length > 0) weeklyAvailable = Math.max(...totals);
+      } else {
+        (roles || []).forEach(role => {
+          weeklyAvailable += Number(data?.adm?.[role]?.[selectedKpiWeek]) || 0;
+          if (hasSecondShift) {
+            weeklyAvailable += Number(data?.shift2?.[role]?.[selectedKpiWeek]) || 0;
+          }
+        });
+      }
+    }
+
+    const localMachineDateCount: Record<string, number> = {};
+    Object.values(activeProject?.dailyMachineAllocation || {}).forEach(dateMap => {
+      Object.entries(dateMap || {}).forEach(([dateStr, mIds]) => {
+        if (!matchesWeek(dateStr)) return;
+        (mIds || []).forEach(mId => {
+          const key = `${mId}|${dateStr}`;
+          localMachineDateCount[key] = (localMachineDateCount[key] || 0) + 1;
+        });
+      });
+    });
+
+    const conflictingKeys = new Set<string>();
+    Object.entries(localMachineDateCount).forEach(([key, count]) => {
+      if (count > 1) conflictingKeys.add(key);
+      const [mId, dateStr] = key.split('|');
+      const globalUsage = allMachineAllocationsGlobal[mId]?.[dateStr] || [];
+      if (globalUsage.some(u => u.projectId !== activeProject?.id)) {
+        conflictingKeys.add(key);
+      }
+    });
+
+    return {
+      totalActivities,
+      totalMarks,
+      programadoCount,
+      realizadoCount,
+      completionRate,
+      dailyAllocatedTotal,
+      weeklyAvailable,
+      machineConflicts: conflictingKeys.size,
+      totalMachines: activeProject?.machines?.length || 0,
+    };
+  }, [liveData, activeProject, allMachineAllocationsGlobal, selectedKpiWeek]);
   
   const filteredData = useMemo(() => {
     const filters = activeFilters as Record<string, Set<string>>;
@@ -578,12 +734,15 @@ export const App = () => {
        setProjects(localProjects);
        
        const lastActiveId = localStorage.getItem(`pcp-lastActive-guest-user`);
-       const projectToLoad = migrateProject(localProjects[lastActiveId!] || Object.values(localProjects)[0]);
-       if (projectToLoad) {
+       const loaded = migrateProject(localProjects[lastActiveId!] || Object.values(localProjects)[0]);
+       if (loaded) {
+           const normalizedSummary = loaded.summaryData || loaded.liveData;
+           const projectToLoad = { ...loaded, summaryData: normalizedSummary };
+           lastSavedProjectRef.current = projectToLoad;
            setLastSavedTime(projectToLoad.lastModified);
            setActiveProject(projectToLoad);
            dispatch({ type: 'LOAD_DATA', payload: projectToLoad.liveData });
-           dispatchSummary({ type: 'LOAD_DATA', payload: projectToLoad.summaryData || projectToLoad.liveData });
+           dispatchSummary({ type: 'LOAD_DATA', payload: normalizedSummary });
        }
        return;
     }
@@ -611,14 +770,18 @@ export const App = () => {
         
         if (needsInitialLoad && !activeProjectRef.current) {
             const lastActiveId = localStorage.getItem(`pcp-lastActive-${currentUser.uid}`);
-            const projectToLoad = newProjects[lastActiveId!];
-            if (projectToLoad) {
+            const rawLoaded = newProjects[lastActiveId!];
+            if (rawLoaded) {
+                const normalizedSummary = rawLoaded.summaryData || rawLoaded.liveData;
+                const projectToLoad = { ...rawLoaded, summaryData: normalizedSummary };
+                lastSavedProjectRef.current = projectToLoad;
                 setLastSavedTime(projectToLoad.lastModified);
                 setActiveProject(projectToLoad);
-            if (projectToLoad.startDate) {
-                setCurrentStartDate(new Date(projectToLoad.startDate + 'T00:00:00Z'));
-            }
+                if (projectToLoad.startDate) {
+                    setCurrentStartDate(new Date(projectToLoad.startDate + 'T00:00:00Z'));
+                }
                 dispatch({ type: 'LOAD_DATA', payload: projectToLoad.liveData });
+                dispatchSummary({ type: 'LOAD_DATA', payload: normalizedSummary });
             } else if (Object.keys(newProjects).length > 0) {
                  setLoadModalOpen(true);
             }
@@ -642,12 +805,69 @@ export const App = () => {
     setIsAuthReady(true);
   };
 
-  const handleLogout = async () => {
-    if (activeProject) {
-      await persistProjectToFirebase(activeProject);
+  const hasUnsavedChanges = useMemo(() => {
+    if (!activeProject) return false;
+    const saved = lastSavedProjectRef.current;
+    if (!saved || saved.id !== activeProject.id) return true;
+    return (
+      activeProject.liveData !== saved.liveData ||
+      activeProject.summaryData !== saved.summaryData ||
+      activeProject.manpowerAllocation !== saved.manpowerAllocation ||
+      activeProject.dailyManpowerAllocation !== saved.dailyManpowerAllocation ||
+      activeProject.machines !== saved.machines ||
+      activeProject.dailyMachineAllocation !== saved.dailyMachineAllocation ||
+      activeProject.title !== saved.title ||
+      activeProject.name !== saved.name ||
+      activeProject.programmerName !== saved.programmerName ||
+      activeProject.startDate !== saved.startDate ||
+      activeProject.dynamicColumns !== saved.dynamicColumns
+    );
+  }, [activeProject]);
+
+  useEffect(() => {
+    const handleClickOutsideMenus = (e: MouseEvent) => {
+      if (userMenuRef.current && !userMenuRef.current.contains(e.target as Node)) {
+        setIsUserMenuOpen(false);
+      }
+      if (navMenuRef.current && !navMenuRef.current.contains(e.target as Node)) {
+        setIsNavMenuOpen(false);
+      }
+    };
+    const handleKeyDownEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setIsNavMenuOpen(false);
+        setIsUserMenuOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutsideMenus);
+    document.addEventListener('keydown', handleKeyDownEscape);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutsideMenus);
+      document.removeEventListener('keydown', handleKeyDownEscape);
+    };
+  }, []);
+
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (hasUnsavedChanges) {
+        e.preventDefault();
+        e.returnValue = '';
+      }
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [hasUnsavedChanges]);
+
+  const handleExitWithoutSaving = () => {
+    if (hasUnsavedChanges) {
+      if (!window.confirm('Existem alterações não salvas. Deseja realmente sair do projeto sem salvar?')) {
+        return;
+      }
     }
+    setIsUserMenuOpen(false);
+    lastSavedProjectRef.current = null;
     setActiveProject(null);
-    addToast('Projeto salvo e fechado com sucesso!', 'success');
+    addToast('Projeto fechado sem salvar alterações pendentes.', 'success');
   };
 
   const persistProjectToFirebase = async (project: Project) => {
@@ -657,6 +877,9 @@ export const App = () => {
         const localProjects = localProjectsRaw ? JSON.parse(localProjectsRaw) : {};
         localProjects[project.id] = project;
         localStorage.setItem('pcp-local-projects', JSON.stringify(localProjects));
+        if (activeProjectRef.current?.id === project.id) {
+          lastSavedProjectRef.current = project;
+        }
         setLastSavedTime(Date.now());
         setProjects(localProjects);
       } catch (e) {
@@ -677,6 +900,9 @@ export const App = () => {
         displaySettings: project.displaySettings ? JSON.stringify(project.displaySettings) : ''
       };
       await setDoc(doc(db, 'projects', project.id), dbProject);
+      if (activeProjectRef.current?.id === project.id) {
+        lastSavedProjectRef.current = project;
+      }
       setLastSavedTime(Date.now());
     } catch (error) {
       handleFirestoreError(error, OperationType.WRITE, 'projects/' + project.id);
@@ -691,10 +917,12 @@ export const App = () => {
     }
     const newProject = createNewProject(name, obra);
     newProject.ownerId = currentUser.uid;
+    newProject.summaryData = newProject.liveData;
+    lastSavedProjectRef.current = newProject;
     
     setActiveProject(newProject);
     dispatch({ type: 'LOAD_DATA', payload: newProject.liveData });
-    dispatchSummary({ type: 'LOAD_DATA', payload: newProject.liveData });
+    dispatchSummary({ type: 'LOAD_DATA', payload: newProject.summaryData });
     localStorage.setItem(`pcp-lastActive-${currentUser.uid}`, newProject.id);
     setisSaveModalOpen(false);
     
@@ -733,34 +961,39 @@ export const App = () => {
 
   const handleSaveAndExit = useCallback(async () => {
     if (!activeProject) return;
+    setIsUserMenuOpen(false);
     await handleSaveProject(true);
     addToast(`Projeto '${activeProject.name}' salvo com sucesso!`, 'success');
+    lastSavedProjectRef.current = null;
     setActiveProject(null);
   }, [activeProject, handleSaveProject, addToast]);
 
   useEffect(() => {
     if (!isAutoSaveEnabled) return;
     const intervalId = setInterval(() => {
-      if (activeProject) {
+      if (activeProject && hasUnsavedChanges) {
         handleSaveProject(true);
         addToast('Salvamento automático concluído', 'success');
       }
     }, 120000); // 2 minutes
     return () => clearInterval(intervalId);
-  }, [handleSaveProject, activeProject, isAutoSaveEnabled, addToast]);
+  }, [handleSaveProject, activeProject, isAutoSaveEnabled, hasUnsavedChanges, addToast]);
 
   const handleLoadProject = useCallback((projectId: string) => {
     if (!currentUser) return;
     const rawProject = projects[projectId];
     if (rawProject) {
-        const projectToLoad = migrateProject(rawProject);
+        const migrated = migrateProject(rawProject);
+        const normalizedSummary = migrated.summaryData || migrated.liveData;
+        const projectToLoad = { ...migrated, summaryData: normalizedSummary };
+        lastSavedProjectRef.current = projectToLoad;
         setLastSavedTime(projectToLoad.lastModified);
         setActiveProject(projectToLoad);
         if (projectToLoad.startDate) {
             setCurrentStartDate(new Date(projectToLoad.startDate + 'T00:00:00Z'));
         }
         dispatch({ type: 'LOAD_DATA', payload: projectToLoad.liveData });
-        dispatchSummary({ type: 'LOAD_DATA', payload: projectToLoad.summaryData || projectToLoad.liveData });
+        dispatchSummary({ type: 'LOAD_DATA', payload: normalizedSummary });
         localStorage.setItem(`pcp-lastActive-${currentUser.uid}`, projectId);
         setLoadModalOpen(false);
 
@@ -778,7 +1011,7 @@ export const App = () => {
           }
         }
 
-        addToast(`Projeto '${projectToLoad.name}' carregado.`, 'success');
+        addToast(`Projeto '${projectToLoad.name}' aberto.`, 'success');
     }
   }, [currentUser, projects, addToast]);
   
@@ -1144,27 +1377,32 @@ export const App = () => {
     setDeletionModalOpen(true);
   }, [selectedItems]);
 
-  const handleClearAll = useCallback(async () => {
+  const handleClearAll = useCallback(() => {
     if (!activeProject) return;
-    if (window.confirm("Esta ação vai apagar COMPLETAMENTE os dados deste projeto. Deseja continuar?")) {
-        // Reducer update
-        dispatch({ type: 'CLEAR_ALL' });
-        
-        // Persistence update
-        const updatedProject: Project = {
-          ...activeProject,
-          liveData: [],
-          dailyManpowerAllocation: {},
-          dailyMachineAllocation: {},
-          lastModified: Date.now()
-        };
-        setActiveProject(updatedProject);
-        await persistProjectToFirebase(updatedProject);
-        
-        setSelectedItems([]);
-        addToast("Cronograma limpo com sucesso e salvo.", "success");
-    }
-  }, [activeProject, persistProjectToFirebase, addToast, dispatch]);
+    setClearModalOpen(true);
+  }, [activeProject]);
+
+  const handleConfirmClearAll = useCallback(async () => {
+    if (!activeProject) return;
+    // Reducer update
+    dispatch({ type: 'CLEAR_ALL' });
+    dispatchSummary({ type: 'CLEAR_ALL' });
+
+    // Persistence update
+    const updatedProject: Project = {
+      ...activeProject,
+      liveData: [],
+      summaryData: [],
+      dailyManpowerAllocation: {},
+      dailyMachineAllocation: {},
+      lastModified: Date.now()
+    };
+    setActiveProject(updatedProject);
+    await persistProjectToFirebase(updatedProject);
+
+    setSelectedItems([]);
+    addToast("Cronograma limpo com sucesso e salvo.", "success");
+  }, [activeProject, persistProjectToFirebase, addToast, dispatch, dispatchSummary]);
   
   const handleImportSchedule = useCallback(async (text: string, file: File | null) => {
     if (!ai) {
@@ -2212,6 +2450,38 @@ export const App = () => {
     addToast(`Programação e anotações a partir de ${formatted} deslocadas para o próximo dia útil!`, 'success');
   }, [dispatch, addToast]);
 
+  const handleDashboardMarkDone = useCallback((activityId: string, dateStr: string) => {
+    dispatch({
+      type: 'UPDATE_STATUS',
+      payload: { activityId, date: dateStr, status: Status.Realizado },
+    });
+    addToast('Atividade marcada como Concluída (OK)!', 'success');
+  }, [dispatch, addToast]);
+
+  const handleDashboardReschedule = useCallback((activityId: string, fromDateStr: string, targetDateStr: string) => {
+    if (!targetDateStr) return;
+    const updates: { activityId: string; date: string; status: Status | null }[] = [
+      { activityId, date: targetDateStr, status: Status.Programado },
+    ];
+    let wasOpenProgramado = false;
+    for (const g of liveData || []) {
+      for (const t of g.tarefas || []) {
+        const act = (t.activities || []).find(a => a.id === activityId);
+        if (act && act.schedule?.[fromDateStr] === Status.Programado) {
+          wasOpenProgramado = true;
+          break;
+        }
+      }
+      if (wasOpenProgramado) break;
+    }
+    if (wasOpenProgramado && targetDateStr !== fromDateStr) {
+      updates.unshift({ activityId, date: fromDateStr, status: null });
+    }
+    dispatch({ type: 'BATCH_UPDATE_STATUS', payload: updates });
+    const formatted = targetDateStr.split('-').reverse().join('/');
+    addToast(`Atividade reprogramada para ${formatted} (X).`, 'success');
+  }, [liveData, dispatch, addToast]);
+
   if (!isAuthReady) {
     return <div style={{display:'flex',justifyContent:'center',alignItems:'center',height:'100vh',fontSize:'1.2rem',color:'#64748b'}}>Carregando...</div>;
   }
@@ -2236,6 +2506,7 @@ export const App = () => {
             onDuplicateProject={handleDuplicateProject}
             onRenameFolder={handleRenameFolder}
             onDeleteFolder={handleDeleteFolder}
+            onCreateNewProject={() => setisSaveModalOpen(true)}
             onClose={() => setLoadModalOpen(false)} 
             isAdmin={true} 
           />
@@ -2243,6 +2514,12 @@ export const App = () => {
       {isSaveModalOpen && <SaveModal onClose={() => setisSaveModalOpen(false)} onSave={handleNewProject} currentName={activeProject?.name} currentObra={activeProject?.obra} />}
       {isDeletionModalOpen && <DeletionModal isOpen={isDeletionModalOpen} onClose={() => setDeletionModalOpen(false)} selectedItems={selectedItems} onConfirm={handleConfirmDeletion} ai={ai} data={liveData} addToast={addToast}/>}
       {isPrintModalOpen && <PrintScheduleModal isOpen={isPrintModalOpen} onClose={() => setPrintModalOpen(false)} onConfirm={handleConfirmPrint} weeksToPrint={weeksToPrint} setWeeksToPrint={setWeeksToPrint} orientation={orientation} setOrientation={setOrientation}/>}
+      <ClearScheduleModal
+          isOpen={isClearModalOpen}
+          projectName={activeProject?.name || ''}
+          onClose={() => setClearModalOpen(false)}
+          onConfirm={handleConfirmClearAll}
+      />
       {openFilter && <FilterDropdown columnKey={openFilter.column} allOptions={filterOptions[openFilter.column as keyof typeof filterOptions]} activeSelections={activeFilters[openFilter.column] || new Set()} onApply={handleApplyFilter} onClose={handleCloseFilter} position={openFilter.rect}/>}
       
       {!activeProject ? (
@@ -2271,104 +2548,255 @@ export const App = () => {
           </div>
       ) : (
       <div className="app-content">
-        <div className="app-header">
-           <div className="header-left">
-            <button className="sidebar-toggle-btn" onClick={() => setIsMobileNavVisible(!isMobileNavVisible)} aria-label="Menu Mobile">
-                <span className="material-icons">menu</span>
-            </button>
-            <button className="sidebar-toggle control-button" onClick={() => setSidebarCollapsed(!isSidebarCollapsed)} aria-label="Alternar barra lateral">
-                <span className="material-icons">{isSidebarCollapsed ? 'menu_open' : 'menu'}</span>
-            </button>
-            <h1 contentEditable suppressContentEditableWarning onBlur={e => handleTextUpdate('', 'title', e.currentTarget.textContent || '')}>{title}</h1>
-            <nav className="header-nav">
-                <button className={`nav-tab`} style={{ backgroundColor: '#fbbf24', color: '#1e293b', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '4px', marginRight: '8px' }} onClick={() => setLoadModalOpen(true)}>
-                    <span className="material-icons" style={{ fontSize: '18px' }}>folder_open</span> Abrir Projeto
-                </button>
-                <button 
-                  className="nav-tab" 
-                  style={{ 
-                    backgroundColor: '#10b981', 
-                    color: '#ffffff', 
-                    fontWeight: 'bold', 
-                    display: 'flex', 
-                    alignItems: 'center', 
-                    gap: '4px', 
-                    marginRight: '8px',
-                    border: 'none',
-                    cursor: 'pointer'
-                  }} 
-                  onClick={handleSaveAndExit}
-                >
-                    <span className="material-icons" style={{ fontSize: '18px' }}>exit_to_app</span> Salvar e Sair
-                </button>
-                <button className={`nav-tab ${currentPage === 'schedule' ? 'active' : ''}`} onClick={() => setCurrentPage('schedule')}>Programação</button>
-                <button className={`nav-tab ${currentPage === 'dailySummary' ? 'active' : ''}`} onClick={() => setCurrentPage('dailySummary')}>Resumo Diário</button>
-                <button className={`nav-tab ${currentPage === 'manpower' ? 'active' : ''}`} onClick={() => setCurrentPage('manpower')}>Quantitativo de MO</button>
-                <button className={`nav-tab ${currentPage === 'dailyAllocation' ? 'active' : ''}`} onClick={() => setCurrentPage('dailyAllocation')}>Alocação Diária de MO</button>
-                <button className={`nav-tab ${currentPage === 'machines' ? 'active' : ''}`} onClick={() => setCurrentPage('machines')}>Máquinas</button>
-                <button className={`nav-tab ${currentPage === 'dailyMachineAllocation' ? 'active' : ''}`} onClick={() => setCurrentPage('dailyMachineAllocation')}>Alocação de Máquina</button>
-                <button className={`nav-tab ${currentPage === 'dashboard' ? 'active' : ''}`} onClick={() => setCurrentPage('dashboard')}>Dashboard</button>
-                <button className={`nav-tab ${currentPage === 'manpowerDashboard' ? 'active' : ''}`} onClick={() => setCurrentPage('manpowerDashboard')}>Dashboard de MO</button>
-                <button className={`nav-tab ${currentPage === 'comparison' ? 'active' : ''}`} onClick={() => setCurrentPage('comparison')} disabled={!savedPlan}>Comparativo</button>
-            </nav>
-           </div>
-           <div className="header-controls">
-                <div className="zoom-control">
-                    <span className="material-icons">zoom_out</span>
-                    <input 
-                        type="range" 
-                        min="25" 
-                        max="200" 
-                        step="5"
-                        value={zoomLevels[currentPage] || 100} 
-                        onChange={e => setZoomLevels(prev => ({...prev, [currentPage]: Number(e.target.value)}))}
-                        aria-label="Zoom do cronograma"
-                    />
-                    <span className="material-icons">zoom_in</span>
-                    <span className="zoom-percentage">{zoomLevels[currentPage] || 100}%</span>
-                </div>
-                <div className="header-item-editable">
-                    <span className="label">Responsável:</span>
-                    <span className="editable-field" contentEditable suppressContentEditableWarning onBlur={e => handleTextUpdate('', 'programmerName', e.currentTarget.textContent || '')}>{activeProject?.programmerName}</span>
-                </div>
-                <div className="user-info" style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '4px 10px', backgroundColor: '#f1f5f9', borderRadius: '20px', border: '1px solid #e2e8f0' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                        <span className="material-icons" style={{ color: '#475569', fontSize: '18px' }}>account_circle</span>
-                        <span style={{ fontSize: '0.8rem', fontWeight: 500, color: '#334155', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '120px' }} title={currentUser?.displayName || currentUser?.email || 'Usuário'}>
-                            {currentUser?.displayName || currentUser?.email || 'Usuário'}
-                        </span>
-                    </div>
-                    <button 
-                        onClick={handleLogout} 
-                        style={{ 
-                            background: 'none', 
-                            border: 'none', 
-                            padding: '2px 6px', 
-                            cursor: 'pointer', 
-                            display: 'flex', 
-                            alignItems: 'center', 
-                            gap: '3px', 
-                            borderRadius: '10px', 
-                            backgroundColor: '#fee2e2', 
-                            color: '#ef4444', 
-                            fontSize: '0.7rem', 
-                            fontWeight: 'bold',
-                            transition: 'all 0.2s',
-                        }}
-                        title="Sair do aplicativo"
-                    >
-                        <span className="material-icons" style={{ fontSize: '12px' }}>logout</span> Sair
+        <header className="app-header">
+           {/* Faixa 1: Topo escuro (#0F172A) */}
+           <div className="header-top-row bg-slate-900 text-white">
+               <div className="header-left">
+                    <button className="sidebar-toggle-btn" onClick={() => setIsMobileNavVisible(!isMobileNavVisible)} aria-label="Menu Mobile">
+                        <span className="material-icons">menu</span>
                     </button>
+                    <button className="sidebar-toggle control-button" onClick={() => setSidebarCollapsed(!isSidebarCollapsed)} aria-label="Alternar barra lateral" title="Alternar barra lateral">
+                        <span className="material-icons">{isSidebarCollapsed ? 'menu_open' : 'menu'}</span>
+                    </button>
+                    <div className="flex flex-col min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                            <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">Programação Avançada</span>
+                            <span className="text-slate-600 text-xs hidden sm:inline">•</span>
+                            <div className="flex items-center gap-1 text-xs text-slate-300">
+                                <span className="text-slate-400">Obra:</span>
+                                <span
+                                    contentEditable
+                                    suppressContentEditableWarning
+                                    onBlur={e => handleTextUpdate('', 'name', e.currentTarget.textContent || '')}
+                                    className="font-medium text-slate-100 px-1.5 py-0.5 rounded border border-transparent hover:border-slate-600 focus:bg-slate-800 focus:outline-none focus:border-sky-400"
+                                    title="Clique para editar o nome da obra/projeto"
+                                >
+                                    {activeProject.name}
+                                </span>
+                            </div>
+                        </div>
+                        <h1 contentEditable suppressContentEditableWarning onBlur={e => handleTextUpdate('', 'title', e.currentTarget.textContent || '')}>{title}</h1>
+                    </div>
+               </div>
+               <div className="header-controls">
+                    <button
+                        type="button"
+                        onClick={() => {
+                            const newState = !isAutoSaveEnabled;
+                            setIsAutoSaveEnabled(newState);
+                            addToast(newState ? 'Salvamento Automático Ativado' : 'Salvamento Automático Desativado', newState ? 'success' : 'error');
+                        }}
+                        className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-xs font-semibold cursor-pointer whitespace-nowrap transition-colors ${
+                            isAutoSaveEnabled
+                                ? 'bg-slate-800 border-slate-700 text-emerald-300 hover:bg-slate-700'
+                                : 'bg-rose-950/70 border-rose-700 text-rose-200 hover:bg-rose-900/70'
+                        }`}
+                        title={isAutoSaveEnabled ? 'Desativar salvamento automático (a cada 2 min)' : 'Ativar salvamento automático'}
+                    >
+                        <span className="material-icons text-[15px]">{isAutoSaveEnabled ? 'autorenew' : 'sync_disabled'}</span>
+                        {isAutoSaveEnabled ? 'Auto-Save: ON' : 'Auto-Save: OFF'}
+                    </button>
+
+                    {hasUnsavedChanges ? (
+                        <button
+                            type="button"
+                            onClick={() => handleSaveProject()}
+                            title="Clique para salvar alterações pendentes"
+                            className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-amber-500/20 border border-amber-400/50 text-amber-200 hover:bg-amber-500/30 text-xs font-semibold cursor-pointer whitespace-nowrap"
+                        >
+                            <span className="material-icons text-[15px]">warning</span>
+                            Não salvo
+                        </button>
+                    ) : (
+                        <span className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-emerald-500/15 border border-emerald-400/40 text-emerald-200 text-xs font-medium whitespace-nowrap">
+                            <span className="material-icons text-[15px]">check_circle</span>
+                            Salvo
+                        </span>
+                    )}
+
+                    <button
+                        type="button"
+                        onClick={() => setisSaveModalOpen(true)}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-white text-xs font-semibold cursor-pointer whitespace-nowrap transition-colors"
+                    >
+                        <span className="material-icons text-[16px]">add_box</span>
+                        + Novo Projeto
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => setLoadModalOpen(true)}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-400 hover:bg-amber-300 text-slate-950 text-xs font-semibold cursor-pointer whitespace-nowrap transition-colors"
+                    >
+                        <span className="material-icons text-[16px]">folder_open</span>
+                        Abrir Projeto
+                    </button>
+                    <button
+                        type="button"
+                        onClick={handleSaveAndExit}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold cursor-pointer whitespace-nowrap transition-colors"
+                    >
+                        <span className="material-icons text-[16px]">exit_to_app</span>
+                        Salvar e Sair
+                    </button>
+
+                    <div className="user-info" ref={userMenuRef}>
+                        <button
+                            type="button"
+                            className="header-user-trigger"
+                            onClick={() => setIsUserMenuOpen(prev => !prev)}
+                            aria-expanded={isUserMenuOpen}
+                            title="Opções da conta e saída"
+                        >
+                            <span className="material-icons text-[17px] text-slate-300">account_circle</span>
+                            <span className="max-w-[125px] truncate">
+                                {currentUser?.displayName || currentUser?.email || 'Planejador Geral'}
+                            </span>
+                            <span className="text-slate-400">|</span>
+                            <span className="text-slate-200 font-semibold">Sair</span>
+                            <span className="material-icons text-[16px] text-slate-400">expand_more</span>
+                        </button>
+                        {isUserMenuOpen && (
+                            <div className="header-user-dropdown">
+                                <button
+                                    type="button"
+                                    className="header-user-dropdown-item"
+                                    onClick={handleSaveAndExit}
+                                >
+                                    <span className="material-icons text-[18px] text-emerald-600">save</span>
+                                    Salvar e Sair do Projeto
+                                </button>
+                                <button
+                                    type="button"
+                                    className="header-user-dropdown-item danger"
+                                    onClick={handleExitWithoutSaving}
+                                >
+                                    <span className="material-icons text-[18px] text-rose-600">logout</span>
+                                    Sair sem Salvar
+                                </button>
+                            </div>
+                        )}
+                    </div>
+               </div>
+           </div>
+
+           {/* Faixa 2: Barra branca (#FFFFFF) com menu único recolhível à esquerda e Responsável + Zoom à direita */}
+           <div className="header-bottom-row bg-white border-b border-slate-200">
+                {(() => {
+                    const navItems: { id: Page; label: string; icon: string; disabled?: boolean }[] = [
+                        { id: 'schedule', label: 'Programação', icon: 'calendar_month' },
+                        { id: 'dailySummary', label: 'Resumo Diário', icon: 'view_agenda' },
+                        { id: 'manpower', label: 'Quantitativo de MO', icon: 'engineering' },
+                        { id: 'dailyAllocation', label: 'Alocação Diária MO', icon: 'groups' },
+                        { id: 'machines', label: 'Máquinas', icon: 'precision_manufacturing' },
+                        { id: 'dailyMachineAllocation', label: 'Alocação de Máquina', icon: 'settings_suggest' },
+                        { id: 'dashboard', label: 'Dashboard', icon: 'analytics' },
+                        { id: 'manpowerDashboard', label: 'Dashboard de MO', icon: 'bar_chart' },
+                        { id: 'comparison', label: 'Comparativo', icon: 'compare_arrows', disabled: !savedPlan },
+                    ];
+                    const activeNavItem = navItems.find(item => item.id === currentPage) || navItems[0];
+                    return (
+                        <nav className="header-nav relative" ref={navMenuRef}>
+                            <button
+                                type="button"
+                                onClick={() => setIsNavMenuOpen(prev => !prev)}
+                                aria-expanded={isNavMenuOpen}
+                                aria-haspopup="menu"
+                                className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold cursor-pointer whitespace-nowrap transition-colors shadow-sm"
+                            >
+                                <span className="material-icons text-[16px] text-slate-300">{activeNavItem.icon}</span>
+                                <span className="text-slate-400 font-medium">Menu:</span>
+                                <span>{activeNavItem.label}</span>
+                                <span className="material-icons text-[16px] text-slate-300 ml-0.5">
+                                    {isNavMenuOpen ? 'expand_less' : 'expand_more'}
+                                </span>
+                            </button>
+
+                            {isNavMenuOpen && (
+                                <div
+                                    role="menu"
+                                    className="absolute left-0 top-full mt-1.5 w-64 bg-white border border-slate-200 rounded-xl shadow-lg p-1.5 z-50 flex flex-col gap-0.5"
+                                >
+                                    {navItems.map(item => {
+                                        const isActive = currentPage === item.id;
+                                        return (
+                                            <button
+                                                key={item.id}
+                                                type="button"
+                                                role="menuitem"
+                                                disabled={item.disabled}
+                                                onClick={() => {
+                                                    setCurrentPage(item.id);
+                                                    setIsNavMenuOpen(false);
+                                                }}
+                                                className={`w-full flex items-center justify-between gap-2.5 px-3 py-2 rounded-lg text-left text-xs font-medium transition-colors border-0 ${
+                                                    item.disabled
+                                                        ? 'text-slate-300 cursor-not-allowed bg-transparent'
+                                                        : isActive
+                                                            ? 'bg-slate-900 text-white font-semibold cursor-pointer'
+                                                            : 'text-slate-700 hover:bg-slate-100 cursor-pointer bg-transparent'
+                                                }`}
+                                            >
+                                                <span className="flex items-center gap-2.5 min-w-0">
+                                                    <span className={`material-icons text-[17px] ${
+                                                        item.disabled ? 'text-slate-300' : isActive ? 'text-white' : 'text-slate-500'
+                                                    }`}>
+                                                        {item.icon}
+                                                    </span>
+                                                    <span className="truncate">{item.label}</span>
+                                                </span>
+                                                {isActive && (
+                                                    <span className="material-icons text-[15px] text-emerald-400">check</span>
+                                                )}
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                            )}
+                        </nav>
+                    );
+                })()}
+                <div className="flex items-center gap-3 flex-wrap shrink-0">
+                    <div className="header-item-editable">
+                        <span className="label">Responsável:</span>
+                        <span className="editable-field" contentEditable suppressContentEditableWarning onBlur={e => handleTextUpdate('', 'programmerName', e.currentTarget.textContent || '')}>{activeProject?.programmerName || 'Não definido'}</span>
+                    </div>
+                    <div className="zoom-control">
+                        <button
+                            type="button"
+                            onClick={() => setZoomLevels(prev => ({ ...prev, [currentPage]: Math.max(25, (prev[currentPage] || 100) - 5) }))}
+                            title="Diminuir zoom"
+                            className="inline-flex items-center justify-center w-6 h-6 rounded hover:bg-slate-200 text-slate-600 cursor-pointer border-0 bg-transparent"
+                        >
+                            <span className="material-icons text-[16px]">remove</span>
+                        </button>
+                        <input
+                            type="range"
+                            min="25"
+                            max="200"
+                            step="5"
+                            value={zoomLevels[currentPage] || 100}
+                            onChange={e => setZoomLevels(prev => ({ ...prev, [currentPage]: Number(e.target.value) }))}
+                            aria-label="Zoom do cronograma"
+                        />
+                        <button
+                            type="button"
+                            onClick={() => setZoomLevels(prev => ({ ...prev, [currentPage]: Math.min(200, (prev[currentPage] || 100) + 5) }))}
+                            title="Aumentar zoom"
+                            className="inline-flex items-center justify-center w-6 h-6 rounded hover:bg-slate-200 text-slate-600 cursor-pointer border-0 bg-transparent"
+                        >
+                            <span className="material-icons text-[16px]">add</span>
+                        </button>
+                        <span className="zoom-percentage tabular-nums">{zoomLevels[currentPage] || 100}%</span>
+                    </div>
                 </div>
-            </div>
-        </div>
+           </div>
+        </header>
         <div className="app-container">
             <div className="sidebar-overlay" onClick={() => setIsMobileNavVisible(false)}></div>
             {(!isSidebarCollapsed || isMobileNavVisible) && (
               <Sidebar 
-                handleUndo={handleUndo} handleRedo={handleRedo} historyIndex={historyIndex} historyLength={history.length}
                 handleSavePlan={handleSavePlan}
-                setImportModalOpen={setImportModalOpen} setSaveModalOpen={setisSaveModalOpen} setLoadModalOpen={setLoadModalOpen}
+                setImportModalOpen={setImportModalOpen}
                 handleSaveProject={handleSaveProject}
                 handleExportExcel={handleExportExcel} onExportPdfClick={() => setPrintModalOpen(true)}
                 handleExportTxt={handleExportTxt} onImportTxtClick={handleImportTxtClick}
@@ -2385,87 +2813,187 @@ export const App = () => {
                 hasSelection={!!selectionBlock}
                 handleShiftHoliday={handleShiftHoliday}
                 activeCell={activeCell}
-                handleSaveAndExit={handleSaveAndExit}
               />
             )}
-            <main className="main-content" ref={gridRef}>
+            <main className="main-content bg-slate-50" ref={gridRef}>
               {!activeProject ? (
                 <div className="no-project-view">
                     <span className="material-icons" style={{ fontSize: '4rem', color: '#94a3b8' }}>folder_off</span>
                     <h2>Nenhum Projeto Ativo</h2>
-                    <p>Crie um novo projeto ou carregue um existente para começar.</p>
+                    <p>Crie um novo projeto ou abra um existente para começar.</p>
                 </div>
               ) : (
                 <>
+                  {/* Faixa compacta de 4 KPIs executivos */}
+                  <div className="no-print bg-slate-50 border-b border-slate-200 px-4 py-2.5 shrink-0">
+                    <div className="flex items-center justify-between gap-2 mb-2 flex-wrap">
+                      <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+                        Indicadores do Cronograma
+                      </span>
+                      <div className="flex items-center gap-1.5">
+                        <label htmlFor="kpi-week-select" className="text-[11px] font-semibold text-slate-600">
+                          Semana:
+                        </label>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (kpiWeekOptions.length === 0) return;
+                            if (selectedKpiWeek === 'all') {
+                              setSelectedKpiWeek(kpiWeekOptions[0].value);
+                            } else {
+                              const idx = kpiWeekOptions.findIndex(w => w.value === selectedKpiWeek);
+                              if (idx > 0) setSelectedKpiWeek(kpiWeekOptions[idx - 1].value);
+                              else setSelectedKpiWeek('all');
+                            }
+                          }}
+                          title="Semana anterior"
+                          className="inline-flex items-center justify-center w-6 h-6 rounded-md bg-white border border-slate-200 text-slate-600 hover:bg-slate-100 cursor-pointer"
+                        >
+                          <span className="material-icons text-[15px]">chevron_left</span>
+                        </button>
+                        <select
+                          id="kpi-week-select"
+                          value={selectedKpiWeek}
+                          onChange={e => setSelectedKpiWeek(e.target.value)}
+                          className="px-2.5 py-1 text-xs font-medium bg-white border border-slate-200 rounded-md text-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-900/15 focus:border-slate-400 tabular-nums cursor-pointer"
+                        >
+                          <option value="all">Todas as semanas</option>
+                          {kpiWeekOptions.map(opt => (
+                            <option key={opt.value} value={opt.value}>
+                              {opt.label}
+                            </option>
+                          ))}
+                        </select>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (kpiWeekOptions.length === 0) return;
+                            if (selectedKpiWeek === 'all') {
+                              setSelectedKpiWeek(kpiWeekOptions[0].value);
+                            } else {
+                              const idx = kpiWeekOptions.findIndex(w => w.value === selectedKpiWeek);
+                              if (idx >= 0 && idx < kpiWeekOptions.length - 1) {
+                                setSelectedKpiWeek(kpiWeekOptions[idx + 1].value);
+                              }
+                            }
+                          }}
+                          disabled={selectedKpiWeek !== 'all' && kpiWeekOptions.findIndex(w => w.value === selectedKpiWeek) === kpiWeekOptions.length - 1}
+                          title="Próxima semana"
+                          className="inline-flex items-center justify-center w-6 h-6 rounded-md bg-white border border-slate-200 text-slate-600 hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+                        >
+                          <span className="material-icons text-[15px]">chevron_right</span>
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                      <div className="bg-white border border-slate-200 rounded-xl shadow-sm px-3.5 py-2.5 flex items-center justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 m-0 truncate">Atividades Programadas</p>
+                          <p className="text-xl font-bold text-slate-900 tabular-nums leading-tight mt-0.5 mb-0">{executiveKpis.totalActivities}</p>
+                          <p className="text-[11px] text-slate-500 tabular-nums mt-0.5 mb-0 truncate">
+                            {executiveKpis.programadoCount} pendentes · {executiveKpis.totalMarks} alocações
+                          </p>
+                        </div>
+                        <div className="w-9 h-9 rounded-lg bg-slate-100 text-slate-700 flex items-center justify-center shrink-0">
+                          <span className="material-icons text-[20px]">assignment</span>
+                        </div>
+                      </div>
+
+                      <div className="bg-white border border-slate-200 rounded-xl shadow-sm px-3.5 py-2.5 flex items-center justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 m-0 truncate">Taxa de Realização (%)</p>
+                          <p className="text-xl font-bold text-emerald-700 tabular-nums leading-tight mt-0.5 mb-0">{executiveKpis.completionRate}%</p>
+                          <p className="text-[11px] text-slate-500 tabular-nums mt-0.5 mb-0 truncate">
+                            {executiveKpis.realizadoCount} de {executiveKpis.totalMarks} concluídas
+                          </p>
+                        </div>
+                        <div className="w-9 h-9 rounded-lg bg-emerald-50 text-emerald-700 flex items-center justify-center shrink-0">
+                          <span className="material-icons text-[20px]">task_alt</span>
+                        </div>
+                      </div>
+
+                      <div className="bg-white border border-slate-200 rounded-xl shadow-sm px-3.5 py-2.5 flex items-center justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 m-0 truncate">Efetivo Alocado</p>
+                          <p className="text-xl font-bold text-slate-900 tabular-nums leading-tight mt-0.5 mb-0">{executiveKpis.dailyAllocatedTotal}</p>
+                          <p className="text-[11px] text-slate-500 tabular-nums mt-0.5 mb-0 truncate">
+                            {selectedKpiWeek === 'all' ? 'Pico semanal disp.:' : 'Disponível na sem.:'} {executiveKpis.weeklyAvailable} prof.
+                          </p>
+                        </div>
+                        <div className="w-9 h-9 rounded-lg bg-amber-50 text-amber-700 flex items-center justify-center shrink-0">
+                          <span className="material-icons text-[20px]">groups</span>
+                        </div>
+                      </div>
+
+                      <div className="bg-white border border-slate-200 rounded-xl shadow-sm px-3.5 py-2.5 flex items-center justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 m-0 truncate">Conflitos de Máquina</p>
+                          <p className={`text-xl font-bold tabular-nums leading-tight mt-0.5 mb-0 ${executiveKpis.machineConflicts > 0 ? 'text-rose-700' : 'text-slate-900'}`}>
+                            {executiveKpis.machineConflicts}
+                          </p>
+                          <p className={`text-[11px] tabular-nums mt-0.5 mb-0 truncate ${executiveKpis.machineConflicts > 0 ? 'text-rose-600 font-medium' : 'text-slate-500'}`}>
+                            {executiveKpis.machineConflicts > 0 ? 'Conflito de agenda detectado' : `${executiveKpis.totalMachines} máquinas cadastradas`}
+                          </p>
+                        </div>
+                        <div className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 ${executiveKpis.machineConflicts > 0 ? 'bg-rose-50 text-rose-700' : 'bg-slate-100 text-slate-700'}`}>
+                          <span className="material-icons text-[20px]">precision_manufacturing</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
                   {currentPage === 'schedule' && (
                     <>
-                      <div className="project-detail-header" style={{ display: 'flex', gap: '24px', padding: '16px', backgroundColor: '#fff', borderBottom: '1px solid #e2e8f0', marginBottom: '8px', zIndex: 10, flexWrap: 'wrap', alignItems: 'center' }}>
-                        <div style={{ flex: 1, minWidth: '200px' }}>
-                            <label style={{ display: 'block', fontSize: '0.75rem', color: '#64748b', fontWeight: '600', textTransform: 'uppercase', marginBottom: '4px' }}>Obra / Projeto</label>
-                            <div contentEditable suppressContentEditableWarning onBlur={e => handleTextUpdate('', 'name', e.currentTarget.textContent || '')} style={{ fontSize: '1.25rem', fontWeight: 'bold', color: '#1e293b', borderBottom: '1px dashed #cbd5e1', paddingBottom: '2px' }}>{activeProject.name}</div>
-                        </div>
-                        <div style={{ width: '200px' }}>
-                            <label style={{ display: 'block', fontSize: '0.75rem', color: '#64748b', fontWeight: '600', textTransform: 'uppercase', marginBottom: '4px' }}>Programador</label>
-                            <div contentEditable suppressContentEditableWarning onBlur={e => handleTextUpdate('', 'programmerName', e.currentTarget.textContent || '')} style={{ fontWeight: '500', color: '#334155', borderBottom: '1px dashed #cbd5e1' }}>{activeProject.programmerName || 'Não definido'}</div>
-                        </div>
-                        <RichTextToolbar />
-                        <div style={{ width: '200px' }}>
-                            <label style={{ display: 'block', fontSize: '0.75rem', color: '#64748b', fontWeight: '600', textTransform: 'uppercase', marginBottom: '4px' }}>Buscar Atividade</label>
-                            <input
-                                type="text"
-                                value={activitySearchText}
-                                onChange={(e) => setActivitySearchText(e.target.value)}
-                                placeholder="ex: corte, ensaio..."
-                                style={{
-                                    width: '100%',
-                                    padding: '4px 8px',
-                                    border: '1px solid #cbd5e1',
-                                    borderRadius: '4px',
-                                    fontSize: '0.875rem'
-                                }}
-                            />
-                        </div>
-                        <div style={{ width: '150px', textAlign: 'right' }}>
-                            <label style={{ display: 'block', fontSize: '0.75rem', color: '#64748b', fontWeight: '600', textTransform: 'uppercase', marginBottom: '4px' }}>Último Salvamento</label>
-                            <div style={{ color: '#64748b' }}>{lastSavedTime ? new Date(lastSavedTime).toLocaleString('pt-BR') : 'Aguardando...'}</div>
-                        </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <button
-                                onClick={() => {
-                                    const newState = !isAutoSaveEnabled;
-                                    setIsAutoSaveEnabled(newState);
-                                    addToast(newState ? 'Salvamento Automático Ativado' : 'Salvamento Automático Desativado', newState ? 'success' : 'error');
-                                }}
-                                className="control-button"
-                                style={{ display: 'flex', alignItems: 'center', gap: '4px', backgroundColor: isAutoSaveEnabled ? '#e0e7ff' : '#fee2e2', color: isAutoSaveEnabled ? '#4338ca' : '#b91c1c', border: '1px solid', borderColor: isAutoSaveEnabled ? '#818cf8' : '#fca5a5', height: 'fit-content' }}
-                                title={isAutoSaveEnabled ? "Desativar salvamento automático" : "Ativar salvamento automático"}
-                            >
-                                <span className="material-icons" style={{ fontSize: '18px' }}>{isAutoSaveEnabled ? 'autorenew' : 'sync_disabled'}</span>
-                                {isAutoSaveEnabled ? 'Auto-Save: ON' : 'Auto-Save: OFF'}
-                            </button>
+                      <div className="project-detail-header bg-white border-b border-slate-200 px-4 py-2.5 flex flex-wrap items-center justify-between gap-3 z-10 shrink-0">
+                        <RichTextToolbar
+                            handleUndo={handleUndo}
+                            handleRedo={handleRedo}
+                            canUndo={historyIndex > 0}
+                            canRedo={historyIndex < history.length - 1}
+                        />
+                        <div className="flex items-center gap-2.5 flex-wrap">
+                            <div className="relative">
+                                <span className="material-icons text-slate-400 text-[16px] absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none">search</span>
+                                <input
+                                    type="text"
+                                    value={activitySearchText}
+                                    onChange={(e) => setActivitySearchText(e.target.value)}
+                                    placeholder="Buscar atividade..."
+                                    className="pl-8 pr-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-800 placeholder-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-slate-900/15 focus:border-slate-400 w-48"
+                                />
+                            </div>
                             {(Object.values(activeFilters).some((s: any) => s && s.size > 0) || activitySearchText) && (
                                 <button
+                                    type="button"
                                     onClick={() => {
                                         setActiveFilters({});
                                         setActivitySearchText('');
                                     }}
-                                    className="control-button"
-                                    style={{ display: 'flex', alignItems: 'center', gap: '4px', backgroundColor: '#fee2e2', color: '#b91c1c', border: '1px solid', borderColor: '#fca5a5', height: 'fit-content' }}
+                                    className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-rose-50 text-rose-700 border border-rose-200 hover:bg-rose-100 text-xs font-semibold cursor-pointer whitespace-nowrap"
                                     title="Limpar todos os filtros ativos e busca"
                                 >
-                                    <span className="material-icons" style={{ fontSize: '18px' }}>filter_alt_off</span>
+                                    <span className="material-icons text-[15px]">filter_alt_off</span>
                                     Limpar Filtros
                                 </button>
                             )}
                             <button
+                                type="button"
                                 onClick={() => setShowHiddenActivities(prev => !prev)}
-                                className="control-button"
-                                style={{ display: 'flex', alignItems: 'center', gap: '4px', backgroundColor: showHiddenActivities ? '#e0e7ff' : '#f1f5f9', color: showHiddenActivities ? '#4338ca' : '#475569', border: '1px solid', borderColor: showHiddenActivities ? '#818cf8' : '#cbd5e1', height: 'fit-content' }}
+                                className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg border text-xs font-semibold cursor-pointer whitespace-nowrap transition-colors ${
+                                    showHiddenActivities
+                                        ? 'bg-slate-900 text-white border-slate-900'
+                                        : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+                                }`}
                                 title={showHiddenActivities ? "Ocultar atividades invisíveis" : "Mostrar atividades ocultas"}
                             >
-                                <span className="material-icons" style={{ fontSize: '18px' }}>{showHiddenActivities ? 'visibility' : 'visibility_off'}</span>
+                                <span className="material-icons text-[15px]">{showHiddenActivities ? 'visibility' : 'visibility_off'}</span>
                                 {showHiddenActivities ? "Esconder Ocultos" : "Mostrar Ocultos"}
                             </button>
+                            <span className="text-[11px] text-slate-500 tabular-nums hidden xl:inline-flex items-center gap-1 pl-2 border-l border-slate-200">
+                                <span className="material-icons text-[14px] text-slate-400">schedule</span>
+                                Último salvamento: <strong className={hasUnsavedChanges ? 'text-amber-700' : 'text-slate-700'}>{lastSavedTime ? new Date(lastSavedTime).toLocaleString('pt-BR') : 'Aguardando...'}</strong>
+                            </span>
                         </div>
                       </div>
                       <div className="table-wrapper">
@@ -2546,11 +3074,37 @@ export const App = () => {
                   </>
                   )}
                   {currentPage === 'dailySummary' && <DailySummaryView data={summaryData} dates={dates} onTextUpdate={handleSummaryTextUpdate} onAddItem={handleSummaryAddItem} onDeleteItem={(id, type) => handleSummaryDeleteItem(id, type)} onSyncWithSchedule={() => dispatchSummary({ type: 'LOAD_DATA', payload: liveData })} />}
-                  {currentPage === 'dashboard' && <DashboardView data={liveData} title={title} programmerName={activeProject.programmerName} dynamicColumns={activeProject.dynamicColumns}/>}
+                  {currentPage === 'dashboard' && (
+                    <DashboardView
+                      data={liveData}
+                      project={activeProject}
+                      setProject={setActiveProject}
+                      dates={dates}
+                      title={title}
+                      programmerName={activeProject.programmerName}
+                      dynamicColumns={activeProject.dynamicColumns}
+                      initialTab="schedule"
+                      onMarkActivityDone={handleDashboardMarkDone}
+                      onRescheduleActivity={handleDashboardReschedule}
+                    />
+                  )}
                   {currentPage === 'comparison' && <ComparisonView savedPlan={savedPlan} liveData={liveData} dates={dates} columnWidths={comparisonTableColumnWidths} onResizeStart={handleResizeStart} stickyColumnPositions={stickyColumnPositions} title={title} dynamicColumns={activeProject.dynamicColumns}/>}
                   {currentPage === 'manpower' && <ManpowerAllocationView project={activeProject} setProject={setActiveProject} dates={dates} title={title} zoomLevel={zoomLevels.manpower} />}
                   {currentPage === 'dailyAllocation' && <DailyAllocationView project={activeProject} setProject={setActiveProject} dates={dates} filteredData={filteredData} title={title} dateColumnWidth={effectiveDateColumnWidth} zoomLevel={zoomLevels.dailyAllocation} />}
-                  {currentPage === 'manpowerDashboard' && <ManpowerDashboardView project={activeProject} dates={dates} title={title} programmerName={activeProject.programmerName}/>}
+                  {currentPage === 'manpowerDashboard' && (
+                    <DashboardView
+                      data={liveData}
+                      project={activeProject}
+                      setProject={setActiveProject}
+                      dates={dates}
+                      title={title}
+                      programmerName={activeProject.programmerName}
+                      dynamicColumns={activeProject.dynamicColumns}
+                      initialTab="manpower"
+                      onMarkActivityDone={handleDashboardMarkDone}
+                      onRescheduleActivity={handleDashboardReschedule}
+                    />
+                  )}
                   {currentPage === 'machines' && <MachineListView project={activeProject} setProject={setActiveProject} ai={ai} addToast={addToast} zoomLevel={zoomLevels.machines} />}
                   {currentPage === 'dailyMachineAllocation' && <DailyMachineAllocationView project={activeProject} setProject={setActiveProject} dates={dates} filteredData={filteredData} title={title} dateColumnWidth={effectiveDateColumnWidth} allMachineAllocationsGlobal={allMachineAllocationsGlobal} zoomLevel={zoomLevels.dailyMachineAllocation} />}
                   </>

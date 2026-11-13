@@ -1328,6 +1328,342 @@ export const exportManpowerDashboardToPdfAgent = (chartImage: string | null, tit
     doc.save(`Dashboard_MO_${title.replace(/ /g, '_')}.pdf`);
 };
 
+const compositeCanvasForPdf = (canvas: HTMLCanvasElement | null): string | null => {
+    if (!canvas) return null;
+    try {
+        const offscreen = document.createElement('canvas');
+        offscreen.width = canvas.width || 800;
+        offscreen.height = canvas.height || 400;
+        const ctx = offscreen.getContext('2d');
+        if (!ctx) return canvas.toDataURL('image/png', 1.0);
+        ctx.fillStyle = '#0f172a';
+        ctx.fillRect(0, 0, offscreen.width, offscreen.height);
+        ctx.drawImage(canvas, 0, 0, offscreen.width, offscreen.height);
+        return offscreen.toDataURL('image/png', 1.0);
+    } catch (e) {
+        console.error('Error compositing canvas for PDF:', e);
+        return null;
+    }
+};
+
+const drawDashboardReportHeader = (
+    doc: jsPDF,
+    viewTitle: string,
+    projectTitle: string,
+    programmerName: string,
+    filtersSummary: string
+): number => {
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const margin = 14;
+    const now = new Date();
+    const emissionStr = `Emitido em: ${now.toLocaleDateString('pt-BR')} às ${now.toLocaleTimeString('pt-BR', {
+        hour: '2-digit',
+        minute: '2-digit',
+    })}`;
+
+    doc.setFillColor(15, 23, 42); // Slate-900
+    doc.rect(0, 0, pageWidth, 34, 'F');
+
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(14);
+    doc.setFont('helvetica', 'bold');
+    doc.text(viewTitle, margin, 13);
+
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(203, 213, 225); // Slate-300
+    doc.text(`Projeto: ${projectTitle || 'Sem Título'}  |  Responsável: ${programmerName || 'Não informado'}`, margin, 21);
+    doc.text(emissionStr, pageWidth - margin, 13, { align: 'right' });
+
+    // Filters bar
+    doc.setFillColor(241, 245, 249); // Slate-100
+    doc.rect(margin, 38, pageWidth - margin * 2, 11, 'F');
+    doc.setDrawColor(203, 213, 225);
+    doc.rect(margin, 38, pageWidth - margin * 2, 11, 'S');
+    doc.setTextColor(30, 41, 59);
+    doc.setFontSize(8);
+    doc.setFont('helvetica', 'bold');
+    const filterLines = doc.splitTextToSize(`Filtros aplicados: ${filtersSummary}`, pageWidth - margin * 2 - 6);
+    doc.text(filterLines[0] || `Filtros aplicados: ${filtersSummary}`, margin + 3, 45);
+
+    return 54;
+};
+
+export interface ScheduleDashboardPdfPayload {
+    title: string;
+    programmerName: string;
+    filtersSummary: string;
+    kpis: {
+        adherenceRate: string;
+        adherenceDelta: string;
+        targetAdherence: number;
+        totalCarteira: number;
+        totalRealizado: number;
+        totalNaoRealizado: number;
+        totalCancelado: number;
+        totalProgramadoOpen: number;
+    };
+    canvases: {
+        daily: HTMLCanvasElement | null;
+        doughnut: HTMLCanvasElement | null;
+        sector: HTMLCanvasElement | null;
+    };
+    faRows: { faLabel: string; sector: string; ok: number; active: number; pending: number; pct: string }[];
+    actionRows: { dateBr: string; faLabel: string; sector: string; taskTitle: string; activityName: string; statusLabel: string }[];
+}
+
+export const exportScheduleDashboardPdf = (payload: ScheduleDashboardPdfPayload) => {
+    const doc = new jsPDF({ orientation: 'portrait', format: 'a4' });
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const pageHeight = doc.internal.pageSize.getHeight();
+    const margin = 14;
+
+    let cursorY = drawDashboardReportHeader(
+        doc,
+        'Dashboard Gerencial — Programação & Aderência',
+        payload.title,
+        payload.programmerName,
+        payload.filtersSummary
+    );
+
+    // 1. KPI Summary Table
+    autoTable(doc, {
+        startY: cursorY,
+        margin: { left: margin, right: margin },
+        head: [['Aderência Efetiva', 'Desvio vs Meta', 'Carteira', 'Executadas (OK)', 'Não Realizadas (N)', 'Canceladas (C)']],
+        body: [[
+            payload.kpis.adherenceRate,
+            payload.kpis.adherenceDelta,
+            `${payload.kpis.totalCarteira} (${payload.kpis.totalProgramadoOpen} X)`,
+            payload.kpis.totalRealizado,
+            payload.kpis.totalNaoRealizado,
+            payload.kpis.totalCancelado,
+        ]],
+        theme: 'grid',
+        headStyles: { fillColor: [30, 41, 59], textColor: [255, 255, 255], fontSize: 8, halign: 'center' },
+        bodyStyles: { fontSize: 8.5, halign: 'center', fontStyle: 'bold', textColor: [15, 23, 42] },
+    });
+    cursorY = (doc as any).lastAutoTable.finalY + 6;
+
+    // 2. Charts (Daily + Doughnut side by side, then Sector below)
+    const dailyImg = compositeCanvasForPdf(payload.canvases.daily);
+    const doughnutImg = compositeCanvasForPdf(payload.canvases.doughnut);
+    const sectorImg = compositeCanvasForPdf(payload.canvases.sector);
+
+    const contentW = pageWidth - margin * 2;
+    if (dailyImg || doughnutImg) {
+        const rowH = 56;
+        if (cursorY + rowH > pageHeight - margin) {
+            doc.addPage();
+            cursorY = margin;
+        }
+        if (dailyImg && doughnutImg) {
+            const leftW = contentW * 0.58;
+            const rightW = contentW * 0.39;
+            doc.addImage(dailyImg, 'PNG', margin, cursorY, leftW, rowH);
+            doc.addImage(doughnutImg, 'PNG', margin + leftW + contentW * 0.03, cursorY, rightW, rowH);
+        } else if (dailyImg) {
+            doc.addImage(dailyImg, 'PNG', margin, cursorY, contentW, rowH);
+        } else if (doughnutImg) {
+            doc.addImage(doughnutImg, 'PNG', margin, cursorY, contentW * 0.5, rowH);
+        }
+        cursorY += rowH + 6;
+    }
+
+    if (sectorImg) {
+        const secH = 62;
+        if (cursorY + secH > pageHeight - margin) {
+            doc.addPage();
+            cursorY = margin;
+        }
+        doc.addImage(sectorImg, 'PNG', margin, cursorY, contentW, secH);
+        cursorY += secH + 6;
+    }
+
+    // 3. FA Summary Table
+    if (payload.faRows.length > 0) {
+        if (cursorY + 25 > pageHeight - margin) {
+            doc.addPage();
+            cursorY = margin;
+        }
+        doc.setFontSize(10);
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(15, 23, 42);
+        doc.text('Atingimento por Folha de Acompanhamento (FA)', margin, cursorY);
+        cursorY += 3;
+
+        autoTable(doc, {
+            startY: cursorY,
+            margin: { left: margin, right: margin },
+            head: [['FA', 'Setor Principal', 'OK / Ativas', 'Pendências', '% Atingido']],
+            body: payload.faRows.slice(0, 20).map(r => [r.faLabel, r.sector, `${r.ok}/${r.active}`, r.pending, r.pct]),
+            theme: 'striped',
+            headStyles: { fillColor: [30, 41, 59], textColor: [255, 255, 255], fontSize: 8 },
+            bodyStyles: { fontSize: 7.5 },
+        });
+        cursorY = (doc as any).lastAutoTable.finalY + 8;
+    }
+
+    // 4. Action Plan Table (N and C)
+    if (cursorY + 25 > pageHeight - margin) {
+        doc.addPage();
+        cursorY = margin;
+    }
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(15, 23, 42);
+    doc.text(`Plano de Ação — Gargalos Críticos (N e C) (${payload.actionRows.length})`, margin, cursorY);
+    cursorY += 3;
+
+    autoTable(doc, {
+        startY: cursorY,
+        margin: { left: margin, right: margin },
+        head: [['Data', 'FA', 'Setor', 'Tarefa Principal', 'Atividade', 'Status']],
+        body:
+            payload.actionRows.length > 0
+                ? payload.actionRows.map(r => [r.dateBr, r.faLabel, r.sector, r.taskTitle, r.activityName, r.statusLabel])
+                : [['—', '—', '—', 'Nenhuma atividade N ou C nos filtros atuais.', '—', '—']],
+        theme: 'striped',
+        headStyles: { fillColor: [153, 27, 27], textColor: [255, 255, 255], fontSize: 8 },
+        bodyStyles: { fontSize: 7.5 },
+    });
+
+    const safeName = (payload.title || 'Projeto').replace(/[^\w\-]+/g, '_');
+    doc.save(`Dashboard_Programacao_${safeName}.pdf`);
+};
+
+export interface ManpowerDashboardPdfPayload {
+    title: string;
+    programmerName: string;
+    filtersSummary: string;
+    kpis: {
+        allocatedVsPlanned: string;
+        occupancyBadge: string;
+        netDeviation: string;
+        worstDeficitInfo: string;
+        shift2Coverage: string;
+        shift2PctInfo: string;
+        peakDailyValue: string;
+        peakDailyInfo: string;
+    };
+    canvases: {
+        histogram: HTMLCanvasElement | null;
+        category: HTMLCanvasElement | null;
+        roles: HTMLCanvasElement | null;
+    };
+    tableRows: {
+        role: string;
+        category: string;
+        planned: number;
+        allocated: number;
+        manDays: number;
+        deviationLabel: string;
+        statusLabel: string;
+    }[];
+}
+
+export const exportManpowerDashboardPdf = (payload: ManpowerDashboardPdfPayload) => {
+    const doc = new jsPDF({ orientation: 'portrait', format: 'a4' });
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const pageHeight = doc.internal.pageSize.getHeight();
+    const margin = 14;
+
+    let cursorY = drawDashboardReportHeader(
+        doc,
+        'Dashboard Gerencial — Mão de Obra (MO)',
+        payload.title,
+        payload.programmerName,
+        payload.filtersSummary
+    );
+
+    // 1. 4 KPIs Summary
+    autoTable(doc, {
+        startY: cursorY,
+        margin: { left: margin, right: margin },
+        head: [['Alocado vs. Planejado', 'Déficit / Superávit', 'Cobertura 2º Turno', 'Pico Diário Histograma']],
+        body: [[
+            `${payload.kpis.allocatedVsPlanned}\n(${payload.kpis.occupancyBadge})`,
+            `${payload.kpis.netDeviation}\n(${payload.kpis.worstDeficitInfo})`,
+            `${payload.kpis.shift2Coverage}\n(${payload.kpis.shift2PctInfo})`,
+            `${payload.kpis.peakDailyValue}\n(${payload.kpis.peakDailyInfo})`,
+        ]],
+        theme: 'grid',
+        headStyles: { fillColor: [30, 41, 59], textColor: [255, 255, 255], fontSize: 8, halign: 'center' },
+        bodyStyles: { fontSize: 8, halign: 'center', fontStyle: 'bold', textColor: [15, 23, 42] },
+    });
+    cursorY = (doc as any).lastAutoTable.finalY + 6;
+
+    // 2. Charts (Histogram + Category Doughnut side by side, then Roles bar chart)
+    const histImg = compositeCanvasForPdf(payload.canvases.histogram);
+    const catImg = compositeCanvasForPdf(payload.canvases.category);
+    const rolesImg = compositeCanvasForPdf(payload.canvases.roles);
+    const contentW = pageWidth - margin * 2;
+
+    if (histImg || catImg) {
+        const rowH = 56;
+        if (cursorY + rowH > pageHeight - margin) {
+            doc.addPage();
+            cursorY = margin;
+        }
+        if (histImg && catImg) {
+            const leftW = contentW * 0.58;
+            const rightW = contentW * 0.39;
+            doc.addImage(histImg, 'PNG', margin, cursorY, leftW, rowH);
+            doc.addImage(catImg, 'PNG', margin + leftW + contentW * 0.03, cursorY, rightW, rowH);
+        } else if (histImg) {
+            doc.addImage(histImg, 'PNG', margin, cursorY, contentW, rowH);
+        } else if (catImg) {
+            doc.addImage(catImg, 'PNG', margin, cursorY, contentW * 0.5, rowH);
+        }
+        cursorY += rowH + 6;
+    }
+
+    if (rolesImg) {
+        const rolesH = 66;
+        if (cursorY + rolesH > pageHeight - margin) {
+            doc.addPage();
+            cursorY = margin;
+        }
+        doc.addImage(rolesImg, 'PNG', margin, cursorY, contentW, rolesH);
+        cursorY += rolesH + 6;
+    }
+
+    // 3. Balanceamento & Desvios de Efetivo Table
+    if (cursorY + 25 > pageHeight - margin) {
+        doc.addPage();
+        cursorY = margin;
+    }
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(15, 23, 42);
+    doc.text('Balanceamento & Desvios de Efetivo', margin, cursorY);
+    cursorY += 3;
+
+    autoTable(doc, {
+        startY: cursorY,
+        margin: { left: margin, right: margin },
+        head: [['Cargo', 'Categoria', 'Planejado', 'Alocado (Pico)', 'H-Dia', 'Desvio', 'Situação']],
+        body:
+            payload.tableRows.length > 0
+                ? payload.tableRows.map(r => [
+                      r.role,
+                      r.category,
+                      r.planned,
+                      r.allocated,
+                      r.manDays,
+                      r.deviationLabel,
+                      r.statusLabel,
+                  ])
+                : [['—', '—', 0, 0, 0, '0', 'Sem dados para os filtros selecionados']],
+        theme: 'striped',
+        headStyles: { fillColor: [30, 41, 59], textColor: [255, 255, 255], fontSize: 8 },
+        bodyStyles: { fontSize: 8 },
+    });
+
+    const safeName = (payload.title || 'Projeto').replace(/[^\w\-]+/g, '_');
+    doc.save(`Dashboard_MO_${safeName}.pdf`);
+};
+
 export const exportDailySummaryToWordAgent = async (
     viewMode: 'daily' | 'weekly',
     startDate: string,

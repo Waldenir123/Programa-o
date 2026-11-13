@@ -1,5 +1,5 @@
 import React, { useMemo, useState, useEffect } from 'react';
-import { ScheduleData, Status, STATUS_LABELS, STATUS_COLOR_MAP } from '../state/types';
+import { ScheduleData, Status, STATUS_LABELS, STATUS_BADGE_CLASSES } from '../state/types';
 import { formatDate, cleanText } from '../utils/dataUtils';
 
 interface DailySummaryViewProps {
@@ -295,9 +295,6 @@ export const DailySummaryView: React.FC<DailySummaryViewProps> = ({ data, dates,
                     >
                         <span className="material-icons" style={{ fontSize: '18px' }}>add</span> Adicionar Grupo
                     </button>
-                    <button onClick={() => window.print()} style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '8px 16px', backgroundColor: '#10b981', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }} className="no-print">
-                        <span className="material-icons" style={{ fontSize: '18px' }}>print</span> Imprimir
-                    </button>
                     
                     <div>
                         <label style={{ marginRight: '8px', fontWeight: 'bold', color: '#475569' }}>Setor:</label>
@@ -495,16 +492,7 @@ export const DailySummaryView: React.FC<DailySummaryViewProps> = ({ data, dates,
                                                                     dangerouslySetInnerHTML={{ __html: cleanText(act.name) }}
                                                                 />
                                                             </div>
-                                                            <span style={{ 
-                                                                padding: '4px 8px', 
-                                                                borderRadius: '12px', 
-                                                                fontSize: '0.75rem', 
-                                                                fontWeight: 'bold',
-                                                                backgroundColor: STATUS_COLOR_MAP[act.status],
-                                                                color: '#1e293b',
-                                                                whiteSpace: 'nowrap',
-                                                                marginLeft: '16px'
-                                                            }}>
+                                                            <span className={`ml-3 px-2 py-0.5 rounded-md text-xs font-semibold whitespace-nowrap ${STATUS_BADGE_CLASSES[act.status]}`}>
                                                                 {STATUS_LABELS[act.status]}
                                                             </span>
                                                         </li>
@@ -605,16 +593,7 @@ export const DailySummaryView: React.FC<DailySummaryViewProps> = ({ data, dates,
                                                                                 dangerouslySetInnerHTML={{ __html: cleanText(act.name) }}
                                                                             />
                                                                         </div>
-                                                                        <span style={{ 
-                                                                            padding: '2px 6px', 
-                                                                            borderRadius: '8px', 
-                                                                            fontSize: '0.7rem', 
-                                                                            fontWeight: 'bold',
-                                                                            backgroundColor: STATUS_COLOR_MAP[act.status],
-                                                                            color: '#1e293b',
-                                                                            whiteSpace: 'nowrap',
-                                                                            marginLeft: '12px'
-                                                                        }}>
+                                                                        <span className={`ml-3 px-2 py-0.5 rounded-md text-[11px] font-semibold whitespace-nowrap ${STATUS_BADGE_CLASSES[act.status]}`}>
                                                                             {STATUS_LABELS[act.status]}
                                                                         </span>
                                                                     </li>

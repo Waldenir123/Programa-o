@@ -348,7 +348,7 @@ export const DailyAllocationView: React.FC<{
                     <thead>
                         <tr>
                             <th colSpan={3} rowSpan={3} className="col-sticky col-sticky-1 summary-header" style={{ width: fixedColumnWidths.slice(0, 3).reduce((a, b) => a + b, 0), left: 0 }}>
-                                {title === 'Manpower' ? 'Resumo de Alocação Diária' : 'Resumo de Alocação de Máquinas'}
+                                Resumo de Alocação de Mão de Obra
                             </th>
                             {weekSpans.map(span => <th key={`summary-week-${span.week}`} colSpan={span.count} className="week-header">Semana {span.week}</th>)}
                         </tr>
@@ -460,7 +460,7 @@ export const DailyAllocationView: React.FC<{
                     <h2>Alocação Diária de Mão de Obra</h2>
                      <div className="view-controls">
                         <button className="control-button" onClick={handleExport}>
-                            <span className="material-icons">print</span> Imprimir Alocação
+                            <span className="material-icons">print</span> Imprimir
                         </button>
                     </div>
                 </div>

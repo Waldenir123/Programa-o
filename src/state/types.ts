@@ -18,16 +18,22 @@ export const STATUS_CLASS_MAP: Record<Status, string> = {
     [Status.NaoRealizado]: 'nao-realizado',
 };
 export const STATUS_COLOR_MAP: Record<Status, string> = {
-    [Status.Programado]: '#fef08a',
-    [Status.Realizado]: '#bbf7d0',
-    [Status.Cancelado]: '#bfdbfe',
-    [Status.NaoRealizado]: '#fecaca',
+    [Status.Programado]: '#fef3c7',     // Amber-100
+    [Status.Realizado]: '#d1fae5',      // Emerald-100
+    [Status.Cancelado]: '#dfe6f0',      // Slate-Blue tint
+    [Status.NaoRealizado]: '#ffe4e6',   // Rose-100
 };
 export const STATUS_COLOR_MAP_DARK: Record<Status, string> = {
-    [Status.Programado]: '#ca8a04', // Dark Yellow
-    [Status.Realizado]: '#15803d', // Dark Green
-    [Status.Cancelado]: '#2563eb', // Dark Blue
-    [Status.NaoRealizado]: '#dc2626', // Dark Red
+    [Status.Programado]: '#b45309',     // Amber-700
+    [Status.Realizado]: '#047857',      // Emerald-700
+    [Status.Cancelado]: '#475569',      // Slate-600
+    [Status.NaoRealizado]: '#be123c',   // Rose-700
+};
+export const STATUS_BADGE_CLASSES: Record<Status, string> = {
+    [Status.Programado]: 'bg-amber-100 text-amber-800 border border-amber-200',
+    [Status.Realizado]: 'bg-emerald-100 text-emerald-800 border border-emerald-200',
+    [Status.Cancelado]: 'bg-slate-200/80 text-slate-700 border border-slate-300',
+    [Status.NaoRealizado]: 'bg-rose-100 text-rose-800 border border-rose-200',
 };
 export const STATUS_CYCLE: Status[] = [Status.Programado, Status.Realizado, Status.Cancelado, Status.NaoRealizado];
 
